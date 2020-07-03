@@ -59,8 +59,8 @@ static Enum* FindEnum(String name, Scope* scope)
 	return null;
 }
 
-static Type ParseType(Ast_TypeExpression* ast_type, Scope* scope, Semantic* semantic);
-static BaseType ParseBaseType(Ast_TypeExpression* ast_type, Scope* scope, Semantic* semantic);
+static Type ParseType(Ast_Type* ast_type, Scope* scope, Semantic* semantic);
+static BaseType ParseBaseType(Ast_Type* ast_type, Scope* scope, Semantic* semantic);
 
 static bool Compare(Type a, Type b);
 
@@ -85,110 +85,15 @@ static bool Compare(Type a, Type b)
 	return Compare(a.specifiers, b.specifiers) && Compare(a.base_type, b.base_type);
 }
 
-static BaseType ParseBaseType(Ast_TypeExpression* ast_type, Scope* scope, Semantic* semantic)
+static BaseType ParseBaseType(Ast_Type* ast_type, Scope* scope, Semantic* semantic)
 {
 	BaseType base_type;
-
-	if (ast_type->kind == AST_TYPE_EXPRESSION_PRIMITIVE)
-	{
-		base_type.kind = BASETYPE_PRIMITIVE;
-
-		if      (ast_type->token->kind == Token_Bool)    base_type.primitive = PRIMITIVE_BOOL;
-		else if (ast_type->token->kind == Token_Uint)    base_type.primitive = PRIMITIVE_UINT;
-		else if (ast_type->token->kind == Token_Uint8)   base_type.primitive = PRIMITIVE_UINT8;
-		else if (ast_type->token->kind == Token_Uint16)  base_type.primitive = PRIMITIVE_UINT16;
-		else if (ast_type->token->kind == Token_Uint32)  base_type.primitive = PRIMITIVE_UINT32;
-		else if (ast_type->token->kind == Token_Uint64)  base_type.primitive = PRIMITIVE_UINT64;
-		else if (ast_type->token->kind == Token_Int)     base_type.primitive = PRIMITIVE_INT;
-		else if (ast_type->token->kind == Token_Int8)    base_type.primitive = PRIMITIVE_INT8;
-		else if (ast_type->token->kind == Token_Int16)   base_type.primitive = PRIMITIVE_INT16;
-		else if (ast_type->token->kind == Token_Int32)   base_type.primitive = PRIMITIVE_INT32;
-		else if (ast_type->token->kind == Token_Int64)   base_type.primitive = PRIMITIVE_INT64;
-		else if (ast_type->token->kind == Token_Float16) base_type.primitive = PRIMITIVE_FLOAT16;
-		else if (ast_type->token->kind == Token_Float32) base_type.primitive = PRIMITIVE_FLOAT32;
-		else if (ast_type->token->kind == Token_Float64) base_type.primitive = PRIMITIVE_FLOAT64;
-	}
-	else if (ast_type->kind == AST_TYPE_EXPRESSION_FUNCTION)
-	{
-		base_type.kind = BASETYPE_FUNCTION;
-		base_type.input_params = semantic->info.stack.CreateArray<Type>(ast_type->input_params.count);
-
-		for (u32 i = 0; i < base_type.input_params.count; i++)
-		{
-			base_type.input_params[i] = ParseType(ast_type->input_params[i], scope, semantic);
-		}
-
-		base_type.output = null;
-
-		if (ast_type->output_type)
-		{
-			base_type.output = semantic->info.stack.Allocate<Type>();
-			*base_type.output = ParseType(ast_type->output_type, scope, semantic);
-		}
-	}
-	else if (ast_type->kind == AST_TYPE_EXPRESSION_USERTYPE)
-	{
-		if (Struct* s = FindStruct(ast_type->token->info.string, scope))
-		{
-			base_type.kind = BASETYPE_STRUCT;
-			base_type.structure = s;
-		}
-		else if (Enum* e = FindEnum(ast_type->token->info.string, scope))
-		{
-			base_type.kind = BASETYPE_ENUM;
-			base_type.enumeration = e;
-		}
-		else
-		{
-			Error(semantic, ast_type->token->location, "Unknown type: %\n", ast_type->token->info.string);
-		}
-	}
-	else if (ast_type->kind == AST_TYPE_EXPRESSION_TUPLE)
-	{
-		base_type.kind = BASETYPE_TUPLE;
-		base_type.tuple = semantic->info.stack.CreateArray<Type>(ast_type->tuple.count);
-
-		for (u32 i = 0; i < base_type.tuple.count; i++)
-		{
-			base_type.tuple[i] = ParseType(ast_type->tuple[i], scope, semantic);
-		}
-	}
-
 	return base_type;
 }
 
-static Type ParseType(Ast_TypeExpression* ast_type, Scope* scope, Semantic* semantic)
+static Type ParseType(Ast_Type* ast_type, Scope* scope, Semantic* semantic)
 {
 	Type type;
-	u32 count = 0;
-
-	for (Ast_TypeExpression* t = ast_type;
-		t->kind == AST_TYPE_EXPRESSION_ARRAY ||
-		t->kind == AST_TYPE_EXPRESSION_OPTIONAL ||
-		t->kind == AST_TYPE_EXPRESSION_POINTER;
-		count++, t = t->subtype);
-
-	type.specifiers = semantic->info.stack.CreateArray<Specifier>(count);
-
-	for (Specifier* specifier = type.specifiers; specifier < type.specifiers.End(); specifier++)
-	{
-		specifier->array_size = 0;
-		if (ast_type->kind == AST_TYPE_EXPRESSION_ARRAY)
-		{
-			if (ast_type->size_expression)
-			{
-				specifier->kind = SPECIFIER_FIXED_ARRAY;
-			}
-			else specifier->kind = SPECIFIER_DYNAMIC_ARRAY;
-
-			specifier->array_size = 0;
-		}
-		else if (ast_type->kind == AST_TYPE_EXPRESSION_POINTER)  specifier->kind = SPECIFIER_POINTER;
-		else if (ast_type->kind == AST_TYPE_EXPRESSION_OPTIONAL) specifier->kind = SPECIFIER_OPTIONAL;
-		ast_type = ast_type->subtype;
-	}
-
-	type.base_type = ParseBaseType(ast_type, scope, semantic);
 	return type;
 }
 
@@ -250,7 +155,7 @@ static void GenerateFunctions(List<Ast_Function> ast_functions, Scope* scope, Se
 			Parameter* param = &function->parameters[j];
 			param->ast  = &function->ast->params[j];
 			param->name = param->ast->name->info.string;
-			param->type = ParseType(param->ast->type, scope, semantic);
+			param->type = ParseType(&param->ast->type, scope, semantic);
 		}
 	}
 }

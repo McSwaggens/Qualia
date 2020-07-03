@@ -60,44 +60,44 @@ Parse_Info LexicalParse(String file_path)
 			u64 size = end - start;
 			String str = String(start, size);
 
-			if      (CompareStrings(str, ToString(Token_Import)))  token.kind = Token_Import;
-			else if (CompareStrings(str, ToString(Token_Struct)))  token.kind = Token_Struct;
-			else if (CompareStrings(str, ToString(Token_Enum)))    token.kind = Token_Enum;
-			else if (CompareStrings(str, ToString(Token_If)))      token.kind = Token_If;
-			else if (CompareStrings(str, ToString(Token_Else)))    token.kind = Token_Else;
-			else if (CompareStrings(str, ToString(Token_Then)))    token.kind = Token_Then;
-			else if (CompareStrings(str, ToString(Token_Where)))   token.kind = Token_Where;
-			else if (CompareStrings(str, ToString(Token_For)))     token.kind = Token_For;
-			else if (CompareStrings(str, ToString(Token_While)))   token.kind = Token_While;
-			else if (CompareStrings(str, ToString(Token_Return)))  token.kind = Token_Return;
-			else if (CompareStrings(str, ToString(Token_Claim)))   token.kind = Token_Claim;
-			else if (CompareStrings(str, ToString(Token_Defer)))   token.kind = Token_Defer;
-			else if (CompareStrings(str, ToString(Token_Alias)))   token.kind = Token_Alias;
-			else if (CompareStrings(str, ToString(Token_As)))      token.kind = Token_As;
-			else if (CompareStrings(str, ToString(Token_In)))      token.kind = Token_In;
-			else if (CompareStrings(str, ToString(Token_Null)))    token.kind = Token_Null;
-			else if (CompareStrings(str, ToString(Token_True)))    token.kind = Token_True;
-			else if (CompareStrings(str, ToString(Token_False)))   token.kind = Token_False;
-			else if (CompareStrings(str, ToString(Token_Bool)))    token.kind = Token_Bool;
-			else if (CompareStrings(str, ToString(Token_Int)))     token.kind = Token_Int;
-			else if (CompareStrings(str, ToString(Token_Int8)))    token.kind = Token_Int8;
-			else if (CompareStrings(str, ToString(Token_Int16)))   token.kind = Token_Int16;
-			else if (CompareStrings(str, ToString(Token_Int32)))   token.kind = Token_Int32;
-			else if (CompareStrings(str, ToString(Token_Int64)))   token.kind = Token_Int64;
-			else if (CompareStrings(str, ToString(Token_Uint)))    token.kind = Token_Uint;
-			else if (CompareStrings(str, ToString(Token_Uint8)))   token.kind = Token_Uint8;
-			else if (CompareStrings(str, ToString(Token_Uint16)))  token.kind = Token_Uint16;
-			else if (CompareStrings(str, ToString(Token_Uint32)))  token.kind = Token_Uint32;
-			else if (CompareStrings(str, ToString(Token_Uint64)))  token.kind = Token_Uint64;
-			else if (CompareStrings(str, ToString(Token_Float16))) token.kind = Token_Float16;
-			else if (CompareStrings(str, ToString(Token_Float32))) token.kind = Token_Float32;
-			else if (CompareStrings(str, ToString(Token_Float64))) token.kind = Token_Float64;
-			else if (CompareStrings(str, ToString(Token_Or)))      token.kind = Token_Or;
-			else if (CompareStrings(str, ToString(Token_And)))     token.kind = Token_And;
-			else if (CompareStrings(str, ToString(Token_OR)))      token.kind = Token_OR;
-			else if (CompareStrings(str, ToString(Token_AND)))     token.kind = Token_AND;
-			else if (CompareStrings(str, ToString(Token_XOR)))     token.kind = Token_XOR;
-			else if (CompareStrings(str, ToString(Token_NOT)))     token.kind = Token_NOT;
+			if      (CompareStrings(str, ToString(TOKEN_IMPORT)))      token.kind = TOKEN_IMPORT;
+			else if (CompareStrings(str, ToString(TOKEN_STRUCT)))      token.kind = TOKEN_STRUCT;
+			else if (CompareStrings(str, ToString(TOKEN_ENUM)))        token.kind = TOKEN_ENUM;
+			else if (CompareStrings(str, ToString(TOKEN_IF)))          token.kind = TOKEN_IF;
+			else if (CompareStrings(str, ToString(TOKEN_ELSE)))        token.kind = TOKEN_ELSE;
+			else if (CompareStrings(str, ToString(TOKEN_THEN)))        token.kind = TOKEN_THEN;
+			else if (CompareStrings(str, ToString(TOKEN_WHERE)))       token.kind = TOKEN_WHERE;
+			else if (CompareStrings(str, ToString(TOKEN_FOR)))         token.kind = TOKEN_FOR;
+			else if (CompareStrings(str, ToString(TOKEN_WHILE)))       token.kind = TOKEN_WHILE;
+			else if (CompareStrings(str, ToString(TOKEN_RETURN)))      token.kind = TOKEN_RETURN;
+			else if (CompareStrings(str, ToString(TOKEN_CLAIM)))       token.kind = TOKEN_CLAIM;
+			else if (CompareStrings(str, ToString(TOKEN_DEFER)))       token.kind = TOKEN_DEFER;
+			else if (CompareStrings(str, ToString(TOKEN_ALIAS)))       token.kind = TOKEN_ALIAS;
+			else if (CompareStrings(str, ToString(TOKEN_AS)))          token.kind = TOKEN_AS;
+			else if (CompareStrings(str, ToString(TOKEN_IN)))          token.kind = TOKEN_IN;
+			else if (CompareStrings(str, ToString(TOKEN_NULL)))        token.kind = TOKEN_NULL;
+			else if (CompareStrings(str, ToString(TOKEN_TRUE)))        token.kind = TOKEN_TRUE;
+			else if (CompareStrings(str, ToString(TOKEN_FALSE)))       token.kind = TOKEN_FALSE;
+			else if (CompareStrings(str, ToString(TOKEN_BOOL)))        token.kind = TOKEN_BOOL;
+			else if (CompareStrings(str, ToString(TOKEN_INT)))         token.kind = TOKEN_INT;
+			else if (CompareStrings(str, ToString(TOKEN_INT8)))        token.kind = TOKEN_INT8;
+			else if (CompareStrings(str, ToString(TOKEN_INT16)))       token.kind = TOKEN_INT16;
+			else if (CompareStrings(str, ToString(TOKEN_INT32)))       token.kind = TOKEN_INT32;
+			else if (CompareStrings(str, ToString(TOKEN_INT64)))       token.kind = TOKEN_INT64;
+			else if (CompareStrings(str, ToString(TOKEN_UINT)))        token.kind = TOKEN_UINT;
+			else if (CompareStrings(str, ToString(TOKEN_UINT8)))       token.kind = TOKEN_UINT8;
+			else if (CompareStrings(str, ToString(TOKEN_UINT16)))      token.kind = TOKEN_UINT16;
+			else if (CompareStrings(str, ToString(TOKEN_UINT32)))      token.kind = TOKEN_UINT32;
+			else if (CompareStrings(str, ToString(TOKEN_UINT64)))      token.kind = TOKEN_UINT64;
+			else if (CompareStrings(str, ToString(TOKEN_FLOAT16)))     token.kind = TOKEN_FLOAT16;
+			else if (CompareStrings(str, ToString(TOKEN_FLOAT32)))     token.kind = TOKEN_FLOAT32;
+			else if (CompareStrings(str, ToString(TOKEN_FLOAT64)))     token.kind = TOKEN_FLOAT64;
+			else if (CompareStrings(str, ToString(TOKEN_OR)))          token.kind = TOKEN_OR;
+			else if (CompareStrings(str, ToString(TOKEN_AND)))         token.kind = TOKEN_AND;
+			else if (CompareStrings(str, ToString(TOKEN_BITWISE_OR)))  token.kind = TOKEN_BITWISE_OR;
+			else if (CompareStrings(str, ToString(TOKEN_BITWISE_AND))) token.kind = TOKEN_BITWISE_AND;
+			else if (CompareStrings(str, ToString(TOKEN_BITWISE_XOR))) token.kind = TOKEN_BITWISE_XOR;
+			else if (CompareStrings(str, ToString(TOKEN_BITWISE_NOT))) token.kind = TOKEN_BITWISE_NOT;
 			else
 			{
 				if (cursor[-1] == '_')
@@ -106,7 +106,7 @@ Parse_Info LexicalParse(String file_path)
 					Fail();
 				}
 
-				token.kind = Token_Identifier;
+				token.kind = TOKEN_IDENTIFIER;
 				token.info.string = String(start, size);
 			}
 		}
@@ -220,7 +220,7 @@ Parse_Info LexicalParse(String file_path)
 				}
 			}
 
-			token.kind = Token_IntegerLiteral;
+			token.kind = TOKEN_INTEGER_LITERAL;
 			token.info.integer.value = value;
 			token.info.integer.is_unsigned = false;
 
@@ -301,34 +301,34 @@ Parse_Info LexicalParse(String file_path)
 
 			char* end = cursor++;
 			u64 size = end - start;
-			token.kind = Token_StringLiteral;
+			token.kind = TOKEN_STRING_LITERAL;
 			token.info.span = Span(start, end);
 		}
 		else if (*cursor == '(')
 		{
 			cursor += 1;
-			token.kind = Token_OpenParen;
+			token.kind = TOKEN_OPEN_PAREN;
 			token.info.next = prev_region_index;
 			prev_region_index = tokens.count;
 		}
 		else if (*cursor == '{')
 		{
 			cursor += 1;
-			token.kind = Token_OpenBrace;
+			token.kind = TOKEN_OPEN_BRACE;
 			token.info.next = prev_region_index;
 			prev_region_index = tokens.count;
 		}
 		else if (*cursor == '[')
 		{
 			cursor += 1;
-			token.kind = Token_OpenBracket;
+			token.kind = TOKEN_OPEN_BRACKET;
 			token.info.next = prev_region_index;
 			prev_region_index = tokens.count;
 		}
 		else if (*cursor == ')')
 		{
 			cursor += 1;
-			token.kind = Token_CloseParen;
+			token.kind = TOKEN_CLOSE_PAREN;
 
 			if (prev_region_index == -1)
 			{
@@ -337,7 +337,7 @@ Parse_Info LexicalParse(String file_path)
 			}
 
 			Token& open = tokens[prev_region_index];
-			if (open.kind != Token_OpenParen)
+			if (open.kind != TOKEN_OPEN_PAREN)
 			{
 				Print("%:%: error: Missmatch between % and %\n", file_path, token.location, open, token);
 				Fail();
@@ -350,7 +350,7 @@ Parse_Info LexicalParse(String file_path)
 		else if (*cursor == '}')
 		{
 			cursor += 1;
-			token.kind = Token_CloseBrace;
+			token.kind = TOKEN_CLOSE_BRACE;
 
 			if (prev_region_index == -1)
 			{
@@ -359,7 +359,7 @@ Parse_Info LexicalParse(String file_path)
 			}
 
 			Token& open = tokens[prev_region_index];
-			if (open.kind != Token_OpenBrace)
+			if (open.kind != TOKEN_OPEN_BRACE)
 			{
 				Print("%:%: error: Missmatch between % and %\n", file_path, token.location, open, token);
 				Fail();
@@ -372,7 +372,7 @@ Parse_Info LexicalParse(String file_path)
 		else if (*cursor == ']')
 		{
 			cursor += 1;
-			token.kind = Token_CloseBracket;
+			token.kind = TOKEN_CLOSE_BRACKET;
 
 			if (prev_region_index == -1)
 			{
@@ -381,7 +381,7 @@ Parse_Info LexicalParse(String file_path)
 			}
 
 			Token& open = tokens[prev_region_index];
-			if (open.kind != Token_OpenBracket)
+			if (open.kind != TOKEN_OPEN_BRACKET)
 			{
 				Print("%:%: error: Missmatch between % and %\n", file_path, token.location, open, token);
 				Fail();
@@ -391,37 +391,37 @@ Parse_Info LexicalParse(String file_path)
 			prev_region_index = open.info.next;
 			open.info.next = offset;
 		}
-		else if (*cursor == '&' && cursor[1] == '&') cursor += 2, token.kind = Token_StrongAnd;
-		else if (*cursor == '|' && cursor[1] == '|') cursor += 2, token.kind = Token_StrongOr;
-		else if (*cursor == '=' && cursor[1] == '>') cursor += 2, token.kind = Token_FatArrow;
-		else if (*cursor == '!' && cursor[1] == '=') cursor += 2, token.kind = Token_NotEqual;
-		else if (*cursor == '-' && cursor[1] == '>') cursor += 2, token.kind = Token_Arrow;
-		else if (*cursor == '<' && cursor[1] == '<') cursor += 2, token.kind = Token_LeftShift;
-		else if (*cursor == '>' && cursor[1] == '>') cursor += 2, token.kind = Token_RightShift;
-		else if (*cursor == '<' && cursor[1] == '=') cursor += 2, token.kind = Token_LessOrEqual;
-		else if (*cursor == '>' && cursor[1] == '=') cursor += 2, token.kind = Token_GreaterOrEqual;
-		else if (*cursor == '+' && cursor[1] == '=') cursor += 2, token.kind = Token_PlusEqual;
-		else if (*cursor == '-' && cursor[1] == '=') cursor += 2, token.kind = Token_MinusEqual;
-		else if (*cursor == '*' && cursor[1] == '=') cursor += 2, token.kind = Token_TimesEqual;
-		else if (*cursor == '/' && cursor[1] == '=') cursor += 2, token.kind = Token_DivideEqual;
-		else if (*cursor == '^' && cursor[1] == '=') cursor += 2, token.kind = Token_ExponentialEqual;
-		else if (*cursor == '.' && cursor[1] == '.') cursor += 2, token.kind = Token_DotDot;
-		else if (*cursor == '.') cursor += 1, token.kind = Token_Dot;
-		else if (*cursor == ';') cursor += 1, token.kind = Token_SemiColon;
-		else if (*cursor == ':') cursor += 1, token.kind = Token_Colon;
-		else if (*cursor == ',') cursor += 1, token.kind = Token_Comma;
-		else if (*cursor == '<') cursor += 1, token.kind = Token_Less;
-		else if (*cursor == '>') cursor += 1, token.kind = Token_Greater;
-		else if (*cursor == '+') cursor += 1, token.kind = Token_Plus;
-		else if (*cursor == '-') cursor += 1, token.kind = Token_Minus;
-		else if (*cursor == '*') cursor += 1, token.kind = Token_Asterisk;
-		else if (*cursor == '/') cursor += 1, token.kind = Token_Divide;
-		else if (*cursor == '^') cursor += 1, token.kind = Token_Exponent;
-		else if (*cursor == '&') cursor += 1, token.kind = Token_Ampersand;
-		else if (*cursor == '|') cursor += 1, token.kind = Token_Bar;
-		else if (*cursor == '?') cursor += 1, token.kind = Token_QuestionMark;
-		else if (*cursor == '!') cursor += 1, token.kind = Token_ExclamationMark;
-		else if (*cursor == '=') cursor += 1, token.kind = Token_Equal;
+		else if (*cursor == '&' && cursor[1] == '&') cursor += 2, token.kind = TOKEN_STRONG_AND;
+		else if (*cursor == '|' && cursor[1] == '|') cursor += 2, token.kind = TOKEN_STRONG_OR;
+		else if (*cursor == '=' && cursor[1] == '>') cursor += 2, token.kind = TOKEN_FAT_ARROW;
+		else if (*cursor == '!' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_NOT_EQUAL;
+		else if (*cursor == '-' && cursor[1] == '>') cursor += 2, token.kind = TOKEN_ARROW;
+		else if (*cursor == '<' && cursor[1] == '<') cursor += 2, token.kind = TOKEN_LEFT_SHIFT;
+		else if (*cursor == '>' && cursor[1] == '>') cursor += 2, token.kind = TOKEN_RIGHT_SHIFT;
+		else if (*cursor == '<' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_LESS_OR_EQUAL;
+		else if (*cursor == '>' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_GREATER_OR_EQUAL;
+		else if (*cursor == '+' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_PLUS_EQUAL;
+		else if (*cursor == '-' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_MINUS_EQUAL;
+		else if (*cursor == '*' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_TIMES_EQUAL;
+		else if (*cursor == '/' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_DIVIDE_EQUAL;
+		else if (*cursor == '^' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_EXPONENTIAL_EQUAL;
+		else if (*cursor == '.' && cursor[1] == '.') cursor += 2, token.kind = TOKEN_DOT_DOT;
+		else if (*cursor == '.') cursor += 1, token.kind = TOKEN_DOT;
+		else if (*cursor == ';') cursor += 1, token.kind = TOKEN_SEMICOLON;
+		else if (*cursor == ':') cursor += 1, token.kind = TOKEN_COLON;
+		else if (*cursor == ',') cursor += 1, token.kind = TOKEN_COMMA;
+		else if (*cursor == '<') cursor += 1, token.kind = TOKEN_LESS;
+		else if (*cursor == '>') cursor += 1, token.kind = TOKEN_GREATER;
+		else if (*cursor == '+') cursor += 1, token.kind = TOKEN_PLUS;
+		else if (*cursor == '-') cursor += 1, token.kind = TOKEN_MINUS;
+		else if (*cursor == '*') cursor += 1, token.kind = TOKEN_ASTERISK;
+		else if (*cursor == '/') cursor += 1, token.kind = TOKEN_DIVIDE;
+		else if (*cursor == '^') cursor += 1, token.kind = TOKEN_EXPONENT;
+		else if (*cursor == '&') cursor += 1, token.kind = TOKEN_AMPERSAND;
+		else if (*cursor == '|') cursor += 1, token.kind = TOKEN_BAR;
+		else if (*cursor == '?') cursor += 1, token.kind = TOKEN_QUESTION_MARK;
+		else if (*cursor == '!') cursor += 1, token.kind = TOKEN_EXCLAMATION_MARK;
+		else if (*cursor == '=') cursor += 1, token.kind = TOKEN_EQUAL;
 		else
 		{
 			if (IsPrintable(*cursor))
@@ -440,7 +440,7 @@ Parse_Info LexicalParse(String file_path)
 	}
 
 	Token token;
-	token.kind = Token_Eof;
+	token.kind = TOKEN_EOF;
 	token.location.line = line;
 	// token.location.offset = cursor - line_start;
 	token.location.offset = 0;

@@ -35,6 +35,7 @@ enum Ast_Specifier_Kind
 struct Ast_Specifier
 {
 	Ast_Specifier_Kind kind;
+	Token* token;
 	Ast_Expression* size_expression;
 };
 
@@ -64,7 +65,7 @@ struct Ast_BaseType_Tuple
 struct Ast_BaseType_Function
 {
 	List<Ast_Type> input;
-	List<Ast_Type> output;
+	Ast_Type* output;
 };
 
 struct Ast_BaseType
@@ -98,76 +99,6 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_AS,
 	AST_EXPRESSION_IF_ELSE,
 };
-
-// // ------------------------------------- //
-
-// struct Ast_Expression
-// {
-// 	Ast_Expression_Kind kind;
-// };
-
-// struct Ast_Expression_Unary : Ast_Expression
-// {
-// 	Token* token;
-// 	Ast_Expression* right;
-// };
-
-// struct Ast_Expression_Binary : Ast_Expression
-// {
-// 	Token* token;
-// 	Ast_Expression* left;
-// 	Ast_Expression* right;
-// };
-
-// struct Ast_Expression_Trinary : Ast_Expression
-// {
-// 	Token* token[2];
-// 	Ast_Expression* left;
-// 	Ast_Expression* middle;
-// 	Ast_Expression* right;
-// };
-
-// struct Ast_Expression_SubScript : Ast_Expression
-// {
-// 	Token* token;
-// 	Ast_Expression* left;
-// 	Ast_Expression* right;
-// };
-
-// // ------------------------------------- //
-
-// struct Ast_UnaryExpression
-// {
-// 	Token* token;
-// 	Ast_Expression* right;
-// };
-
-// struct Ast_BinaryExpression
-// {
-// 	Token* token;
-// 	Ast_Expression* left;
-// 	Ast_Expression* right;
-// };
-
-// struct Ast_TrinaryExpression
-// {
-// 	Token* token[2];
-// 	Ast_Expression* left;
-// 	Ast_Expression* middle;
-// 	Ast_Expression* right;
-// };
-
-// struct Ast_Expression
-// {
-// 	Ast_Expression_Kind kind;
-
-// 	union
-// 	{
-// 		Ast_UnaryExpression   unary;
-// 		Ast_BinaryExpression  binary;
-// 		Ast_TrinaryExpression trinary;
-// 	};
-// };
 
 struct Ast_Expression
 {
@@ -261,7 +192,7 @@ struct Ast_VariableDeclaration
 {
 	Token* name;
 	Ast_Attribute attribute;
-	Ast_TypeExpression* type;
+	Ast_Type* type;
 	Ast_Expression* assignment;
 };
 
@@ -300,18 +231,18 @@ struct Ast_Statement
 
 struct Ast_Param
 {
-	Ast_TypeExpression* type;
+	Ast_Type type;
 	Token* name;
 };
 
 
 struct Ast_Function
 {
-	Token* name;
-	Ast_Attribute attribute;
+	Token*          name;
+	Ast_Attribute   attribute;
 	List<Ast_Param> params;
-	Ast_TypeExpression* return_type;
-	Ast_Code code;
+	Ast_Type*       return_type;
+	Ast_Code        code;
 };
 
 
@@ -326,7 +257,7 @@ struct Ast_Struct_Member
 {
 	Token* name;
 	Ast_Attribute attribute;
-	Ast_TypeExpression* type;
+	Ast_Type type;
 };
 
 

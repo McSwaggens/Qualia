@@ -64,21 +64,21 @@ void Write(OutputBuffer* buffer, Token_Kind kind)
 
 void Write(OutputBuffer* buffer, Token& token)
 {
-	if (token.kind == Token_Identifier)
+	if (token.kind == TOKEN_IDENTIFIER)
 	{
 		Write(buffer, token.info.string);
 	}
-	else if (token.kind == Token_StringLiteral)
+	else if (token.kind == TOKEN_STRING_LITERAL)
 	{
 		buffer->Write('"');
 		Write(buffer, token.info.span);
 		buffer->Write('"');
 	}
-	else if (token.kind == Token_IntegerLiteral)
+	else if (token.kind == TOKEN_INTEGER_LITERAL)
 	{
 		Write(buffer, token.info.integer.value);
 	}
-	else if (token.kind == Token_FloatLiteral)
+	else if (token.kind == TOKEN_FLOAT_LITERAL)
 	{
 		// TODO: Implement f64 print function.
 		//Write(buffer, token.info.floating_point.value);

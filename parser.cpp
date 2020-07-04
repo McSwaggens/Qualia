@@ -4,11 +4,9 @@
 #include "memory.h"
 #include "assert.h"
 
-
 static void Write(OutputBuffer* buffer, Ast_Expression* expression);
 static void Write(OutputBuffer* buffer, Ast_Type* type);
 static void Write(OutputBuffer* buffer, Ast_Type type);
-
 
 static void Write(OutputBuffer* buffer, Ast_Type* type)
 {
@@ -76,7 +74,6 @@ static void Write(OutputBuffer* buffer, Ast_Type type)
 		Write(buffer, ")");
 	}
 }
-
 
 static void Write(OutputBuffer* buffer, Ast_Expression* expression)
 {
@@ -158,7 +155,6 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression)
 	}
 }
 
-
 static bool IsSpecifier(Token_Kind kind)
 {
 	return kind == TOKEN_ASTERISK
@@ -170,7 +166,6 @@ static bool IsTernaryOperator(Token_Kind kind)
 {
 	return kind == TOKEN_IF;
 }
-
 
 static bool IsBinaryOperator(Token_Kind kind)
 {
@@ -185,10 +180,6 @@ static bool IsBinaryOperator(Token_Kind kind)
 		|| kind == TOKEN_BITWISE_AND
 		|| kind == TOKEN_BITWISE_OR
 		|| kind == TOKEN_BITWISE_XOR
-		|| kind == TOKEN_WEAK_AND
-		|| kind == TOKEN_WEAK_OR
-		|| kind == TOKEN_STRONG_AND
-		|| kind == TOKEN_STRONG_OR
 		|| kind == TOKEN_LEFT_SHIFT
 		|| kind == TOKEN_RIGHT_SHIFT
 		|| kind == TOKEN_EQUAL
@@ -199,7 +190,6 @@ static bool IsBinaryOperator(Token_Kind kind)
 		|| kind == TOKEN_GREATER_OR_EQUAL;
 }
 
-
 static bool IsUnaryOperator(Token_Kind kind)
 {
 	return kind == TOKEN_ASTERISK
@@ -207,9 +197,9 @@ static bool IsUnaryOperator(Token_Kind kind)
 		|| kind == TOKEN_PLUS
 		|| kind == TOKEN_MINUS
 		|| kind == TOKEN_BITWISE_NOT
+		|| kind == TOKEN_NOT
 		|| kind == TOKEN_EXCLAMATION_MARK;
 }
-
 
 static bool IsAssignment(Token_Kind kind)
 {
@@ -220,7 +210,6 @@ static bool IsAssignment(Token_Kind kind)
 		|| kind == TOKEN_DIVIDE_EQUAL
 		|| kind == TOKEN_EXPONENTIAL_EQUAL;
 }
-
 
 static bool IsPrimitive(Token_Kind kind)
 {
@@ -240,7 +229,6 @@ static bool IsPrimitive(Token_Kind kind)
 		|| kind == TOKEN_FLOAT64;
 }
 
-
 static bool IsTerm(Token_Kind kind)
 {
 	return kind == TOKEN_IDENTIFIER
@@ -252,14 +240,12 @@ static bool IsTerm(Token_Kind kind)
 		|| kind == TOKEN_NULL;
 }
 
-
 static bool IsExpressionStarter(Token_Kind kind)
 {
 	return IsUnaryOperator(kind)
 		|| IsTerm(kind)
 		|| kind == TOKEN_OPEN_PAREN;
 }
-
 
 static u32 GetTernaryPrecedence(Token_Kind kind)
 {
@@ -273,7 +259,6 @@ static u32 GetTernaryPrecedence(Token_Kind kind)
 			Unreachable();
 	}
 }
-
 
 static u32 GetBinaryPrecedence(Token_Kind kind)
 {
@@ -309,13 +294,9 @@ static u32 GetBinaryPrecedence(Token_Kind kind)
 			return 7;
 
 		case TOKEN_AND:
-		case TOKEN_WEAK_AND:
-		case TOKEN_STRONG_AND:
 			return 8;
 
 		case TOKEN_OR:
-		case TOKEN_WEAK_OR:
-		case TOKEN_STRONG_OR:
 			return 9;
 
 		default:
@@ -324,25 +305,26 @@ static u32 GetBinaryPrecedence(Token_Kind kind)
 	}
 }
 
-
 static u32 GetUnaryPrecedence(Token_Kind kind)
 {
 	switch (kind)
 	{
 		case TOKEN_ASTERISK:
 		case TOKEN_AMPERSAND:
+		case TOKEN_NOT:
 			return 1;
 
-		case TOKEN_PLUS:
-		case TOKEN_MINUS:
+		case TOKEN_PLUS:  // I totally forgot why these are on 2 and not 1...
+		case TOKEN_MINUS: //    it isn't because of exponentials...
 			return 2;
+
+		// @Bug: Not all unary operators are handled here.
 
 		default:
 			Assert("Invalid unary operator.");
 			Unreachable();
 	}
 }
-
 
 static u32 GetPostfixPrecedence(Token_Kind kind)
 {
@@ -358,19 +340,16 @@ static u32 GetPostfixPrecedence(Token_Kind kind)
 	}
 }
 
-
 static bool IsOperatorRightToLeft(Token_Kind kind)
 {
 	return kind == TOKEN_EXPONENT;
 }
-
 
 static bool IsPostfixOperator(Token_Kind kind)
 {
 	return kind == TOKEN_OPEN_PAREN
 		|| kind == TOKEN_OPEN_BRACKET;
 }
-
 
 static bool IsOperator(Token_Kind kind)
 {
@@ -379,7 +358,6 @@ static bool IsOperator(Token_Kind kind)
 		|| IsTernaryOperator(kind);
 }
 
-
 static u32 GetOperatorPrecedence(Token_Kind kind)
 {
 	if (IsBinaryOperator(kind))  return GetBinaryPrecedence(kind);
@@ -387,7 +365,6 @@ static u32 GetOperatorPrecedence(Token_Kind kind)
 	if (IsPostfixOperator(kind)) return GetPostfixPrecedence(kind);
 	Unreachable();
 }
-
 
 template<typename ...Args>
 [[noreturn]]
@@ -416,18 +393,15 @@ static void Error(Parse_Info* info, SourceLocation where, String format, Args&&.
 	Fail();
 }
 
-
 static bool CanTakeNextOp(Token* token, bool assignment_break, u32 parent_precedence)
 {
 	return !(!IsOperator(token->kind) || (token->kind == TOKEN_EQUAL && assignment_break)) && GetOperatorPrecedence(token->kind) < parent_precedence + IsOperatorRightToLeft(token->kind);
 }
 
-
 static bool IsOnCorrectScope(Token* token, u32 scope)
 {
 	return !token->newline || token->indent == scope;
 }
-
 
 static void CheckScope(Token* token, u32 scope, Parse_Info* info)
 {
@@ -437,7 +411,6 @@ static void CheckScope(Token* token, u32 scope, Parse_Info* info)
 	}
 }
 
-
 static void SkipSemiColon(Token*& token, u32 scope, Parse_Info* info)
 {
 	if (token->kind == TOKEN_SEMICOLON && IsOnCorrectScope(token, scope))
@@ -446,12 +419,10 @@ static void SkipSemiColon(Token*& token, u32 scope, Parse_Info* info)
 	}
 }
 
-
 static Ast_Type ParseType(Token*& token, u32 scope, Parse_Info* info);
 static Ast_Expression* ParseExpression(Token*& token, u32 scope, Parse_Info* info, bool assignment_break = false, u32 parent_precedence = -1);
 static Ast_Function ParseFunction(Token*& token, u32 scope, Parse_Info* info);
 static Ast_Code ParseCode(Token*& token, u32 scope, Parse_Info* info);
-
 
 static Ast_Struct ParseStructure(Token*& token, u32 scope, Parse_Info* info)
 {
@@ -527,7 +498,6 @@ static Ast_Struct ParseStructure(Token*& token, u32 scope, Parse_Info* info)
 	return structure;
 }
 
-
 static Ast_Enum ParseEnumeration(Token*& token, u32 scope, Parse_Info* info)
 {
 	Ast_Enum enumeration;
@@ -602,7 +572,6 @@ static Ast_Enum ParseEnumeration(Token*& token, u32 scope, Parse_Info* info)
 
 	return enumeration;
 }
-
 
 static Ast_Expression* ParseExpression(Token*& token, u32 scope, Parse_Info* info, bool assignment_break, u32 parent_precedence)
 {
@@ -781,7 +750,6 @@ static Ast_Expression* ParseExpression(Token*& token, u32 scope, Parse_Info* inf
 	return left;
 }
 
-
 static Ast_Type ParseType(Token*& token, u32 scope, Parse_Info* info)
 {
 	Ast_Type type;
@@ -901,7 +869,6 @@ static Ast_Type ParseType(Token*& token, u32 scope, Parse_Info* info)
 	return type;
 }
 
-
 static void ParseParameters(Ast_Function* function, Token* open_paren, u32 scope, Parse_Info* info)
 {
 	Token* closure = open_paren->GetClosure();
@@ -952,7 +919,6 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 scope
 		}
 	}
 }
-
 
 static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 scope, Parse_Info* info)
 {
@@ -1026,7 +992,6 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 scope, Parse_Info* in
 
 	return branch_block;
 }
-
 
 static Ast_Statement ParseStatement(Token*& token, u32 scope, Parse_Info* info)
 {
@@ -1151,7 +1116,6 @@ static Ast_Statement ParseStatement(Token*& token, u32 scope, Parse_Info* info)
 	}
 }
 
-
 static Ast_Attribute ParseAttribute(Token*& token, u32 scope, Parse_Info* info)
 {
 	Ast_Attribute attribute;
@@ -1162,7 +1126,6 @@ static Ast_Attribute ParseAttribute(Token*& token, u32 scope, Parse_Info* info)
 	token = closure+1;
 	return attribute;
 }
-
 
 static Ast_Code ParseCode(Token*& token, u32 scope, Parse_Info* info)
 {
@@ -1235,7 +1198,6 @@ static Ast_Code ParseCode(Token*& token, u32 scope, Parse_Info* info)
 	return code;
 }
 
-
 static Ast_Function ParseFunction(Token*& token, u32 scope, Parse_Info* info)
 {
 	Ast_Function function;
@@ -1269,7 +1231,6 @@ static Ast_Function ParseFunction(Token*& token, u32 scope, Parse_Info* info)
 
 	return function;
 }
-
 
 static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 {
@@ -1340,7 +1301,6 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 		}
 	}
 }
-
 
 Parse_Info ParseFile(String file_path)
 {

@@ -94,6 +94,7 @@ Parse_Info LexicalParse(String file_path)
 			else if (CompareStrings(str, ToString(TOKEN_FLOAT64)))     token.kind = TOKEN_FLOAT64;
 			else if (CompareStrings(str, ToString(TOKEN_OR)))          token.kind = TOKEN_OR;
 			else if (CompareStrings(str, ToString(TOKEN_AND)))         token.kind = TOKEN_AND;
+			else if (CompareStrings(str, ToString(TOKEN_NOT)))         token.kind = TOKEN_NOT;
 			else if (CompareStrings(str, ToString(TOKEN_BITWISE_OR)))  token.kind = TOKEN_BITWISE_OR;
 			else if (CompareStrings(str, ToString(TOKEN_BITWISE_AND))) token.kind = TOKEN_BITWISE_AND;
 			else if (CompareStrings(str, ToString(TOKEN_BITWISE_XOR))) token.kind = TOKEN_BITWISE_XOR;
@@ -391,8 +392,6 @@ Parse_Info LexicalParse(String file_path)
 			prev_region_index = open.info.next;
 			open.info.next = offset;
 		}
-		else if (*cursor == '&' && cursor[1] == '&') cursor += 2, token.kind = TOKEN_STRONG_AND;
-		else if (*cursor == '|' && cursor[1] == '|') cursor += 2, token.kind = TOKEN_STRONG_OR;
 		else if (*cursor == '=' && cursor[1] == '>') cursor += 2, token.kind = TOKEN_FAT_ARROW;
 		else if (*cursor == '!' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_NOT_EQUAL;
 		else if (*cursor == '-' && cursor[1] == '>') cursor += 2, token.kind = TOKEN_ARROW;

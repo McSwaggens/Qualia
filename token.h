@@ -31,6 +31,7 @@ enum Token_Kind
 	TOKEN_IN,
 	TOKEN_AND,
 	TOKEN_OR,
+	TOKEN_NOT,
 	TOKEN_NULL,
 	TOKEN_TRUE,
 	TOKEN_FALSE,
@@ -65,10 +66,6 @@ enum Token_Kind
 	TOKEN_EXPONENT,
 	TOKEN_AMPERSAND,
 	TOKEN_BAR,
-	TOKEN_WEAK_AND = TOKEN_AMPERSAND,
-	TOKEN_WEAK_OR = TOKEN_BAR,
-	TOKEN_STRONG_AND,
-	TOKEN_STRONG_OR,
 	TOKEN_EXCLAMATION_MARK,
 	TOKEN_QUESTION_MARK,
 	TOKEN_EQUAL,
@@ -121,6 +118,7 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_IN:                return "in";
 		case TOKEN_OR:                return "or";
 		case TOKEN_AND:               return "and";
+		case TOKEN_NOT:               return "not";
 		case TOKEN_NULL:              return "null";
 		case TOKEN_TRUE:              return "true";
 		case TOKEN_FALSE:             return "false";
@@ -157,8 +155,6 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_EXPONENT:          return "^";
 		case TOKEN_AMPERSAND:         return "&";
 		case TOKEN_BAR:               return "|";
-		case TOKEN_STRONG_AND:        return "&&";
-		case TOKEN_STRONG_OR:         return "||";
 		case TOKEN_EXCLAMATION_MARK:  return "!";
 		case TOKEN_QUESTION_MARK:     return "?";
 		case TOKEN_PLUS_EQUAL:        return "+=";
@@ -173,7 +169,7 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_OPEN_BRACKET:      return "[";
 		case TOKEN_CLOSE_BRACKET:     return "]";
 		case TOKEN_DOT:               return ".";
-		case TOKEN_DOT_DOT:            return "..";
+		case TOKEN_DOT_DOT:           return "..";
 		case TOKEN_COMMA:             return ",";
 		case TOKEN_FAT_ARROW:         return "=>";
 		case TOKEN_ARROW:             return "->";

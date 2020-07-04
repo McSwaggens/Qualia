@@ -12,10 +12,12 @@ s32 main(s32 argc, const char** argv)
 
 	for (s32 i = 0; i < param_count; i++)
 	{
+		// @Todo: Handle command-line input.
 	}
 
 	String file_path = "test.q";
-	if (param_count) {
+	if (param_count)
+	{
 		file_path = params[0];
 	}
 

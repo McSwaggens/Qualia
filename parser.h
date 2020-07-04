@@ -6,7 +6,6 @@
 #include "token.h"
 #include "span.h"
 
-
 struct Ast_Expression;
 struct Ast_Statement;
 struct Ast_Specifier;
@@ -17,7 +16,6 @@ struct Ast_Struct;
 struct Ast_Enum;
 struct Ast_Code;
 struct Ast_Attribute;
-
 
 struct Ast_Attribute
 {
@@ -35,7 +33,7 @@ enum Ast_Specifier_Kind
 struct Ast_Specifier
 {
 	Ast_Specifier_Kind kind;
-	Token* token;
+	Token* token; // @Optimization: s[n].token = s[n-1].token+1
 	Ast_Expression* size_expression;
 };
 
@@ -120,7 +118,6 @@ struct Ast_Expression
 	};
 };
 
-
 struct Ast_Code
 {
 	// @Todo Consolidate this into one big allocation?
@@ -129,7 +126,6 @@ struct Ast_Code
 	List<Ast_Struct> structs;
 	List<Ast_Enum> enums;
 };
-
 
 enum Ast_Statement_Kind 
 {
@@ -143,14 +139,14 @@ enum Ast_Statement_Kind
 	AST_STATEMENT_ASSIGNMENT,
 };
 
-
+// @Todo: Redo this branch shit
+//       this is ECH!
 enum Ast_Branch_Kind
 {
 	AST_BRANCH_INIT,
 	AST_BRANCH_ELSE,
 	AST_BRANCH_THEN,
 };
-
 
 struct Ast_Branch
 {
@@ -160,12 +156,10 @@ struct Ast_Branch
 	Ast_Code code;
 };
 
-
 struct Ast_BranchBlock
 {
 	List<Ast_Branch> branches;
 };
-
 
 struct Ast_Defer
 {
@@ -173,20 +167,18 @@ struct Ast_Defer
 	Ast_Code code;
 };
 
-
 struct Ast_Alias
 {
 	Token* token;
 	Ast_Expression* expression; // ????
+	// Token for identifier here?
 };
-
 
 struct Ast_Return
 {
 	Token* token;
 	Ast_Expression* expression;
 };
-
 
 struct Ast_VariableDeclaration
 {
@@ -196,7 +188,6 @@ struct Ast_VariableDeclaration
 	Ast_Expression* assignment;
 };
 
-
 struct Ast_Assignment
 {
 	Token* token;
@@ -204,12 +195,10 @@ struct Ast_Assignment
 	Ast_Expression* right;
 };
 
-
 struct Ast_Break
 {
 	Token* token;
 };
-
 
 struct Ast_Statement
 {
@@ -228,13 +217,11 @@ struct Ast_Statement
 	};
 };
 
-
 struct Ast_Param
 {
 	Ast_Type type;
 	Token* name;
 };
-
 
 struct Ast_Function
 {
@@ -245,13 +232,11 @@ struct Ast_Function
 	Ast_Code        code;
 };
 
-
 struct Ast_Import
 {
 	Token* token;
 	Token* module;
 };
-
 
 struct Ast_Struct_Member
 {
@@ -260,14 +245,12 @@ struct Ast_Struct_Member
 	Ast_Type type;
 };
 
-
 struct Ast_Enum_Member
 {
 	Token* name;
 	Ast_Attribute attribute;
 	Ast_Expression* expression;
 };
-
 
 struct Ast_Struct
 {
@@ -276,14 +259,12 @@ struct Ast_Struct
 	List<Ast_Struct_Member> members;
 };
 
-
 struct Ast_Enum
 {
 	Token* name;
 	Ast_Attribute attribute;
 	List<Ast_Enum_Member> members;
 };
-
 
 struct Ast_Root
 {
@@ -292,7 +273,6 @@ struct Ast_Root
 	List<Ast_Struct>   structs;
 	List<Ast_Enum>     enums;
 };
-
 
 struct Parse_Info
 {
@@ -303,7 +283,6 @@ struct Parse_Info
 	Ast_Root* ast_root;
 	String file_path;
 };
-
 
 Parse_Info ParseFile(String file_path);
 Parse_Info LexicalParse(String file_path);

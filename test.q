@@ -44,6 +44,8 @@ Main():
 	IsDead(p: Person) -> bool:
 		return p.health <= 0
 
+	is_cool := alpha and beta and not delta^charlie("because everyone hates charlie.")
+
 	while !person.IsDead():
 		FireTheLaser(*person, laser_damage)
 

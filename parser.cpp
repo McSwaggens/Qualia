@@ -467,7 +467,7 @@ static Ast_Struct ParseStructure(Token*& token, u32 scope, Parse_Info* info)
 	structure.name = token;
 	token++;
 
-	Print("Ast_Struct:\n\tname: %\n", structure.name);
+	Print("Ast_Struct %:\n", structure.name);
 
 	if (token->kind != TOKEN_COLON)
 	{
@@ -509,9 +509,7 @@ static Ast_Struct ParseStructure(Token*& token, u32 scope, Parse_Info* info)
 				token++;
 			}
 
-			Print("\tAst_Struct_Member:\n");
-			Print("\t\tname: %\n", member.name);
-			Print("\t\ttype: %\n", member.type);
+			Print("\t% : %\n", member.name, member.type);
 
 			if (token->kind == TOKEN_SEMICOLON && IsOnCorrectScope(token, scope+1))
 			{
@@ -544,7 +542,7 @@ static Ast_Enum ParseEnumeration(Token*& token, u32 scope, Parse_Info* info)
 	enumeration.name = token;
 	token++;
 
-	Print("Ast_Enum:\n\tname: %\n", enumeration.name);
+	Print("Ast_Enum %:\n", enumeration.name);
 
 	if (token->kind != TOKEN_COLON)
 	{
@@ -592,9 +590,7 @@ static Ast_Enum ParseEnumeration(Token*& token, u32 scope, Parse_Info* info)
 
 			members.Add(member);
 
-			Print("\tAst_Enum_Member:\n");
-			Print("\t\tname: %\n", member.name);
-			Print("\t\tvalue: %\n", member.expression);
+			Print("\t% = %\n", member.name, member.expression);
 		}
 		else
 		{

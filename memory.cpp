@@ -13,7 +13,7 @@ void* AllocateVirtualPage(u64 size)
 {
 	u64 page_size = GetSystemPageSize();
 	Assert(size == (size & -page_size), "Invalid page size detected.");
-	Print("Allocating virtual page: %K\n", size / 1024);
+	// Print("Allocating virtual page: %K\n", size / 1024);
 	void* page = mmap(null, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	Assert(page != MAP_FAILED, "Failed to map virtual page.");
 	return page;

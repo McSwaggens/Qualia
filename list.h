@@ -74,7 +74,20 @@ struct List
 	{
 		count = 0;
 	}
+
+	[[nodiscard]]
+	constexpr Array<T> ToArray()
+	{
+		return Array<T>(data, count);
+	}
 };
+
+template<typename T>
+[[nodiscard]]
+static constexpr List<T> ToArray(List<T> list)
+{
+	return Array<T>(list.data, list.count);
+}
 
 template<typename T>
 [[nodiscard]]

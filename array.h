@@ -10,6 +10,7 @@ struct Array
 	u32 count;
 
 	constexpr Array() = default;
+	constexpr Array(T* data, u32 count) : data(data), count(count) { }
 	constexpr Array(InitList<T> initlist) : data(initlist.begin()), count(initlist.size()) { }
 	constexpr Array(Null) : data(null), count(0) { }
 	constexpr operator T*() { return data; }

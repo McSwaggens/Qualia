@@ -2,7 +2,6 @@
 #include "string.h"
 #include "print.h"
 #include "parser.h"
-#include "semantic.h"
 
 s32 main(s32 argc, const char** argv)
 {
@@ -21,8 +20,7 @@ s32 main(s32 argc, const char** argv)
 		file_path = params[0];
 	}
 
-	Parse_Info info = ParseFile(file_path);
-	SemanticParse(info);
+	ParseFile(file_path);
 
 	standard_output_buffer.Flush();
 	standard_error_buffer.Flush();

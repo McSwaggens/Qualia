@@ -1,10 +1,9 @@
 #pragma once
+
 #include "int.h"
 #include "util.h"
-#include <stdlib.h>
-#include <string.h>
-
 #include "array.h"
+#include <stdlib.h>
 
 #define ATTRIBUTE_ALLOCATOR __attribute__((malloc))
 

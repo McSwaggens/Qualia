@@ -186,6 +186,11 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Parse_Info* in
 	{
 		u32 tuple_count = basetype.tuple.count;
 
+		if (!tuple_count)
+		{
+			Error(info, basetype.token->location, "Empty tuple is an invalid type.\n");
+		}
+
 		for (u32 i = 0; i < tuple_count; i++)
 		{
 			Ast_Type* t = &basetype.tuple[i];
@@ -220,7 +225,6 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Parse_Info* in
 			if (!fail)
 			{
 				return tuple;
-				Print("Found existing tuple type.\n");
 			}
 		}
 
@@ -237,7 +241,6 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Parse_Info* in
 		}
 
 		front_type->tuple_extensions.Add(new_type);
-		Print("Pushed new tuple type.\n");
 
 		return new_type;
 	}
@@ -256,7 +259,6 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Parse_Info* in
 			Type* func = input_tuple->function_extensions[i];
 			if (func->function.output == output_type)
 			{
-				Print("Found existing function type.\n");
 				return func;
 			}
 		}
@@ -267,7 +269,6 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Parse_Info* in
 		new_func->function.input = input_tuple;
 		new_func->function.output = output_type;
 		input_tuple->function_extensions.Add(new_func);
-		Print("Pushed new function type.\n");
 
 		return new_func;
 	}
@@ -711,6 +712,58 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 	}
 }
 
+static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Parse_Info* info)
+{
+	if (params.count == 1)
+	{
+		return params[0].type;
+	}
+
+	Type* first;
+	if (params.count == 0)
+	{
+		first = &empty_tuple;
+	}
+	else
+	{
+		first = params[0].type;
+	}
+
+	for (u32 i = 0; i < first->tuple_extensions.count; i++)
+	{
+		Type* tuple = first->tuple_extensions[i];
+		bool fail = false;
+
+		for (u32 j = 0; j < tuple->tuple.count; j++)
+		{
+			if (tuple->tuple[j] != params[j].type)
+			{
+				fail = true;
+				break;
+			}
+		}
+
+		if (!fail)
+		{
+			return tuple;
+		}
+	}
+
+	Type* tuple = info->stack.Allocate<Type>();
+	Type** tuple_members = info->stack.Allocate<Type*>(params.count);
+	ZeroMemory(tuple);
+	tuple->kind = TYPE_BASETYPE_TUPLE;
+
+	for (u32 i = 0; i < params.count; i++)
+	{
+		tuple_members[i] = params[i].type;
+	}
+
+	tuple->tuple = Array(tuple_members, params.count);
+	first->tuple_extensions.Add(tuple);
+	return tuple;
+}
+
 static void ParseFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info)
 {
 	for (Ast_VariableDeclaration* param = function->parameters; param < function->parameters.End(); param++)
@@ -742,6 +795,28 @@ static void ParseFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* 
 		{
 			Error(info, function->ast_return_type->basetype.token->location, "Unknown type: %\n", function->ast_return_type);
 		}
+	}
+
+	Type* param_type = GetTypeFromParams(function->parameters.ToArray(), info);
+
+	for (u32 i = 0; i < param_type->function_extensions.count; i++)
+	{
+		if (param_type->function_extensions[i]->function.output == function->return_type)
+		{
+			function->type = param_type->function_extensions[i];
+			break;
+		}
+	}
+
+	if (!function->type)
+	{
+		Type* func_type = info->stack.Allocate<Type>();
+		ZeroMemory(func_type);
+		func_type->kind = TYPE_BASETYPE_FUNCTION;
+		func_type->function.input = param_type;
+		func_type->function.output = function->return_type;
+		param_type->function_extensions.Add(func_type);
+		function->type = func_type;
 	}
 
 	ParseCode(&function->code, scope, function, info);

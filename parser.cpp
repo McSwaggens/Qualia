@@ -38,6 +38,22 @@ void Write(OutputBuffer* buffer, Type* type)
 	{
 		Write(buffer, type->primitive);
 	}
+	else if (type->kind == TYPE_BASETYPE_FUNCTION)
+	{
+		Write(buffer, type->function.input);
+		Write(buffer, " -> ");
+		Write(buffer, type->function.output);
+	}
+	else if (type->kind == TYPE_BASETYPE_TUPLE)
+	{
+		Write(buffer, '(');
+		for (u32 i = 0; i < type->tuple.count; i++)
+		{
+			if (i) Write(buffer, ", ");
+			Write(buffer, type->tuple[i]);
+		}
+		Write(buffer, ')');
+	}
 	else if (type->kind == TYPE_BASETYPE_STRUCT)
 	{
 		Write(buffer, type->structure->name);

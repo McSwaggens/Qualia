@@ -95,6 +95,7 @@ Parse_Info LexicalParse(String file_path)
 			else if (CompareStrings(str, ToString(TOKEN_OR)))          token.kind = TOKEN_OR;
 			else if (CompareStrings(str, ToString(TOKEN_AND)))         token.kind = TOKEN_AND;
 			else if (CompareStrings(str, ToString(TOKEN_NOT)))         token.kind = TOKEN_NOT;
+			else if (CompareStrings(str, ToString(TOKEN_MOD)))         token.kind = TOKEN_MOD;
 			else if (CompareStrings(str, ToString(TOKEN_BITWISE_OR)))  token.kind = TOKEN_BITWISE_OR;
 			else if (CompareStrings(str, ToString(TOKEN_BITWISE_AND))) token.kind = TOKEN_BITWISE_AND;
 			else if (CompareStrings(str, ToString(TOKEN_BITWISE_XOR))) token.kind = TOKEN_BITWISE_XOR;
@@ -260,9 +261,9 @@ Parse_Info LexicalParse(String file_path)
 					Fail();
 				}
 
-				if (min_bytes > explicit_bytes)
+				if (min_bytes > explicit_bytes && explicit_bytes)
 				{
-					Print("error: Integer '%' size specifier is too small. Suggestion: use %%%\n", Span(start, cursor), Span(start, end_of_digits+1), min_bytes * 8);
+					Print("error: Integer '%' size specifier is too small. Suggestion: use %%\n", Span(start, cursor), Span(start, end_of_digits+1), min_bytes * 8);
 					Fail();
 				}
 			}

@@ -53,6 +53,7 @@ enum Token_Kind
 	TOKEN_BITWISE_AND,
 	TOKEN_BITWISE_XOR,
 	TOKEN_BITWISE_NOT,
+	TOKEN_MOD,
 	TOKEN_LESS,
 	TOKEN_LESS_OR_EQUAL,
 	TOKEN_GREATER,
@@ -140,6 +141,7 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_BITWISE_AND:       return "AND";
 		case TOKEN_BITWISE_XOR:       return "XOR";
 		case TOKEN_BITWISE_NOT:       return "NOT";
+		case TOKEN_MOD:               return "MOD";
 		case TOKEN_EQUAL:             return "=";
 		case TOKEN_NOT_EQUAL:         return "!=";
 		case TOKEN_LESS:              return "<";

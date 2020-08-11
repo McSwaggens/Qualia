@@ -22,9 +22,34 @@ static void Error(Parse_Info* info, SourceLocation where, String format, Args&&.
 	Fail();
 }
 
+template<typename ...Args>
+[[noreturn]]
+static void Error(Parse_Info* info, Span<Token> where, String format, Args&&... message_args)
+{
+	u32 margin = 2;
+	u32 start = where[0].location.line;
+	SourceLocation loc_begin = where.Begin()->location;
+	SourceLocation loc_end = where.End()->location;
+	u32 number_of_lines = loc_end.line - loc_begin.line + margin + 1;
+
+	Print("%:%:%: error: ", info->file_path, (loc_begin.line+1), (loc_begin.offset+1));
+	Print(format, message_args...);
+
+	// @Todo: Coloring/Highlighting
+
+	for (u32 line = start; line < start + number_of_lines && line < info->lines.count; line++)
+	{
+		Print("%\n", String(info->lines[line], info->lines[line].Length()));
+	}
+
+	Fail();
+}
+
 static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info);
 static void ParseScope(Ast_Scope* scope, Parse_Info* info);
+static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info);
 static void ParseFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info);
+static Type* GetTypeFromTupleExpression(Array<Ast_Expression*> expressions, Parse_Info* info);
 static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info);
 
 static void InitSpecifiers(Type* type, Parse_Info* info)
@@ -145,6 +170,45 @@ static Type* GetPrimitiveType(Token_Kind kind)
 	else if (kind == TOKEN_FLOAT32) return &primitive_float32;
 	else if (kind == TOKEN_FLOAT64) return &primitive_float64;
 	else Unreachable();
+}
+
+static bool IsNumericalType(Type* type)
+{
+	return type->kind == TYPE_BASETYPE_PRIMITIVE
+		|| type->kind == TYPE_SPECIFIER_POINTER
+		|| type->kind == TYPE_BASETYPE_ENUM;
+}
+
+static bool IsConvertableToBool(Type* type)
+{
+	return type->kind == TYPE_BASETYPE_PRIMITIVE
+		|| type->kind == TYPE_SPECIFIER_POINTER
+		|| type->kind == TYPE_SPECIFIER_OPTIONAL
+		|| type->kind == TYPE_BASETYPE_ENUM;
+}
+
+static bool IsIntegerType(Type* type)
+{
+	return type == &primitive_int8
+		|| type == &primitive_int16
+		|| type == &primitive_int32
+		|| type == &primitive_int64
+		|| type == &primitive_uint8
+		|| type == &primitive_uint16
+		|| type == &primitive_uint32
+		|| type == &primitive_uint64;
+}
+
+static bool IsFloatType(Type* type)
+{
+	return type == &primitive_float16
+		|| type == &primitive_float32
+		|| type == &primitive_float64;
+}
+
+static bool AreTypesCompatible(Type* a, Type* b)
+{
+	return a == b || (a->kind == TYPE_BASETYPE_PRIMITIVE && b->kind == TYPE_BASETYPE_PRIMITIVE);
 }
 
 static Type* GetBaseType(Token* token, Ast_Scope* scope)
@@ -342,7 +406,7 @@ static Ast_Function* GetFunction(Token* token, Span<Ast_Expression*> parameters,
 	{
 		for (Ast_Function* function = scope->functions; function < scope->functions.End(); function++)
 		{
-			if (parameters.Length() == function->parameters.count && CompareStrings(token->info.string, function->name->info.string))
+			if (function->parameters.count == parameters.Length() && CompareStrings(token->info.string, function->name->info.string))
 			{
 				bool failed = false;
 				for (u32 i = 0; i < parameters.Length(); i++)
@@ -367,6 +431,47 @@ static Ast_Function* GetFunction(Token* token, Span<Ast_Expression*> parameters,
 	return null;
 }
 
+static Ast_Struct_Member* FindStructMember(Ast_Struct* ast_struct, String name)
+{
+	for (Ast_Struct_Member* member = ast_struct->members; member < ast_struct->members.End(); member++)
+	{
+		if (CompareStrings(name, member->name->info.string))
+		{
+			return member;
+		}
+	}
+
+	return null;
+}
+
+static Ast_Enum_Member* FindEnumMember(Ast_Enum* ast_enum, String name)
+{
+	for (Ast_Enum_Member* member = ast_enum->members; member < ast_enum->members.End(); member++)
+	{
+		if (CompareStrings(name, member->name->info.string))
+		{
+			return member;
+		}
+	}
+
+	return null;
+}
+
+static bool IsBaseType(Type* type)
+{
+	return type->kind == TYPE_BASETYPE_PRIMITIVE
+		|| type->kind == TYPE_BASETYPE_STRUCT
+		|| type->kind == TYPE_BASETYPE_ENUM
+		|| type->kind == TYPE_BASETYPE_FUNCTION
+		|| type->kind == TYPE_BASETYPE_TUPLE;
+}
+
+static Type* FindBaseType(Type* type)
+{
+	while (!IsBaseType(type)) type = type->subtype;
+	return type;
+}
+
 static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info)
 {
 	if (expression->kind == AST_EXPRESSION_TERMINAL)
@@ -376,6 +481,9 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 			expression->kind = AST_EXPRESSION_TERMINAL_VARIABLE;
 			expression->variable = variable;
 			expression->type = variable->type;
+			expression->is_referential_value = true;
+			expression->is_pure = variable->is_pure;
+			expression->can_constantly_evaluate = variable->can_constantly_evaluate;
 		}
 		else if (Type* type = GetBaseType(expression->token, scope))
 		{
@@ -468,25 +576,491 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 	}
 	else if (expression->kind == AST_EXPRESSION_TUPLE)
 	{
-		for (Ast_Expression** sub = expression->begin; sub < expression->end; sub++)
+		expression->can_constantly_evaluate = true;
+		expression->is_pure = true;
+		expression->is_referential_value = true;
+
+		for (u32 i = 0; i < expression->end - expression->begin; i++)
 		{
-			ParseExpression(*sub, scope, info);
+			Ast_Expression* sub = expression->begin[i];
+			ParseExpression(sub, scope, info);
+
+			if (!sub->can_constantly_evaluate)
+			{
+				expression->can_constantly_evaluate = false;
+			}
+
+			if (!sub->is_pure)
+			{
+				expression->is_pure = false;
+			}
+
+			if (!sub->is_referential_value)
+			{
+				expression->is_referential_value = false;
+			}
+		}
+
+		expression->type = GetTypeFromTupleExpression(Array(expression->begin, expression->end - expression->begin), info);
+	}
+	else if (expression->kind == AST_EXPRESSION_UNARY_ADDRESS_OF)
+	{
+		ParseExpression(expression->left, scope, info);
+		expression->type = GetPointer(expression->left->type, info);
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure;
+		expression->is_referential_value = false;
+
+		if (!expression->left->is_referential_value)
+		{
+			Error(info, expression->span, "Cannot get address of a non-referential value.\n");
 		}
 	}
-	else if (expression->kind == AST_EXPRESSION_UNARY)
+	else if (expression->kind == AST_EXPRESSION_UNARY_VALUE_OF)
 	{
-		ParseExpression(expression->right, scope, info);
+		ParseExpression(expression->left, scope, info);
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure;
+		expression->is_referential_value = true;
+
+		if (expression->left->type->kind != TYPE_SPECIFIER_POINTER)
+		{
+			Error(info, expression->span, "Cannot dereference type: %\n", expression->left->type);
+		}
+
+		expression->type = expression->left->type->subtype;
 	}
-	else if (expression->kind == AST_EXPRESSION_BINARY)
+	else if (expression->kind == AST_EXPRESSION_UNARY_BINARY_NOT)
+	{
+		ParseExpression(expression->left, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure;
+		expression->is_referential_value = false;
+		// @Todo: Check if numeric type
+		// @Todo: Enforce integer type?
+	}
+	else if (expression->kind == AST_EXPRESSION_UNARY_MINUS)
+	{
+		ParseExpression(expression->left, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure;
+		expression->is_referential_value = false;
+		// @Todo: Check if numeric type
+	}
+	else if (expression->kind == AST_EXPRESSION_UNARY_PLUS)
+	{
+		ParseExpression(expression->left, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure;
+		expression->is_referential_value = false;
+		// @Todo: Check if numeric type
+	}
+	else if (expression->kind == AST_EXPRESSION_UNARY_NOT)
+	{
+		ParseExpression(expression->left, scope, info);
+		expression->type = &primitive_bool;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure;
+		expression->is_referential_value = false;
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_DOT)
+	{
+		ParseExpression(expression->left,  scope, info);
+		expression->is_referential_value = true;
+
+		// @Todo: Handle inferred function calls.
+
+		Type* type = expression->left->type;
+
+		while (type->kind == TYPE_SPECIFIER_POINTER) type = type->subtype;
+
+		if (type->kind == TYPE_BASETYPE_STRUCT)
+		{
+			Assert(expression->right->kind == AST_EXPRESSION_TERMINAL && expression->right->token->kind == TOKEN_IDENTIFIER);
+			Ast_Struct* ast_struct = type->structure;
+			Ast_Struct_Member* member = FindStructMember(ast_struct, expression->right->token->info.string);
+
+			if (!member)
+			{
+				Error(info, expression->span, "Struct % does not have a member named %\n", ast_struct->name, expression->right->token);
+			}
+
+			expression->type = member->type.type;
+			expression->right->struct_member = member;
+		}
+		else
+		{
+			Error(info, expression->span, "Cannot dot into type: %\n", expression->left->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_COMPARE_EQUAL)
 	{
 		ParseExpression(expression->left,  scope, info);
 		ParseExpression(expression->right, scope, info);
+		expression->type = &primitive_bool;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!AreTypesCompatible(expression->left->type, expression->right->type))
+		{
+			Error(info, expression->token->location, "% and % are incompatible types.\n", expression->left->type, expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = &primitive_bool;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!AreTypesCompatible(expression->left->type, expression->right->type))
+		{
+			Error(info, expression->token->location, "% and % are incompatible types.\n", expression->left->type, expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_COMPARE_LESS)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = &primitive_bool;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = &primitive_bool;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_COMPARE_GREATER)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = &primitive_bool;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = &primitive_bool;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_ADD)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+
+		if (!AreTypesCompatible(expression->left->type, expression->right->type))
+		{
+			Error(info, expression->token->location, "% and % are incompatible types.\n", expression->left->type, expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_SUBTRACT)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_MULTIPLY)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_DIVIDE)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_MODULO)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_EXPONENTIAL)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_BITWISE_OR)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type) || IsFloatType(expression->left->type))
+		{
+			Error(info, expression->span, "Cannot use bitwise OR with type: %\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type) || IsFloatType(expression->right->type))
+		{
+			Error(info, expression->span, "Cannot use bitwise OR with type: %\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_BITWISE_XOR)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type) || IsFloatType(expression->left->type))
+		{
+			Error(info, expression->span, "Cannot use bitwise XOR with type: %\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type) || IsFloatType(expression->right->type))
+		{
+			Error(info, expression->span, "Cannot use bitwise XOR with type: %\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_BITWISE_AND)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type) || IsFloatType(expression->left->type))
+		{
+			Error(info, expression->span, "Cannot use bitwise AND with type: %\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type) || IsFloatType(expression->right->type))
+		{
+			Error(info, expression->span, "Cannot use bitwise AND with type: %\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_LEFT_SHIFT)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_RIGHT_SHIFT)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_AND)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
+	}
+	else if (expression->kind == AST_EXPRESSION_BINARY_OR)
+	{
+		ParseExpression(expression->left,  scope, info);
+		ParseExpression(expression->right, scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
+
+		if (!IsNumericalType(expression->left->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->left->type);
+		}
+
+		if (!IsNumericalType(expression->right->type))
+		{
+			Error(info, expression->token->location, "% is not a numerical type.\n", expression->right->type);
+		}
 	}
 	else if (expression->kind == AST_EXPRESSION_IF_ELSE)
 	{
 		ParseExpression(expression->left,   scope, info);
 		ParseExpression(expression->middle, scope, info);
 		ParseExpression(expression->right,  scope, info);
+		expression->type = expression->left->type;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->middle->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->middle->is_pure && expression->right->is_pure;
+		expression->is_referential_value = false;
 
 		if (expression->left->type != expression->right->type)
 		{
@@ -514,7 +1088,15 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 			{
 				expression->left->kind = AST_EXPRESSION_TERMINAL_VARIABLE;
 				expression->left->variable = variable;
-				// @Todo @Bug: Need to check if the variable is a function type e.g. ()->()
+				expression->type = variable->type->function.output;
+				expression->is_referential_value = true;
+				expression->is_pure = variable->is_pure;
+				expression->can_constantly_evaluate = variable->can_constantly_evaluate;
+
+				if (variable->type->kind != TYPE_BASETYPE_FUNCTION)
+				{
+					Error(info, expression->left->token->location, "Variable % with type % cannot be called like a function.\n", variable->name, variable->type);
+				}
 			}
 			else
 			{
@@ -533,6 +1115,8 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 	{
 		ParseExpression(expression->left,  scope, info);
 		ParseExpression(expression->right, scope, info);
+		// @Todo: Set expression->type
+		// @Todo: Check if array or pointer
 	}
 }
 
@@ -622,6 +1206,12 @@ static void ParseScope(Ast_Scope* scope, Parse_Info* info)
 	{
 		ParseFunction(f, scope, info);
 	}
+
+	for (Ast_Function* f = scope->functions; f < scope->functions.End(); f++)
+	{
+		ParseCode(&f->code, scope, f, info);
+	}
+
 }
 
 static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info)
@@ -643,26 +1233,57 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 				}
 			}
 
+			if (variable->assignment)
+			{
+				ParseExpression(variable->assignment, &code->scope, info);
+
+				if (!variable->assignment->type)
+				{
+					Error(info, variable->assignment->span, "Expression does not have a type.\n");
+				}
+			}
+
 			if (variable->explicit_type != null)
 			{
 				variable->type = GetType(variable->explicit_type, &code->scope, info);
 				variable->explicit_type->type = variable->type;
+
+				if (variable->assignment)
+				{
+					if (variable->type != variable->assignment->type)
+					{
+						Error(info, variable->name->location, "Cannot assign expression with type % to variable with type %\n", variable->assignment->type, variable->type);
+					}
+				}
 			}
 			else
 			{
-				// @Todo: Infer type from expression which is guaranteed not to be null.
+				variable->type = variable->assignment->type;
 			}
 
-			if (variable->assignment != null)
-			{
-				ParseExpression(variable->assignment, &code->scope, info);
-			}
+			// Print("Variable % has type %\n", variable->name, variable->type);
 
 			code->scope.variables.Add(variable);
 		}
-		else if (statement->kind == AST_STATEMENT_ASSIGNMENT)
+		else if (statement->kind == AST_STATEMENT_ASSIGNMENT
+			||   statement->kind == AST_STATEMENT_ASSIGNMENT_ADD
+			||   statement->kind == AST_STATEMENT_ASSIGNMENT_SUBTRACT
+			||   statement->kind == AST_STATEMENT_ASSIGNMENT_MULTIPLY
+			||   statement->kind == AST_STATEMENT_ASSIGNMENT_DIVIDE
+			||   statement->kind == AST_STATEMENT_ASSIGNMENT_POWER)
 		{
 			ParseExpression(statement->assignment.right, &code->scope, info);
+			ParseExpression(statement->assignment.left,  &code->scope, info);
+
+			if (!statement->assignment.left->is_referential_value)
+			{
+				Error(info, statement->assignment.left->span, "Expression is not referential.\n");
+			}
+
+			if (!AreTypesCompatible(statement->assignment.left->type, statement->assignment.right->type))
+			{
+				Error(info, statement->assignment.token->location, "Left and right types are incompatible.\n");
+			}
 		}
 		else if (statement->kind == AST_STATEMENT_BRANCH_BLOCK)
 		{
@@ -678,6 +1299,10 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 		else if (statement->kind == AST_STATEMENT_DEFER)
 		{
 			ParseCode(&statement->defer.code, &code->scope, function, info);
+		}
+		else if (statement->kind == AST_STATEMENT_CLAIM)
+		{
+			ParseExpression(statement->claim.expression, &code->scope, info);
 		}
 		else if (statement->kind == AST_STATEMENT_EXPRESSION)
 		{
@@ -696,7 +1321,7 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 					Error(info, statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
 				}
 
-				if (statement->ret.expression->type != function->return_type)
+				if (!AreTypesCompatible(statement->ret.expression->type, function->return_type))
 				{
 					Error(info, statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
 				}
@@ -764,6 +1389,50 @@ static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Parse_Info
 	return tuple;
 }
 
+static Type* GetTypeFromTupleExpression(Array<Ast_Expression*> expressions, Parse_Info* info)
+{
+	if (expressions.count == 1)
+	{
+		return expressions[0]->type;
+	}
+
+	Type* first = expressions[0]->type;
+
+	for (u32 i = 0; i < first->tuple_extensions.count; i++)
+	{
+		Type* tuple = first->tuple_extensions[i];
+		bool fail = false;
+
+		for (u32 j = 0; j < tuple->tuple.count; j++)
+		{
+			if (tuple->tuple[j] != expressions[j]->type)
+			{
+				fail = true;
+				break;
+			}
+		}
+
+		if (!fail)
+		{
+			return tuple;
+		}
+	}
+
+	Type* tuple = info->stack.Allocate<Type>();
+	Type** tuple_members = info->stack.Allocate<Type*>(expressions.count);
+	ZeroMemory(tuple);
+	tuple->kind = TYPE_BASETYPE_TUPLE;
+
+	for (u32 i = 0; i < expressions.count; i++)
+	{
+		tuple_members[i] = expressions[i]->type;
+	}
+
+	tuple->tuple = Array(tuple_members, expressions.count);
+	first->tuple_extensions.Add(tuple);
+	return tuple;
+}
+
 static void ParseFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info)
 {
 	for (Ast_VariableDeclaration* param = function->parameters; param < function->parameters.End(); param++)
@@ -818,8 +1487,6 @@ static void ParseFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* 
 		param_type->function_extensions.Add(func_type);
 		function->type = func_type;
 	}
-
-	ParseCode(&function->code, scope, function, info);
 }
 
 void SemanticParse(Parse_Info* info)

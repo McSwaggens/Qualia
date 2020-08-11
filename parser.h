@@ -64,6 +64,8 @@ struct Type
 
 	Type* specifiers;
 	u64 size;
+
+	// @Optimization: Combine these into single List?
 	List<Type*> fixed_arrays;
 	List<Type*> tuple_extensions;
 	List<Type*> function_extensions;
@@ -139,8 +141,32 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_TERMINAL_PRIMITIVE,
 	AST_EXPRESSION_TERMINAL_STRUCT_MEMBER,
 	AST_EXPRESSION_TERMINAL_ENUM_MEMBER,
-	AST_EXPRESSION_UNARY,
-	AST_EXPRESSION_BINARY,
+	AST_EXPRESSION_UNARY_BINARY_NOT,
+	AST_EXPRESSION_UNARY_NOT,
+	AST_EXPRESSION_UNARY_MINUS,
+	AST_EXPRESSION_UNARY_PLUS,
+	AST_EXPRESSION_UNARY_VALUE_OF,
+	AST_EXPRESSION_UNARY_ADDRESS_OF,
+	AST_EXPRESSION_BINARY_COMPARE_EQUAL,
+	AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL,
+	AST_EXPRESSION_BINARY_COMPARE_LESS,
+	AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL,
+	AST_EXPRESSION_BINARY_COMPARE_GREATER,
+	AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL,
+	AST_EXPRESSION_BINARY_DOT,
+	AST_EXPRESSION_BINARY_ADD,
+	AST_EXPRESSION_BINARY_SUBTRACT,
+	AST_EXPRESSION_BINARY_MULTIPLY,
+	AST_EXPRESSION_BINARY_DIVIDE,
+	AST_EXPRESSION_BINARY_MODULO,
+	AST_EXPRESSION_BINARY_EXPONENTIAL,
+	AST_EXPRESSION_BINARY_BITWISE_OR,
+	AST_EXPRESSION_BINARY_BITWISE_XOR,
+	AST_EXPRESSION_BINARY_BITWISE_AND,
+	AST_EXPRESSION_BINARY_LEFT_SHIFT,
+	AST_EXPRESSION_BINARY_RIGHT_SHIFT,
+	AST_EXPRESSION_BINARY_AND,
+	AST_EXPRESSION_BINARY_OR,
 	AST_EXPRESSION_CALL,
 	AST_EXPRESSION_SUBSCRIPT,
 	AST_EXPRESSION_LAMBDA,
@@ -153,7 +179,11 @@ struct Ast_Expression
 {
 	Ast_Expression_Kind kind;
 	Token* token;
-	Type*  type;
+	Type* type;
+	Span<Token> span;
+	bool is_pure;
+	bool is_referential_value;
+	bool can_constantly_evaluate;
 
 	union
 	{
@@ -199,12 +229,18 @@ enum Ast_Statement_Kind
 {
 	AST_STATEMENT_BRANCH_BLOCK,
 	AST_STATEMENT_DEFER,
+	AST_STATEMENT_CLAIM,
 	AST_STATEMENT_ALIAS,
 	AST_STATEMENT_RETURN,
 	AST_STATEMENT_BREAK,
 	AST_STATEMENT_EXPRESSION,
 	AST_STATEMENT_VARIABLE_DECLARATION,
 	AST_STATEMENT_ASSIGNMENT,
+	AST_STATEMENT_ASSIGNMENT_ADD,
+	AST_STATEMENT_ASSIGNMENT_SUBTRACT,
+	AST_STATEMENT_ASSIGNMENT_MULTIPLY,
+	AST_STATEMENT_ASSIGNMENT_DIVIDE,
+	AST_STATEMENT_ASSIGNMENT_POWER,
 };
 
 // @Todo: Redo this branch shit
@@ -248,10 +284,18 @@ struct Ast_Return
 	Ast_Expression* expression;
 };
 
+struct Ast_Claim
+{
+	Token* token;
+	Ast_Expression* expression;
+};
+
 struct Ast_VariableDeclaration
 {
 	Token* name;
 	bool is_parameter;
+	bool can_constantly_evaluate;
+	bool is_pure;
 	Ast_Type* explicit_type;
 	Type* type;
 	Ast_Expression* assignment;
@@ -280,6 +324,7 @@ struct Ast_Statement
 		Ast_Assignment          assignment;
 		Ast_BranchBlock         branch;
 		Ast_Defer               defer;
+		Ast_Claim               claim;
 		Ast_Alias               alias;
 		Ast_Break               brk;
 		Ast_Return              ret;
@@ -297,8 +342,7 @@ struct Ast_Function
 	Type* return_type;
 	Ast_Code code;
 	Ast_Attribute attribute;
-	bool visited;
-	bool scanned;
+	bool pure;
 	bool returns_value;
 };
 

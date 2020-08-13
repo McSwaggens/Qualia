@@ -1115,8 +1115,23 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 	{
 		ParseExpression(expression->left,  scope, info);
 		ParseExpression(expression->right, scope, info);
-		// @Todo: Set expression->type
-		// @Todo: Check if array or pointer
+
+		if (expression->left->type->kind != TYPE_SPECIFIER_FIXED_ARRAY   &&
+			expression->left->type->kind != TYPE_SPECIFIER_DYNAMIC_ARRAY &&
+			expression->left->type->kind != TYPE_SPECIFIER_POINTER)
+		{
+			Error(info, expression->left->span, "Expression with type % is not a valid array.\n", expression->left->span);
+		}
+
+		if (!IsIntegerType(expression->right->type))
+		{
+			Error(info, expression->right->span, "Subscript index must be an integer, not: %\n", expression->right->type);
+		}
+
+		expression->type = expression->left->type->subtype;
+		expression->can_constantly_evaluate = expression->left->can_constantly_evaluate && expression->right->can_constantly_evaluate;
+		expression->is_pure = expression->left->is_pure && expression->right->is_pure;
+		expression->is_referential_value = true;
 	}
 }
 

@@ -1525,7 +1525,7 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 		}
 		else
 		{
-			Error(info, token->location, "Unexpected token in global indent: %\n", token);
+			Error(info, token->location, "Unexpected token in global scope: %\n", token);
 		}
 	}
 }

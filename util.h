@@ -2,7 +2,7 @@
 
 #include "int.h"
 
-#define Cast(T, E) ((T)E)
+#define Cast(E, T) ((T)E)
 
 static consteval bool IsDebug()
 {
@@ -206,8 +206,5 @@ static constexpr void Reverse(T* items, u64 count)
 void ExitProcess(bool failure);
 
 [[noreturn]]
-static inline void Fail()
-{
-	ExitProcess(true);
-}
+void Fail();
 

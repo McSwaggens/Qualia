@@ -38,6 +38,20 @@ struct List
 		count += amount;
 	}
 
+	bool AddIfUnique(T item)
+	{
+		for (u32 i = 0; i < count; i++)
+		{
+			if (data[i] == item)
+			{
+				return false;
+			}
+		}
+
+		Add(item);
+		return true;
+	}
+
 	void Add(T item, u32 amount)
 	{
 		if (count + amount >= capacity)
@@ -48,6 +62,19 @@ struct List
 
 		FillMemory(data + count, amount, item);
 		count += amount;
+	}
+
+	bool Contains(T value)
+	{
+		for (u32 i = 0; i < count; i++)
+		{
+			if (data[i] == value)
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	void Pad(u32 amount)

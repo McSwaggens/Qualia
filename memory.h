@@ -112,9 +112,9 @@ struct Stack_Allocator
 	char* head;
 	u64 block_size;
 
-	void Init(u64 size = 4096 * 1024 * 4)
+	void Init(u64 size = 4096 * 1024 * 16)
 	{
-		block = Cast(Stack_Allocator_Block*, AllocateVirtualPage(size));
+		block = Cast(AllocateVirtualPage(size), Stack_Allocator_Block*);
 		block->previous = null;
 		block_size = size;
 		head = block->data;
@@ -136,15 +136,16 @@ struct Stack_Allocator
 		u64 size = sizeof(T) * count;
 
 		// @Todo @Bug: Check if allocation is larger than block_size.
-		if (head + size >= block->data + block_size)
+		if (head + size >= block->data + block_size - sizeof(Stack_Allocator_Block))
 		{
-			Stack_Allocator_Block* new_block = Cast(Stack_Allocator_Block*, AllocateVirtualPage(size));
+			block_size *= 2;
+			Stack_Allocator_Block* new_block = Cast(AllocateVirtualPage(block_size), Stack_Allocator_Block*);
 			new_block->previous = block;
 			head = new_block->data;
 			block = new_block;
 		}
 
-		T* p = Cast(T*, head);
+		T* p = Cast(head, T*);
 		head += size;
 
 		return p;

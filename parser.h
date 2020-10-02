@@ -23,6 +23,7 @@ struct Ast_Code;
 struct Ast_Scope;
 struct Ast_Attribute;
 struct Type;
+struct StackFrame;
 
 void Write(OutputBuffer* buffer, Ast_Expression* expression);
 void Write(OutputBuffer* buffer, Ast_Type* type);
@@ -63,7 +64,8 @@ struct Type
 	};
 
 	Type* specifiers;
-	u64 size;
+	u64 length; // Fixed array size
+	u64 size;   // Size of the type in bytes
 
 	// @Optimization: Combine these into single List?
 	List<Type*> fixed_arrays;
@@ -216,12 +218,14 @@ struct Ast_Scope
 	List<Ast_Struct> structs;
 	List<Ast_Enum> enums;
 	List<Ast_VariableDeclaration*> variables;
+	List<StackFrame> stack_frames;
 };
 
 struct Ast_Code
 {
 	List<Ast_Statement> statements;
 	Ast_Scope scope;
+	u64 frame_size;
 	bool does_return;
 };
 
@@ -296,10 +300,23 @@ struct Ast_VariableDeclaration
 	bool is_parameter;
 	bool can_constantly_evaluate;
 	bool is_pure;
+	bool is_global;
+	u64  offset;
 	Ast_Type* explicit_type;
 	Type* type;
 	Ast_Expression* assignment;
 	Ast_Attribute attribute;
+};
+
+struct StackFrame
+{
+	char* data;
+	// Ast_Code* code;
+
+	inline char* GetData(Ast_VariableDeclaration* variable)
+	{
+		return data + variable->offset;
+	}
 };
 
 struct Ast_Assignment
@@ -322,7 +339,7 @@ struct Ast_Statement
 	{
 		Token*                  token;
 		Ast_Assignment          assignment;
-		Ast_BranchBlock         branch;
+		Ast_BranchBlock         branch_block;
 		Ast_Defer               defer;
 		Ast_Claim               claim;
 		Ast_Alias               alias;
@@ -342,8 +359,9 @@ struct Ast_Function
 	Type* return_type;
 	Ast_Code code;
 	Ast_Attribute attribute;
-	bool pure;
+	bool is_pure;
 	bool returns_value;
+	bool is_global;
 };
 
 struct Ast_Import
@@ -371,6 +389,7 @@ struct Ast_Struct
 	Token* name;
 	Type type;
 	List<Ast_Struct_Member> members;
+	List<Ast_Struct*> closure;
 	Ast_Attribute attribute;
 };
 

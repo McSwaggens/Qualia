@@ -187,6 +187,43 @@ struct SourceLocation
 	u32 offset;
 };
 
+struct DynamicArray32_Value
+{
+	u32 pointer;
+	u32 length;
+};
+
+struct DynamicArray64_Value
+{
+	u64 pointer;
+	u64 length;
+};
+
+union Value
+{
+	bool value_bool;
+
+	u8  value_uint8;
+	u16 value_uint16;
+	u32 value_uint32;
+	u64 value_uint64;
+
+	s8  value_int8;
+	s16 value_int16;
+	s32 value_int32;
+	s64 value_int64;
+
+	// @Todo: value_float16
+	f32 value_float32;
+	f64 value_float64;
+
+	DynamicArray32_Value value_dynamic_array32;
+	DynamicArray64_Value value_dynamic_array64;
+
+	Value* pointer;
+
+	char data[];
+};
 
 struct IntegerInfo
 {

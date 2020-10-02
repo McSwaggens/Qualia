@@ -25,7 +25,7 @@ void Write(OutputBuffer* buffer, Type* type)
 	else if (type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
 	{
 		Write(buffer, '[');
-		Write(buffer, type->size);
+		Write(buffer, type->length);
 		Write(buffer, ']');
 		Write(buffer, type->subtype);
 	}
@@ -560,6 +560,7 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info);
 static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 {
 	Ast_Struct structure;
+	ZeroMemory(&structure);
 	token++;
 
 	if (token->kind != TOKEN_IDENTIFIER)
@@ -705,8 +706,8 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 	if (IsUnaryOperator(token->kind) && IsOnCorrectScope(token, indent))
 	{
 		left = info->stack.Allocate<Ast_Expression>();
-		if      (token->kind == TOKEN_ASTERISK)    left->kind = AST_EXPRESSION_UNARY_ADDRESS_OF;
-		else if (token->kind == TOKEN_AMPERSAND)   left->kind = AST_EXPRESSION_UNARY_VALUE_OF;
+		if      (token->kind == TOKEN_ASTERISK)    left->kind = AST_EXPRESSION_UNARY_VALUE_OF;
+		else if (token->kind == TOKEN_AMPERSAND)   left->kind = AST_EXPRESSION_UNARY_ADDRESS_OF;
 		else if (token->kind == TOKEN_BITWISE_NOT) left->kind = AST_EXPRESSION_UNARY_BINARY_NOT;
 		else if (token->kind == TOKEN_NOT)         left->kind = AST_EXPRESSION_UNARY_NOT;
 		else if (token->kind == TOKEN_MINUS)       left->kind = AST_EXPRESSION_UNARY_MINUS;
@@ -739,6 +740,11 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		Token* open = token++;
 		Token* closure = open->GetClosure();
 		List<Ast_Expression*> elements = null;
+
+		if (token == closure)
+		{
+			Error(info, open->location, "Empty tuples aren't allowed.\n");
+		}
 
 		while (token < closure)
 		{
@@ -784,10 +790,8 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		{
 			CheckScope(token, indent, info);
 		}
-		else
-		{
-			Error(info, token->location, "Invalid expression, expected term, got: %\n", token);
-		}
+
+		Error(info, token->location, "Invalid expression, expected term, got: %\n", token);
 	}
 
 	while (CanTakeNextOp(token, assignment_break, parent_precedence) && IsOnCorrectScope(token, indent))
@@ -920,7 +924,6 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			binary->span.end = token;
 			left = binary;
 		}
-
 	}
 
 	return left;
@@ -1217,6 +1220,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 		statement.variable_declaration.assignment = null;
 		statement.variable_declaration.explicit_type = null;
 		statement.variable_declaration.is_parameter = false;
+		statement.variable_declaration.is_global = false;
 
 		token += 2;
 
@@ -1275,7 +1279,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 	{
 		Ast_BranchBlock branch_block = ParseBranchBlock(token, indent, info);
 		statement.kind = AST_STATEMENT_BRANCH_BLOCK;
-		statement.branch = branch_block;
+		statement.branch_block = branch_block;
 		return statement;
 	}
 	else if (token->kind == TOKEN_DEFER)
@@ -1359,11 +1363,7 @@ static Ast_Attribute ParseAttribute(Token*& token, u32 indent, Parse_Info* info)
 static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 {
 	Ast_Code code;
-	code.statements       = null;
-	code.scope.functions  = null;
-	code.scope.structs    = null;
-	code.scope.enums      = null;
-	code.scope.variables  = null;
+	ZeroMemory(&code);
 
 	while (IsOnCorrectScope(token, indent))
 	{
@@ -1394,6 +1394,7 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 		{
 			Ast_Function function = ParseFunction(token, indent, info);
 			function.attribute = attribute;
+			function.is_global = false;
 			code.scope.functions.Add(function);
 		}
 		else
@@ -1521,6 +1522,7 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 		{
 			Ast_Function function = ParseFunction(token, 0, info);
 			function.attribute = attribute;
+			function.is_global = true;
 			root->scope.functions.Add(function);
 		}
 		else

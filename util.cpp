@@ -9,3 +9,9 @@ void ExitProcess(bool failure)
 	standard_error_buffer.Flush();
 	exit(failure ? EXIT_FAILURE : EXIT_SUCCESS);
 }
+
+[[noreturn]]
+void Fail()
+{
+	ExitProcess(true);
+}

@@ -33,8 +33,8 @@ static constexpr u64 Length(Span<T> span)
 }
 
 template<typename T>
-static constexpr void Zero(Span<T> span)
+static constexpr void ZeroMemory(Span<T> span)
 {
-	Zero(span.begin, span.end);
+	ZeroMemory(span.begin, span.end);
 }
 

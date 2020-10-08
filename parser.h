@@ -177,6 +177,71 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_IF_ELSE,
 };
 
+static bool IsTerminalExpression(Ast_Expression_Kind kind)
+{
+	switch (kind)
+	{
+		case AST_EXPRESSION_TERMINAL:
+		case AST_EXPRESSION_TERMINAL_FUNCTION:
+		case AST_EXPRESSION_TERMINAL_LITERAL:
+		case AST_EXPRESSION_TERMINAL_VARIABLE:
+		case AST_EXPRESSION_TERMINAL_STRUCT:
+		case AST_EXPRESSION_TERMINAL_ENUM:
+		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
+		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER:
+		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER:
+			return true;
+		default:
+			return false;
+	}
+}
+
+static bool IsUnaryExpression(Ast_Expression_Kind kind)
+{
+	switch (kind)
+	{
+		case AST_EXPRESSION_UNARY_BINARY_NOT:
+		case AST_EXPRESSION_UNARY_NOT:
+		case AST_EXPRESSION_UNARY_MINUS:
+		case AST_EXPRESSION_UNARY_PLUS:
+		case AST_EXPRESSION_UNARY_VALUE_OF:
+		case AST_EXPRESSION_UNARY_ADDRESS_OF:
+			return true;
+		default:
+			return false;
+	}
+}
+
+static bool IsBinaryExpression(Ast_Expression_Kind kind)
+{
+	switch (kind)
+	{
+		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
+		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
+		case AST_EXPRESSION_BINARY_COMPARE_LESS:
+		case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:
+		case AST_EXPRESSION_BINARY_COMPARE_GREATER:
+		case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
+		case AST_EXPRESSION_BINARY_DOT:
+		case AST_EXPRESSION_BINARY_ADD:
+		case AST_EXPRESSION_BINARY_SUBTRACT:
+		case AST_EXPRESSION_BINARY_MULTIPLY:
+		case AST_EXPRESSION_BINARY_DIVIDE:
+		case AST_EXPRESSION_BINARY_MODULO:
+		case AST_EXPRESSION_BINARY_EXPONENTIAL:
+		case AST_EXPRESSION_BINARY_BITWISE_OR:
+		case AST_EXPRESSION_BINARY_BITWISE_XOR:
+		case AST_EXPRESSION_BINARY_BITWISE_AND:
+		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
+		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
+		case AST_EXPRESSION_BINARY_AND:
+		case AST_EXPRESSION_BINARY_OR:
+			return true;
+		default:
+			return false;
+	}
+}
+
 struct Ast_Expression
 {
 	Ast_Expression_Kind kind;
@@ -417,7 +482,89 @@ struct Parse_Info
 	String file_path;
 };
 
+struct MemoryBlock
+{
+	char* head;
+	u64   size;
+	MemoryBlock* prev;
+	MemoryBlock* next;
+	char  data[];
+};
+
+struct Interpreter
+{
+	MemoryBlock* block;
+	Ast_Statement* statement;
+};
+
 Parse_Info LexicalParse(String file_path);
 void ParseFile(String file_path);
 void SemanticParse(Parse_Info* info);
+void Interpret(Ast_Code* code, char* output, StackFrame frame, Interpreter* interpreter, Parse_Info* info);
+void Interpret(Ast_Function* function, char* output, Interpreter* interpreter, Parse_Info* info);
+void Interpret(Ast_Expression* expression, char* output);
+StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
+
+static bool IsPrimitive(Type* type, Token_Kind primitive)
+{
+	return type->kind == TYPE_BASETYPE_PRIMITIVE && type->primitive == primitive;
+}
+
+static bool IsConvertableToBool(Type* type)
+{
+	return type->kind == TYPE_BASETYPE_PRIMITIVE
+		|| type->kind == TYPE_SPECIFIER_POINTER
+		|| type->kind == TYPE_SPECIFIER_OPTIONAL
+		|| type->kind == TYPE_BASETYPE_ENUM;
+}
+
+static bool IsIntegerType(Type* type)
+{
+	return IsPrimitive(type, TOKEN_INT8)
+		|| IsPrimitive(type, TOKEN_INT16)
+		|| IsPrimitive(type, TOKEN_INT32)
+		|| IsPrimitive(type, TOKEN_INT64)
+		|| IsPrimitive(type, TOKEN_UINT8)
+		|| IsPrimitive(type, TOKEN_UINT16)
+		|| IsPrimitive(type, TOKEN_UINT32)
+		|| IsPrimitive(type, TOKEN_UINT64);
+	// return type == &primitive_int8
+	// 	|| type == &primitive_int16
+	// 	|| type == &primitive_int32
+	// 	|| type == &primitive_int64
+	// 	|| type == &primitive_uint8
+	// 	|| type == &primitive_uint16
+	// 	|| type == &primitive_uint32
+	// 	|| type == &primitive_uint64;
+}
+
+static bool IsFloatType(Type* type)
+{
+	return IsPrimitive(type, TOKEN_FLOAT16)
+		|| IsPrimitive(type, TOKEN_FLOAT32)
+		|| IsPrimitive(type, TOKEN_FLOAT64);
+	// return type == &primitive_float16
+	// 	|| type == &primitive_float32
+	// 	|| type == &primitive_float64;
+}
+
+static bool IsNumericalType(Type* type)
+{
+	return type->kind == TYPE_BASETYPE_PRIMITIVE
+		|| type->kind == TYPE_SPECIFIER_POINTER
+		|| type->kind == TYPE_BASETYPE_ENUM;
+}
+
+static bool IsIntegerLikeType(Type* type)
+{
+	return IsIntegerType(type)
+		|| IsPrimitive(type, TOKEN_BOOL)
+		|| type->kind == TYPE_SPECIFIER_POINTER
+		|| type->kind == TYPE_BASETYPE_ENUM;
+}
+
+static bool AreTypesCompatible(Type* a, Type* b)
+{
+	return a == b || (a->kind == TYPE_BASETYPE_PRIMITIVE && b->kind == TYPE_BASETYPE_PRIMITIVE);
+}
 

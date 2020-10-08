@@ -1,6 +1,6 @@
 bin/qualia: *.cpp *.h
 	mkdir -p bin
-	clang -o bin/qualia -g3 -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions *.cpp
+	clang -o bin/qualia -lm -g3 -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions *.cpp
 
 run: bin/qualia
 	./bin/qualia

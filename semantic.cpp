@@ -1234,119 +1234,130 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 
 	for (Ast_Statement* statement = code->statements; statement < code->statements.End(); statement++)
 	{
-		if (statement->kind == AST_STATEMENT_VARIABLE_DECLARATION)
+		switch (statement->kind)
 		{
-			Ast_VariableDeclaration* variable = &statement->variable_declaration;
-
-			for (Ast_VariableDeclaration** other_variable = code->scope.variables; other_variable < code->scope.variables.End(); other_variable++)
+			case AST_STATEMENT_BRANCH_BLOCK:
 			{
-				if (CompareStrings(variable->name->info.string, (*other_variable)->name->info.string))
+				for (Ast_Branch* branch = statement->branch_block.branches; branch < statement->branch_block.branches.End(); branch++)
 				{
-					Error(info, variable->name->location, "Variable with name '%' already declared in this scope.\n", variable->name);
+					ParseExpression(branch->condition, &code->scope, info);
+					ParseCode(&branch->code, &code->scope, function, info);
 				}
-			}
+			} break;
 
-			if (variable->assignment)
+			case AST_STATEMENT_DEFER:
 			{
-				ParseExpression(variable->assignment, &code->scope, info);
+				ParseCode(&statement->defer.code, &code->scope, function, info);
+			} break;
 
-				if (!variable->assignment->type)
+			case AST_STATEMENT_CLAIM:
+			{
+				ParseExpression(statement->claim.expression, &code->scope, info);
+			} break;
+
+			case AST_STATEMENT_ALIAS:
+			{
+				Assert();
+			} break;
+
+			case AST_STATEMENT_RETURN:
+			{
+				code->does_return = true;
+
+				if (statement->ret.expression)
 				{
-					Error(info, variable->assignment->span, "Expression does not have a type.\n");
-				}
-			}
+					ParseExpression(statement->ret.expression, &code->scope, info);
 
-			if (variable->explicit_type != null)
+					if (!function->return_type)
+					{
+						Error(info, statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
+					}
+
+					if (!AreTypesCompatible(statement->ret.expression->type, function->return_type))
+					{
+						Error(info, statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
+					}
+				}
+				else if (function->return_type)
+				{
+					Error(info, statement->ret.token->location, "Expected return value with type: %\n", function->return_type);
+				}
+			} break;
+
+			case AST_STATEMENT_BREAK:
 			{
-				variable->type = GetType(variable->explicit_type, &code->scope, info);
-				variable->explicit_type->type = variable->type;
+			} break;
+
+			case AST_STATEMENT_EXPRESSION:
+			{
+				ParseExpression(statement->expression, &code->scope, info);
+			} break;
+
+			case AST_STATEMENT_VARIABLE_DECLARATION:
+			{
+				Ast_VariableDeclaration* variable = &statement->variable_declaration;
+
+				for (Ast_VariableDeclaration** other_variable = code->scope.variables; other_variable < code->scope.variables.End(); other_variable++)
+				{
+					if (CompareStrings(variable->name->info.string, (*other_variable)->name->info.string))
+					{
+						Error(info, variable->name->location, "Variable with name '%' already declared in this scope.\n", variable->name);
+					}
+				}
 
 				if (variable->assignment)
 				{
-					if (!AreTypesCompatible(variable->type, variable->assignment->type))
+					ParseExpression(variable->assignment, &code->scope, info);
+
+					if (!variable->assignment->type)
 					{
-						Error(info, variable->name->location, "Cannot assign expression with type % to variable with type %\n", variable->assignment->type, variable->type);
+						Error(info, variable->assignment->span, "Expression does not have a type.\n");
 					}
 				}
-			}
-			else
-			{
-				variable->type = variable->assignment->type;
-			}
 
-			// Print("Variable % has type %\n", variable->name, variable->type);
-
-			code->scope.variables.Add(variable);
-		}
-		else if (statement->kind == AST_STATEMENT_ASSIGNMENT
-			||   statement->kind == AST_STATEMENT_ASSIGNMENT_ADD
-			||   statement->kind == AST_STATEMENT_ASSIGNMENT_SUBTRACT
-			||   statement->kind == AST_STATEMENT_ASSIGNMENT_MULTIPLY
-			||   statement->kind == AST_STATEMENT_ASSIGNMENT_DIVIDE
-			||   statement->kind == AST_STATEMENT_ASSIGNMENT_POWER)
-		{
-			ParseExpression(statement->assignment.right, &code->scope, info);
-			ParseExpression(statement->assignment.left,  &code->scope, info);
-
-			if (!statement->assignment.left->is_referential_value)
-			{
-				Error(info, statement->assignment.left->span, "Expression is not referential.\n");
-			}
-
-			if (!AreTypesCompatible(statement->assignment.left->type, statement->assignment.right->type))
-			{
-				Error(info, statement->assignment.token->location, "Left and right types are incompatible.\n");
-			}
-		}
-		else if (statement->kind == AST_STATEMENT_BRANCH_BLOCK)
-		{
-			for (Ast_Branch* branch = statement->branch_block.branches; branch < statement->branch_block.branches.End(); branch++)
-			{
-				ParseExpression(branch->condition, &code->scope, info);
-				ParseCode(&branch->code, &code->scope, function, info);
-			}
-		}
-		else if (statement->kind == AST_STATEMENT_BREAK)
-		{
-			// @Todo: Check if in loop
-		}
-		else if (statement->kind == AST_STATEMENT_DEFER)
-		{
-			ParseCode(&statement->defer.code, &code->scope, function, info);
-		}
-		else if (statement->kind == AST_STATEMENT_CLAIM)
-		{
-			ParseExpression(statement->claim.expression, &code->scope, info);
-		}
-		else if (statement->kind == AST_STATEMENT_EXPRESSION)
-		{
-			ParseExpression(statement->expression, &code->scope, info);
-		}
-		else if (statement->kind == AST_STATEMENT_RETURN)
-		{
-			code->does_return = true;
-
-			if (statement->ret.expression)
-			{
-				ParseExpression(statement->ret.expression, &code->scope, info);
-
-				if (!function->return_type)
+				if (variable->explicit_type != null)
 				{
-					Error(info, statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
+					variable->type = GetType(variable->explicit_type, &code->scope, info);
+					variable->explicit_type->type = variable->type;
+
+					if (variable->assignment)
+					{
+						if (!AreTypesCompatible(variable->type, variable->assignment->type))
+						{
+							Error(info, variable->name->location, "Cannot assign expression with type % to variable with type %\n", variable->assignment->type, variable->type);
+						}
+					}
+				}
+				else
+				{
+					variable->type = variable->assignment->type;
 				}
 
-				if (!AreTypesCompatible(statement->ret.expression->type, function->return_type))
-				{
-					Error(info, statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
-				}
-			}
-			else if (function->return_type)
+				// Print("Variable % has type %\n", variable->name, variable->type);
+
+				code->scope.variables.Add(variable);
+			} break;
+
+			case AST_STATEMENT_ASSIGNMENT:
+			case AST_STATEMENT_ASSIGNMENT_ADD:
+			case AST_STATEMENT_ASSIGNMENT_SUBTRACT:
+			case AST_STATEMENT_ASSIGNMENT_MULTIPLY:
+			case AST_STATEMENT_ASSIGNMENT_DIVIDE:
+			case AST_STATEMENT_ASSIGNMENT_POWER:
 			{
-				Error(info, statement->ret.token->location, "Expected return value with type: %\n", function->return_type);
-			}
-		}
-		else if (statement->kind == AST_STATEMENT_ALIAS)
-		{
+				ParseExpression(statement->assignment.right, &code->scope, info);
+				ParseExpression(statement->assignment.left,  &code->scope, info);
+
+				if (!statement->assignment.left->is_referential_value)
+				{
+					Error(info, statement->assignment.left->span, "Expression is not referential.\n");
+				}
+
+				if (!AreTypesCompatible(statement->assignment.left->type, statement->assignment.right->type))
+				{
+					Error(info, statement->assignment.token->location, "Left and right types are incompatible.\n");
+				}
+			} break;
 		}
 	}
 }

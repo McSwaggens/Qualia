@@ -41,13 +41,13 @@ void Interpret(Ast_Expression* expression, char* output)
 				case AST_EXPRESSION_BINARY_DIVIDE:                   n = left /  right; break;
 				case AST_EXPRESSION_BINARY_MODULO:                   n = left %  right; break;
 				case AST_EXPRESSION_BINARY_EXPONENTIAL:              n = (u64)(__builtin_powl(left, right) + 0.5); break; // @TestMe
-				case AST_EXPRESSION_BINARY_BITWISE_OR:               n = left |  right;
-				case AST_EXPRESSION_BINARY_BITWISE_XOR:              n = left ^  right;
-				case AST_EXPRESSION_BINARY_BITWISE_AND:              n = left &  right;
-				case AST_EXPRESSION_BINARY_LEFT_SHIFT:               n = left << right;
-				case AST_EXPRESSION_BINARY_RIGHT_SHIFT:              n = left >> right;
-				case AST_EXPRESSION_BINARY_AND:                      n = left && right;
-				case AST_EXPRESSION_BINARY_OR:                       n = left || right;
+				case AST_EXPRESSION_BINARY_BITWISE_OR:               n = left |  right; break;
+				case AST_EXPRESSION_BINARY_BITWISE_XOR:              n = left ^  right; break;
+				case AST_EXPRESSION_BINARY_BITWISE_AND:              n = left &  right; break;
+				case AST_EXPRESSION_BINARY_LEFT_SHIFT:               n = left << right; break;
+				case AST_EXPRESSION_BINARY_RIGHT_SHIFT:              n = left >> right; break;
+				case AST_EXPRESSION_BINARY_AND:                      n = left && right; break;
+				case AST_EXPRESSION_BINARY_OR:                       n = left || right; break;
 				case AST_EXPRESSION_BINARY_DOT:
 				default: Unreachable();
 			}

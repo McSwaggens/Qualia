@@ -85,9 +85,24 @@ static MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev = null)
 	return block;
 }
 
+static u64 CalculateStackFrameSize(Ast_Function* function);
+static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset);
+
+static u64 CalculateStackFrameSize(Ast_Function* function)
+{
+	u64 return_size = 0;
+
+	if (function->does_return)
+	{
+		return_size = function->return_type->size;
+	}
+
+	return CalculateStackFrameSize(&function->code, return_size) + return_size;
+}
+
 // @Note: This doesn't calculate the minimum memory needed to represent the stackframe which would be ideal for producing optimized binaries.
 //        Another function needs to created for that.
-static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset = 0)
+static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset)
 {
 	u64 initial_offset = offset;
 
@@ -169,23 +184,27 @@ static void Pop(Type* type, Interpreter* interpreter)
 StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter)
 {
 	StackFrame frame;
-	u64 size = CalculateStackFrameSize(&function->code);
+	ZeroMemory(&frame);
+
+	u64 size = CalculateStackFrameSize(function);
 
 	if (!interpreter->block || size > GetFreeSpace(interpreter->block))
 	{
 		interpreter->block = CreateMemoryBlock(size, interpreter->block);
 	}
 
-	frame.data = Span(interpreter->block->head, size);
+	frame.data = interpreter->block->head;
+	frame.function = function;
 	interpreter->block->head += size;
 
-	ZeroMemory(frame.data);
+	ZeroMemory(frame.data, size);
 	return frame;
 }
 
 static Interpreter* CreateInterpreter(Parse_Info* info)
 {
 	Interpreter* interpreter = info->stack.Allocate<Interpreter>();
+	ZeroMemory(interpreter);
 	interpreter->block = CreateMemoryBlock(0x10000);
 	return interpreter;
 }
@@ -197,7 +216,7 @@ static void InitSpecifiers(Type* type, Parse_Info* info)
 
 	type->specifiers[0].kind = TYPE_SPECIFIER_POINTER;
 	type->specifiers[0].subtype = type;
-	type->specifiers[0].size = 8;
+	type->specifiers[0].size = 8; // @FixMe
 
 	type->specifiers[1].kind = TYPE_SPECIFIER_OPTIONAL;
 	type->specifiers[1].subtype = type;
@@ -205,7 +224,7 @@ static void InitSpecifiers(Type* type, Parse_Info* info)
 
 	type->specifiers[2].kind = TYPE_SPECIFIER_DYNAMIC_ARRAY;
 	type->specifiers[2].subtype = type;
-	type->specifiers[2].size = 16;
+	type->specifiers[2].size = 16; // @FixMe
 }
 
 static Type* GetPointer(Type* type, Parse_Info* info)
@@ -1199,9 +1218,14 @@ static void ParseScope(Ast_Scope* scope, Parse_Info* info)
 
 	for (Ast_Struct* s = scope->structs; s < scope->structs.End(); s++)
 	{
+		u64 offset = 0;
+
 		for (Ast_Struct_Member* member = s->members; member < s->members.End(); member++)
 		{
-			member->type.type = GetType(&member->type, scope, info);
+			Type* type = GetType(&member->type, scope, info);
+			member->type.type = type;
+			member->offset = offset;
+			offset += type->size;
 
 			if (!member->type.type)
 			{
@@ -1522,21 +1546,21 @@ void SemanticParse(Parse_Info* info)
 
 	for (u32 i = 0; i < root->scope.functions.count; i++)
 	{
-		Ast_Function* func = &root->scope.functions[i];
+		Ast_Function* function = &root->scope.functions[i];
 
-		if (Compare(func->name->info.string, "Test"))
+		if (Compare(function->name->info.string, "Test"))
 		{
 			Interpreter* interpreter = CreateInterpreter(info);
 			u64 data_size = 0;
 
-			if (func->return_type)
+			if (function->return_type)
 			{
-				data_size = func->return_type->size;
+				data_size = function->return_type->size;
 			}
 
 			char data[data_size];
 			ZeroMemory(data, data_size);
-			Interpret(func, data, interpreter, info);
+			Interpret(function, data, interpreter);
 		}
 	}
 }

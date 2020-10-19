@@ -1446,6 +1446,7 @@ static Ast_Function ParseFunction(Token*& token, u32 indent, Parse_Info* info)
 	{
 		CheckScope(token, indent+1, info);
 		token++;
+		function.does_return = true;
 		function.ast_return_type = info->stack.Allocate<Ast_Type>();
 		*function.ast_return_type = ParseType(token, indent, info);
 	}

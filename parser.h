@@ -376,7 +376,9 @@ struct Ast_VariableDeclaration
 struct StackFrame
 {
 	char* data;
-	// Ast_Code* code;
+	Ast_Function* function;
+	bool do_return;
+	bool do_break;
 
 	inline char* GetData(Ast_VariableDeclaration* variable)
 	{
@@ -425,7 +427,7 @@ struct Ast_Function
 	Ast_Code code;
 	Ast_Attribute attribute;
 	bool is_pure;
-	bool returns_value;
+	bool does_return;
 	bool is_global;
 };
 
@@ -439,6 +441,7 @@ struct Ast_Struct_Member
 {
 	Token* name;
 	Ast_Type type;
+	u64 offset;
 	Ast_Attribute attribute;
 };
 
@@ -494,15 +497,14 @@ struct MemoryBlock
 struct Interpreter
 {
 	MemoryBlock* block;
-	Ast_Statement* statement;
 };
 
 Parse_Info LexicalParse(String file_path);
 void ParseFile(String file_path);
 void SemanticParse(Parse_Info* info);
-void Interpret(Ast_Code* code, char* output, StackFrame frame, Interpreter* interpreter, Parse_Info* info);
-void Interpret(Ast_Function* function, char* output, Interpreter* interpreter, Parse_Info* info);
-void Interpret(Ast_Expression* expression, char* output);
+void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter);
+void Interpret(Ast_Function* function, char* output, Interpreter* interpreter);
+void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter);
 StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
 
 static bool IsPrimitive(Type* type, Token_Kind primitive)

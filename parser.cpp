@@ -553,7 +553,7 @@ static void SkipSemiColon(Token*& token, u32 indent, Parse_Info* info)
 }
 
 static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info);
-static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* info, bool assignment_break = false, u32 parent_precedence = -1);
+static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* info, bool assignment_break = false, u32 parent_precedence = -2);
 static Ast_Function ParseFunction(Token*& token, u32 indent, Parse_Info* info);
 static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info);
 

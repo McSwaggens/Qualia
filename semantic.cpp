@@ -834,7 +834,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 
 			Type* type = expression->left->type;
 
-			if (type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY || TYPE_SPECIFIER_FIXED_ARRAY)
+			if (type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY || type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
 			{
 				if (expression->right->kind == AST_EXPRESSION_TERMINAL)
 				{
@@ -874,6 +874,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 
 					expression->type = member->type.type;
 					expression->right->struct_member = member;
+					expression->right->kind = AST_EXPRESSION_TERMINAL_STRUCT_MEMBER;
 				}
 				else
 				{

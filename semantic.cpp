@@ -90,14 +90,7 @@ static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset);
 
 static u64 CalculateStackFrameSize(Ast_Function* function)
 {
-	u64 return_size = 0;
-
-	if (function->does_return)
-	{
-		return_size = function->return_type->size;
-	}
-
-	return CalculateStackFrameSize(&function->code, return_size) + return_size;
+	return CalculateStackFrameSize(&function->code, 0);
 }
 
 // @Note: This doesn't calculate the minimum memory needed to represent the stackframe which would be ideal for producing optimized binaries.
@@ -111,6 +104,7 @@ static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset)
 		Ast_VariableDeclaration* variable = code->scope.variables[i];
 		variable->offset = offset;
 		offset += variable->type->size;
+		// Print("Variable %:\n\tsize = %\n\toffset = %\n", variable->name, variable->type->size, variable->offset);
 	}
 
 	for (u32 i = 0; i < code->statements.count; i++)
@@ -1148,6 +1142,59 @@ static void CheckForCircularDependencies(Ast_Struct* ast_struct, Parse_Info* inf
 	}
 }
 
+static void CalculateStructSize(Ast_Struct* s);
+static void CalculateTupleSize(Type* tuple);
+
+static void CalculateTupleSize(Type* tuple)
+{
+	if (tuple->size) return;
+
+	u64 size = 0;
+
+	Assert(tuple->tuple.count);
+	for (u32 i = 0; i < tuple->tuple.count; i++)
+	{
+		Type* type = tuple->tuple[i];
+		if (type->kind == TYPE_BASETYPE_STRUCT)
+		{
+			CalculateStructSize(type->structure);
+		}
+		else if (type->kind == TYPE_BASETYPE_TUPLE)
+		{
+			CalculateTupleSize(type);
+		}
+
+		size += type->size;
+	}
+
+	tuple->size = size;
+}
+
+static void CalculateStructSize(Ast_Struct* s)
+{
+	if (s->type.size) return;
+
+	u64 size = 0;
+
+	for (Ast_Struct_Member* member = s->members; member < s->members.End(); member++)
+	{
+		Type* type = member->type.type;
+		if (type->kind == TYPE_BASETYPE_STRUCT)
+		{
+			CalculateStructSize(type->structure);
+		}
+		else if (type->kind == TYPE_BASETYPE_TUPLE)
+		{
+			CalculateTupleSize(type);
+		}
+
+		member->offset = size;
+		size += type->size;
+	}
+
+	s->type.size = size;
+}
+
 static void ParseScope(Ast_Scope* scope, Parse_Info* info)
 {
 	for (Ast_Struct* s = scope->structs; s < scope->structs.End(); s++)
@@ -1219,16 +1266,12 @@ static void ParseScope(Ast_Scope* scope, Parse_Info* info)
 
 	for (Ast_Struct* s = scope->structs; s < scope->structs.End(); s++)
 	{
-		u64 offset = 0;
-
 		for (Ast_Struct_Member* member = s->members; member < s->members.End(); member++)
 		{
 			Type* type = GetType(&member->type, scope, info);
 			member->type.type = type;
-			member->offset = offset;
-			offset += type->size;
 
-			if (!member->type.type)
+			if (!type)
 			{
 				Error(info, member->type.basetype.token->location, "Unknown type '%'\n", member->type.basetype.token);
 			}
@@ -1238,6 +1281,8 @@ static void ParseScope(Ast_Scope* scope, Parse_Info* info)
 	for (Ast_Struct* s = scope->structs; s < scope->structs.End(); s++)
 	{
 		CheckForCircularDependencies(s, info);
+		CalculateStructSize(s);
+		// Print("Struct % has size = %\n", s->name, s->type.size);
 	}
 
 	for (Ast_Function* f = scope->functions; f < scope->functions.End(); f++)

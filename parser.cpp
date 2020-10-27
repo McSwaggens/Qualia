@@ -820,36 +820,11 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		}
 		else if (token->kind == TOKEN_OPEN_PAREN)
 		{
-			Token* open = token++;
+			Token* open = token;
 			Token* closure = open->GetClosure();
 			List<Ast_Expression*> arguments = null;
 
-			while (token != closure)
-			{
-				arguments.Add(ParseExpression(token, indent+1, info));
-
-				if (token->kind == TOKEN_COMMA)
-				{
-					CheckScope(token, indent, info);
-					token++;
-
-					if (token == closure)
-					{
-						Error(info, token->location, "Expected expression after ','\n");
-					}
-				}
-				else if (token == closure)
-				{
-					CheckScope(token, indent, info);
-					token++;
-					break;
-				}
-				else
-				{
-					Error(info, token->location, "Invalid function call expression, unexpected token: %\n", token);
-				}
-			}
-
+			Ast_Expression* params = ParseExpression(token, indent, info, false, GetOperatorPrecedence(token->kind));
 			token = closure + 1;
 
 			Ast_Expression* call = info->stack.Allocate<Ast_Expression>();
@@ -858,8 +833,9 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			call->span.end = token;
 			call->token = open;
 			call->left  = left;
-			call->begin = arguments;
-			call->end   = arguments.End();
+			call->right = params;
+			// call->begin = arguments;
+			// call->end   = arguments.End();
 			left = call;
 		}
 		else if (token->kind == TOKEN_OPEN_BRACKET)

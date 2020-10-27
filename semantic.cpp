@@ -524,28 +524,15 @@ static Ast_VariableDeclaration* GetVariable(Token* token, Ast_Scope* scope)
 	return null;
 }
 
-static Ast_Function* GetFunction(Token* token, Span<Ast_Expression*> parameters, Ast_Scope* scope)
+static Ast_Function* GetFunction(Token* token, Ast_Expression* params, Ast_Scope* scope)
 {
 	while (scope)
 	{
 		for (Ast_Function* function = scope->functions; function < scope->functions.End(); function++)
 		{
-			if (function->parameters.count == parameters.Length() && CompareStrings(token->info.string, function->name->info.string))
+			if (params->type == function->type->function.input && CompareStrings(token->info.string, function->name->info.string))
 			{
-				bool failed = false;
-				for (u32 i = 0; i < parameters.Length(); i++)
-				{
-					if (parameters[i]->type != function->parameters[i].type)
-					{
-						failed = true;
-						break;
-					}
-				}
-
-				if (!failed)
-				{
-					return function;
-				}
+				return function;
 			}
 		}
 
@@ -1023,16 +1010,16 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 
 		case AST_EXPRESSION_CALL:
 		{
-			for (Ast_Expression** param = expression->begin; param < expression->end; param++)
+			if (expression->right) // @RemoveMe?
 			{
-				ParseExpression(*param, scope, info);
+				ParseExpression(expression->right, scope, info);
 			}
 
 			if (expression->left->kind == AST_EXPRESSION_TERMINAL && expression->left->token->kind == TOKEN_IDENTIFIER)
 			{
 				// @Note: expression->left could still be a variable and not a function!
 
-				if (Ast_Function* function = GetFunction(expression->left->token, Span(expression->begin, expression->end), scope); function)
+				if (Ast_Function* function = GetFunction(expression->left->token, expression->right, scope); function)
 				{
 					expression->left->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
 					expression->left->function = function;
@@ -1454,6 +1441,8 @@ static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Parse_Info
 		Type* tuple = first->tuple_extensions[i];
 		bool fail = false;
 
+		if (tuple->tuple.count != params.count) continue;
+
 		for (u32 j = 0; j < tuple->tuple.count; j++)
 		{
 			if (tuple->tuple[j] != params[j].type)
@@ -1477,6 +1466,8 @@ static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Parse_Info
 	for (u32 i = 0; i < params.count; i++)
 	{
 		tuple_members[i] = params[i].type;
+		Assert(params[i].type->size); // @Note @Bug: I don't think this will work with recursive tuples or maybe even structs?
+		tuple->size += params[i].type->size;
 	}
 
 	tuple->tuple = Array(tuple_members, params.count);
@@ -1486,6 +1477,11 @@ static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Parse_Info
 
 static Type* GetTypeFromTupleExpression(Array<Ast_Expression*> expressions, Parse_Info* info)
 {
+	if (expressions.count == 0)
+	{
+		return &empty_tuple;
+	}
+
 	if (expressions.count == 1)
 	{
 		return expressions[0]->type;
@@ -1497,6 +1493,8 @@ static Type* GetTypeFromTupleExpression(Array<Ast_Expression*> expressions, Pars
 	{
 		Type* tuple = first->tuple_extensions[i];
 		bool fail = false;
+
+		if (tuple->tuple.count != expressions.count) continue;
 
 		for (u32 j = 0; j < tuple->tuple.count; j++)
 		{
@@ -1521,6 +1519,7 @@ static Type* GetTypeFromTupleExpression(Array<Ast_Expression*> expressions, Pars
 	for (u32 i = 0; i < expressions.count; i++)
 	{
 		tuple_members[i] = expressions[i]->type;
+		tuple->size += expressions[i]->type->size;
 	}
 
 	tuple->tuple = Array(tuple_members, expressions.count);
@@ -1594,7 +1593,7 @@ void SemanticParse(Parse_Info* info)
 	{
 		Ast_Function* function = &root->scope.functions[i];
 
-		if (Compare(function->name->info.string, "Test"))
+		if (Compare(function->name->info.string, "Test") && !function->parameters.count)
 		{
 			Interpreter* interpreter = CreateInterpreter(info);
 			u64 data_size = 0;
@@ -1606,7 +1605,7 @@ void SemanticParse(Parse_Info* info)
 
 			char data[data_size];
 			ZeroMemory(data, data_size);
-			Interpret(function, data, interpreter);
+			Interpret(function, null, data, interpreter);
 		}
 	}
 }

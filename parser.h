@@ -503,7 +503,7 @@ Parse_Info LexicalParse(String file_path);
 void ParseFile(String file_path);
 void SemanticParse(Parse_Info* info);
 void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter);
-void Interpret(Ast_Function* function, char* output, Interpreter* interpreter);
+void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter);
 void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter);
 StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
 

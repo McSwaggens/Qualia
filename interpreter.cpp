@@ -114,15 +114,29 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		}
 		else Assert();
 	}
+	else if (expression->kind == AST_EXPRESSION_TUPLE)
+	{
+		for (Ast_Expression** sub = expression->begin; sub < expression->end; sub++)
+		{
+			Interpret(*sub, output, false, frame, interpreter);
+			output += (*sub)->type->size;
+		}
+	}
 	else if (expression->kind == AST_EXPRESSION_CALL)
 	{
-		// @Bug?: Not putting the function call output into an intermediate buffer erks me out skoobs!
 		Ast_Function* function = expression->left->function;
+
+		char input[function->type->function.input->size];
+		Interpret(expression->right, input, false, frame, interpreter);
+
 		char data[function->return_type->size];
-		Interpret(function, data, interpreter);
+		Interpret(function, input, data, interpreter);
 		CopyMemory(output, data, expression->type->size);
 	}
-	else Assert();
+	else
+	{
+		Assert();
+	}
 }
 
 void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter)
@@ -159,9 +173,10 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 			case AST_STATEMENT_ASSIGNMENT:
 			{
 				Ast_Assignment* assignment = &statement->assignment;
-				union { char array[8]; char* pointer; } ref;
-				Interpret(assignment->left,  ref.array,   true,  frame, interpreter);
-				Interpret(assignment->right, ref.pointer, false, frame, interpreter); // @Bug: Left size could be smaller than right size and thus buffer overflow. #ToLazyToFixRnFamalamajam
+				char* reference;
+				// char data[]
+				Interpret(assignment->left,  (char*)&reference,   true,  frame, interpreter);
+				Interpret(assignment->right, reference, false, frame, interpreter); // @Bug: Left size could be smaller than right size and thus buffer overflow. #ToLazyToFixRnFamalamajam
 			} break;
 
 			case AST_STATEMENT_ASSIGNMENT_ADD:
@@ -171,27 +186,32 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 			case AST_STATEMENT_ASSIGNMENT_POWER:
 			{
 				Ast_Assignment* assignment = &statement->assignment;
-				union { char array[8]; char* pointer; } ref;
-				u64 left = 0;
-				Interpret(assignment->left,  ref.array,   true,  frame, interpreter);
-				CopyMemory((char*)&left, ref.pointer, assignment->left->type->size);
+				char* reference;
+				Interpret(assignment->left, (char*)&reference, true, frame, interpreter);
 
-				char right_data[GetExpressionMinSize(assignment->right)];
-				ZeroMemory(right_data, sizeof right_data);
-				Interpret(assignment->right, right_data, false, frame, interpreter);
-				u64 right = *(u64*)right_data;
-
-				switch (statement->kind)
+				if (IsIntegerLikeType(assignment->left->type))
 				{
-					case AST_STATEMENT_ASSIGNMENT_ADD:      left += right; break;
-					case AST_STATEMENT_ASSIGNMENT_SUBTRACT: left -= right; break;
-					case AST_STATEMENT_ASSIGNMENT_MULTIPLY: left *= right; break;
-					case AST_STATEMENT_ASSIGNMENT_DIVIDE:   left /= right; break;
-					case AST_STATEMENT_ASSIGNMENT_POWER:    left  = (u64)(__builtin_powl(left, right) + 0.5); break; // @TestMe
-					default: Unreachable();
-				}
+					u64 left = 0;
+					CopyMemory((char*)&left, reference, assignment->left->type->size);
 
-				CopyMemory(ref.pointer, (char*)&left, assignment->left->type->size);
+					char right_data[GetExpressionMinSize(assignment->right)];
+					ZeroMemory(right_data, sizeof right_data);
+					Interpret(assignment->right, right_data, false, frame, interpreter);
+					u64 right = *(u64*)right_data;
+
+					switch (statement->kind)
+					{
+						case AST_STATEMENT_ASSIGNMENT_ADD:      left += right; break;
+						case AST_STATEMENT_ASSIGNMENT_SUBTRACT: left -= right; break;
+						case AST_STATEMENT_ASSIGNMENT_MULTIPLY: left *= right; break;
+						case AST_STATEMENT_ASSIGNMENT_DIVIDE:   left /= right; break;
+						case AST_STATEMENT_ASSIGNMENT_POWER:    left  = (u64)(__builtin_powl(left, right) + 0.5); break; // @TestMe
+						default: Unreachable();
+					}
+
+					CopyMemory(reference, (char*)&left, assignment->left->type->size);
+				}
+				else Assert();
 			} break;
 
 			case AST_STATEMENT_BRANCH_BLOCK:
@@ -229,10 +249,18 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 	}
 }
 
-void Interpret(Ast_Function* function, char* output, Interpreter* interpreter)
+void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter)
 {
 	Print("Interpreting function: %\n", function->name);
 	StackFrame frame = CreateStackFrame(function, interpreter);
+
+	if (function->parameters.count)
+	{
+		// @Note: Assuming The front of the stack is the input parameters.
+		// @Warn: This might not always be the case.
+		CopyMemory(frame.data, input, function->type->function.input->size);
+	}
+
 	Interpret(&function->code, output, &frame, interpreter);
 }
 

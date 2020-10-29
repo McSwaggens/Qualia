@@ -326,6 +326,8 @@ struct Ast_Branch
 	Ast_Branch_Kind kind;
 	Token* token;
 	Ast_Expression* condition;
+	Ast_Branch* else_branch;
+	Ast_Branch* then_branch;
 	Ast_Code code;
 };
 

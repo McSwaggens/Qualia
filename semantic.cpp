@@ -809,7 +809,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 		case AST_EXPRESSION_BINARY_DOT:
 		{
 			ParseExpression(expression->left,  scope, info);
-			expression->is_referential_value = true;
+			expression->is_referential_value = expression->left->is_referential_value || expression->left->type->kind == TYPE_SPECIFIER_POINTER;
 
 			// @Todo: Handle inferred function calls.
 
@@ -855,6 +855,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 
 					expression->type = member->type.type;
 					expression->right->struct_member = member;
+					expression->right->type = member->type.type;
 					expression->right->kind = AST_EXPRESSION_TERMINAL_STRUCT_MEMBER;
 				}
 				else
@@ -1376,6 +1377,11 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 				{
 					variable->type = GetType(variable->explicit_type, &code->scope, info);
 					variable->explicit_type->type = variable->type;
+
+					if (!variable->type)
+					{
+						Error(info, variable->name->location, "Unknown type %\n", variable->explicit_type->basetype.token);
+					}
 
 					if (variable->assignment)
 					{

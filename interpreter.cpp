@@ -13,18 +13,27 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 {
 	if (expression->kind == AST_EXPRESSION_BINARY_DOT)
 	{
-		char* reference;
-		Interpret(expression->left, (char*)&reference, true, frame, interpreter);
+		char data[GetExpressionMinSize(expression->left)];
+		Interpret(expression->left, data, true, frame, interpreter);
 		Assert(expression->right->kind == AST_EXPRESSION_TERMINAL_STRUCT_MEMBER);
-		reference += expression->right->struct_member->offset;
 
-		if (allow_referential)
+		if (expression->left->is_referential_value)
 		{
-			*(char**)output = reference;
+			char* reference = *(char**)data;
+			reference += expression->right->struct_member->offset;
+
+			if (allow_referential)
+			{
+				*(char**)output = reference;
+			}
+			else
+			{
+				CopyMemory(output, reference, expression->type->size);
+			}
 		}
 		else
 		{
-			CopyMemory(output, reference, expression->type->size);
+			CopyMemory(output, data + expression->right->struct_member->offset, expression->right->type->size);
 		}
 	}
 	else if (expression->kind == AST_EXPRESSION_TERMINAL_VARIABLE)
@@ -217,6 +226,13 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 			case AST_STATEMENT_BRANCH_BLOCK:
 			{
 				// @Todo: Handle frame->do_break
+
+				Ast_BranchBlock* block = &statement->branch_block;
+
+				for (Ast_Branch* branch = block->branches; branch < block->branches.End(); branch++)
+				{
+				}
+
 			} break;
 
 			case AST_STATEMENT_ALIAS:

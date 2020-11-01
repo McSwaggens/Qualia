@@ -70,6 +70,7 @@ Parse_Info LexicalParse(String file_path)
 			else if (CompareStrings(str, ToString(TOKEN_FOR)))         token.kind = TOKEN_FOR;
 			else if (CompareStrings(str, ToString(TOKEN_WHILE)))       token.kind = TOKEN_WHILE;
 			else if (CompareStrings(str, ToString(TOKEN_RETURN)))      token.kind = TOKEN_RETURN;
+			else if (CompareStrings(str, ToString(TOKEN_BREAK)))       token.kind = TOKEN_BREAK;
 			else if (CompareStrings(str, ToString(TOKEN_CLAIM)))       token.kind = TOKEN_CLAIM;
 			else if (CompareStrings(str, ToString(TOKEN_DEFER)))       token.kind = TOKEN_DEFER;
 			else if (CompareStrings(str, ToString(TOKEN_ALIAS)))       token.kind = TOKEN_ALIAS;

@@ -1,13 +1,17 @@
-struct N0: v : N1
-struct N1: v : N2
-struct N2: v : N3
-struct N3: v : N4
-struct N4: v : int; q : int
 
-Add(a: int, b: int) -> N0:
-	num : N0
-	num.v.v.v.v.q = a + b
-	return num
+Foo(p: *int):
+	*p = 1337
+
+Add(a: *int, b: *int) -> int:
+	return *a + *b
 
 Test():
-	n := Add(1, 2).v.v.v.v.q + 0
+	n : int
+	Foo(&n)
+	n + 0
+
+	n = 1
+	j := 2
+	k := Add(&n, &j)
+	k + 0
+

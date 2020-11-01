@@ -434,7 +434,7 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Parse_Info* in
 	else if (basetype.kind == AST_BASETYPE_FUNCTION)
 	{
 		Type* input_tuple = GetType(basetype.function.input, scope, info);
-		Type* output_type = null;
+		Type* output_type = &empty_tuple;
 
 		if (basetype.function.output)
 		{
@@ -1025,12 +1025,14 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 					expression->left->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
 					expression->left->function = function;
 					expression->type = function->return_type;
+					if (!expression->type) expression->type = &empty_tuple;
 				}
 				else if (Ast_VariableDeclaration* variable = GetVariable(expression->left->token, scope); variable)
 				{
 					expression->left->kind = AST_EXPRESSION_TERMINAL_VARIABLE;
 					expression->left->variable = variable;
 					expression->type = variable->type->function.output;
+					if (!expression->type) expression->type = &empty_tuple;
 					expression->is_referential_value = true;
 					expression->is_pure = variable->is_pure;
 					expression->can_constantly_evaluate = variable->can_constantly_evaluate;
@@ -1564,6 +1566,10 @@ static void ParseFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* 
 		{
 			Error(info, function->ast_return_type->basetype.token->location, "Unknown type: %\n", function->ast_return_type);
 		}
+	}
+	else
+	{
+		function->return_type = &empty_tuple;
 	}
 
 	Type* param_type = GetTypeFromParams(function->parameters.ToArray(), info);

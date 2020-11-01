@@ -13,7 +13,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 {
 	if (expression->kind == AST_EXPRESSION_BINARY_DOT)
 	{
-		char data[GetExpressionMinSize(expression->left)];
+		char data[expression->left->type->size];
 		Interpret(expression->left, data, true, frame, interpreter);
 		Assert(expression->right->kind == AST_EXPRESSION_TERMINAL_STRUCT_MEMBER);
 
@@ -95,6 +95,53 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		}
 		else Assert();
 	}
+	else if (IsUnaryExpression(expression->kind))
+	{
+		switch (expression->kind)
+		{
+			case AST_EXPRESSION_UNARY_BINARY_NOT:
+			{
+				Assert();
+			} break;
+
+			case AST_EXPRESSION_UNARY_NOT:
+			{
+				Assert();
+			} break;
+
+			case AST_EXPRESSION_UNARY_MINUS:
+			{
+				Assert();
+			} break;
+
+			case AST_EXPRESSION_UNARY_PLUS:
+			{
+				Assert();
+			} break;
+
+			case AST_EXPRESSION_UNARY_VALUE_OF:
+			{
+				char* ref;
+				Interpret(expression->right, (char*)&ref, false, frame, interpreter);
+				if (allow_referential)
+				{
+					*(char**)output = ref;
+				}
+				else
+				{
+					CopyMemory(output, ref, expression->type->size);
+				}
+			} break;
+
+			case AST_EXPRESSION_UNARY_ADDRESS_OF:
+			{
+				Interpret(expression->right, output, true, frame, interpreter);
+			} break;
+
+			default:
+				Unreachable();
+		}
+	}
 	else if (expression->kind == AST_EXPRESSION_TERMINAL_LITERAL)
 	{
 		if (expression->token->kind == TOKEN_INTEGER_LITERAL)
@@ -138,7 +185,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		char input[function->type->function.input->size];
 		Interpret(expression->right, input, false, frame, interpreter);
 
-		char data[function->return_type->size];
+		char data[function->type->function.output->size];
 		Interpret(function, input, data, interpreter);
 		CopyMemory(output, data, expression->type->size);
 	}
@@ -183,7 +230,6 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 			{
 				Ast_Assignment* assignment = &statement->assignment;
 				char* reference;
-				// char data[]
 				Interpret(assignment->left,  (char*)&reference,   true,  frame, interpreter);
 				Interpret(assignment->right, reference, false, frame, interpreter); // @Bug: Left size could be smaller than right size and thus buffer overflow. #ToLazyToFixRnFamalamajam
 			} break;
@@ -276,6 +322,13 @@ void Interpret(Ast_Function* function, char* input, char* output, Interpreter* i
 		// @Warn: This might not always be the case.
 		CopyMemory(frame.data, input, function->type->function.input->size);
 	}
+
+	for (Ast_VariableDeclaration** variable = function->code.scope.variables; variable < function->code.scope.variables.End(); variable++)
+	{
+		Print("&% = %\n", (*variable)->name, (u64)frame.GetData(*variable));
+	}
+
+	standard_output_buffer.Flush();
 
 	Interpret(&function->code, output, &frame, interpreter);
 }

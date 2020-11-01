@@ -271,12 +271,49 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 
 			case AST_STATEMENT_BRANCH_BLOCK:
 			{
-				// @Todo: Handle frame->do_break
-
 				Ast_BranchBlock* block = &statement->branch_block;
+				Ast_Branch* branch = block->branches;
 
-				for (Ast_Branch* branch = block->branches; branch < block->branches.End(); branch++)
+				while (branch)
 				{
+					if (branch->condition)
+					{
+						bool is_if = branch->token->kind == TOKEN_IF;
+						u64 loop_count = 0;
+						char data[GetExpressionMinSize(branch->condition)];
+						ZeroMemory(data, sizeof data);
+
+						while (!frame->do_break && !frame->do_return)
+						{
+							Interpret(branch->condition, data, false, frame, interpreter);
+							bool passed = *(u64*)data;
+
+							if (passed)
+							{
+								loop_count++;
+								Interpret(&branch->code, output, frame, interpreter);
+							}
+
+							if (is_if)
+							{
+								break;
+							}
+						}
+
+						if (!is_if)
+						{
+							frame->do_break = false;
+						}
+
+						branch = loop_count
+							? branch->then_branch
+							: branch->else_branch;
+					}
+					else
+					{
+						Interpret(&branch->code, output, frame, interpreter);
+						break;
+					}
 				}
 
 			} break;

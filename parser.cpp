@@ -1134,6 +1134,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 
 	while ((token->kind == TOKEN_ELSE || token->kind == TOKEN_THEN) && IsOnCorrectScope(token, indent))
 	{
+		ZeroMemory(&branch);
 		Token* continuation_token = token;
 
 		if (token->kind == TOKEN_ELSE)
@@ -1177,6 +1178,26 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 		}
 
 		branch_block.branches.Add(branch);
+	}
+
+	Ast_Branch* else_branch = null;
+	Ast_Branch* then_branch = null;
+
+	for (s32 i = branch_block.branches.count-1; i >= 0; i--)
+	{
+		Ast_Branch* branch = &branch_block.branches[i];
+
+		branch->else_branch = else_branch;
+		branch->then_branch = then_branch;
+
+		if (branch->kind == AST_BRANCH_ELSE)
+		{
+			else_branch = branch;
+		}
+		else if (branch->kind == AST_BRANCH_THEN)
+		{
+			then_branch = branch;
+		}
 	}
 
 	return branch_block;

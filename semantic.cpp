@@ -1300,7 +1300,10 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 			{
 				for (Ast_Branch* branch = statement->branch_block.branches; branch < statement->branch_block.branches.End(); branch++)
 				{
-					ParseExpression(branch->condition, &code->scope, info);
+					if (branch->condition)
+					{
+						ParseExpression(branch->condition, &code->scope, info);
+					}
 					ParseCode(&branch->code, &code->scope, function, info);
 				}
 			} break;

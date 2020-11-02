@@ -1323,6 +1323,39 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 				Assert();
 			} break;
 
+			case AST_STATEMENT_INCREMENT:
+			{
+				Ast_Increment* inc = &statement->increment;
+				ParseExpression(inc->expression, &code->scope, info);
+
+				if (!inc->expression->is_referential_value)
+				{
+					Error(info, inc->expression->span, "Expression is not a referential value.\n");
+				}
+
+				if (!IsIntegerType(inc->expression->type) && inc->expression->type->kind != TYPE_SPECIFIER_POINTER)
+				{
+					Error(info, inc->expression->span, "Expression is an integer or pointer.\n");
+				}
+
+			} break;
+
+			case AST_STATEMENT_DECREMENT:
+			{
+				Ast_Decrement* dec = &statement->decrement;
+				ParseExpression(dec->expression, &code->scope, info);
+
+				if (!dec->expression->is_referential_value)
+				{
+					Error(info, dec->expression->span, "Expression is not a referential value.\n");
+				}
+
+				if (!IsIntegerType(dec->expression->type) && dec->expression->type->kind != TYPE_SPECIFIER_POINTER)
+				{
+					Error(info, dec->expression->span, "Expression is an integer or pointer.\n");
+				}
+			} break;
+
 			case AST_STATEMENT_RETURN:
 			{
 				code->does_return = true;

@@ -19,6 +19,8 @@ enum Token_Kind
 	TOKEN_IF,
 	TOKEN_ELSE,
 	TOKEN_THEN,
+	TOKEN_INC,
+	TOKEN_DEC,
 	TOKEN_WHERE,
 	TOKEN_FOR,
 	TOKEN_WHILE,
@@ -107,6 +109,8 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_IF:                return "if";
 		case TOKEN_ELSE:              return "else";
 		case TOKEN_THEN:              return "then";
+		case TOKEN_INC:               return "inc";
+		case TOKEN_DEC:               return "dec";
 		case TOKEN_WHERE:             return "where";
 		case TOKEN_FOR:               return "for";
 		case TOKEN_WHILE:             return "while";

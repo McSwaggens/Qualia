@@ -302,6 +302,8 @@ enum Ast_Statement_Kind
 	AST_STATEMENT_ALIAS,
 	AST_STATEMENT_RETURN,
 	AST_STATEMENT_BREAK,
+	AST_STATEMENT_INCREMENT,
+	AST_STATEMENT_DECREMENT,
 	AST_STATEMENT_EXPRESSION,
 	AST_STATEMENT_VARIABLE_DECLARATION,
 	AST_STATEMENT_ASSIGNMENT,
@@ -356,6 +358,18 @@ struct Ast_Return
 };
 
 struct Ast_Claim
+{
+	Token* token;
+	Ast_Expression* expression;
+};
+
+struct Ast_Increment
+{
+	Token* token;
+	Ast_Expression* expression;
+};
+
+struct Ast_Decrement
 {
 	Token* token;
 	Ast_Expression* expression;
@@ -416,6 +430,8 @@ struct Ast_Statement
 		Ast_Return              ret;
 		Ast_VariableDeclaration variable_declaration;
 		Ast_Expression*         expression;
+		Ast_Increment           increment;
+		Ast_Decrement           decrement;
 	};
 };
 

@@ -344,6 +344,38 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 			{
 				frame->do_break = true;
 			} break;
+
+			case AST_STATEMENT_INCREMENT:
+			{
+				Ast_Increment* inc = &statement->increment;
+				char* ref;
+				Interpret(inc->expression, (char*)&ref, true, frame, interpreter);
+
+				switch (inc->expression->type->size)
+				{
+					case 8:  ++*(u8 *)ref; break;
+					case 16: ++*(u16*)ref; break;
+					case 32: ++*(u32*)ref; break;
+					case 64: ++*(u64*)ref; break;
+					default: Assert();
+				}
+			} break;
+
+			case AST_STATEMENT_DECREMENT:
+			{
+				Ast_Decrement* dec = &statement->decrement;
+				char* ref;
+				Interpret(dec->expression, (char*)&ref, true, frame, interpreter);
+
+				switch (dec->expression->type->size)
+				{
+					case 8:  --*(u8 *)ref; break;
+					case 16: --*(u16*)ref; break;
+					case 32: --*(u32*)ref; break;
+					case 64: --*(u64*)ref; break;
+					default: Assert();
+				}
+			} break;
 		}
 	}
 }

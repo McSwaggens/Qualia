@@ -5,4 +5,4 @@ Test():
 		if n = 5:
 			break
 		else:
-			n += 1
+			inc n

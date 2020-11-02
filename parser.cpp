@@ -1279,6 +1279,34 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 		statement.branch_block = branch_block;
 		return statement;
 	}
+	else if (token->kind == TOKEN_INC)
+	{
+		statement.kind = AST_STATEMENT_INCREMENT;
+		statement.increment.token = token++;
+
+		if (!IsOnCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
+		{
+			Error(info, statement.increment.token->location, "Expected expression after inc keyword\n");
+		}
+
+		statement.increment.expression = ParseExpression(token, indent+1, info);
+
+		return statement;
+	}
+	else if (token->kind == TOKEN_DEC)
+	{
+		statement.kind = AST_STATEMENT_DECREMENT;
+		statement.decrement.token = token++;
+
+		if (!IsOnCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
+		{
+			Error(info, statement.decrement.token->location, "Expected expression after dec keyword\n");
+		}
+
+		statement.decrement.expression = ParseExpression(token, indent+1, info);
+
+		return statement;
+	}
 	else if (token->kind == TOKEN_DEFER)
 	{
 		statement.kind = AST_STATEMENT_DEFER;

@@ -13,6 +13,7 @@ struct Ast_Import;
 struct Ast_Struct_Member;
 struct Ast_Enum_Member;
 struct Ast_Statement;
+struct Ast_Defer;
 struct Ast_Specifier;
 struct Ast_BaseType;
 struct Ast_Type;
@@ -279,6 +280,7 @@ struct Ast_Expression
 struct Ast_Scope
 {
 	Ast_Scope* parent;
+	// Aliases?
 	List<Ast_Function> functions;
 	List<Ast_Struct> structs;
 	List<Ast_Enum> enums;
@@ -289,9 +291,12 @@ struct Ast_Scope
 struct Ast_Code
 {
 	List<Ast_Statement> statements;
+	List<Ast_Defer*> defers;
 	Ast_Scope scope;
 	u64 frame_size;
 	bool does_return;
+	bool is_inside_loop;
+	bool has_deferrer_that_returns;
 };
 
 enum Ast_Statement_Kind 
@@ -548,14 +553,22 @@ static bool IsIntegerType(Type* type)
 		|| IsPrimitive(type, TOKEN_UINT16)
 		|| IsPrimitive(type, TOKEN_UINT32)
 		|| IsPrimitive(type, TOKEN_UINT64);
-	// return type == &primitive_int8
-	// 	|| type == &primitive_int16
-	// 	|| type == &primitive_int32
-	// 	|| type == &primitive_int64
-	// 	|| type == &primitive_uint8
-	// 	|| type == &primitive_uint16
-	// 	|| type == &primitive_uint32
-	// 	|| type == &primitive_uint64;
+}
+
+static bool IsSignedIntegerType(Type* type)
+{
+	return IsPrimitive(type, TOKEN_INT8)
+		|| IsPrimitive(type, TOKEN_INT16)
+		|| IsPrimitive(type, TOKEN_INT32)
+		|| IsPrimitive(type, TOKEN_INT64);
+}
+
+static bool IsUnsignedIntegerType(Type* type)
+{
+	return IsPrimitive(type, TOKEN_UINT8)
+		|| IsPrimitive(type, TOKEN_UINT16)
+		|| IsPrimitive(type, TOKEN_UINT32)
+		|| IsPrimitive(type, TOKEN_UINT64);
 }
 
 static bool IsFloatType(Type* type)
@@ -563,9 +576,6 @@ static bool IsFloatType(Type* type)
 	return IsPrimitive(type, TOKEN_FLOAT16)
 		|| IsPrimitive(type, TOKEN_FLOAT32)
 		|| IsPrimitive(type, TOKEN_FLOAT64);
-	// return type == &primitive_float16
-	// 	|| type == &primitive_float32
-	// 	|| type == &primitive_float64;
 }
 
 static bool IsNumericalType(Type* type)
@@ -583,8 +593,19 @@ static bool IsIntegerLikeType(Type* type)
 		|| type->kind == TYPE_BASETYPE_ENUM;
 }
 
+static bool IsPointer(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_POINTER;
+}
+
+static bool IsOptional(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_OPTIONAL;
+}
+
 static bool AreTypesCompatible(Type* a, Type* b)
 {
-	return a == b || (a->kind == TYPE_BASETYPE_PRIMITIVE && b->kind == TYPE_BASETYPE_PRIMITIVE);
+	return a == b || (a->kind == TYPE_BASETYPE_PRIMITIVE && b->kind == TYPE_BASETYPE_PRIMITIVE)
+		|| (IsPointer(a) && IsPointer(b)); // @TestMe: This might produce semantic bugs somewhere.
 }
 

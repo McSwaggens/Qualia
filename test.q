@@ -1,8 +1,25 @@
 
 Test():
-	n := 0
-	while n < 10:
-		if n = 5:
+	n := -10
+	j := -20
+	b := true
+
+	defer:
+		n+j
+
+	while true:
+		defer: j = 666+0
+		inc n
+		b = n < 10
+
+		if not b:
 			break
-		else:
-			inc n
+
+	p : *int = null
+
+	if p = null:
+		p = &n
+		*p = 456
+	else:
+		*p = 123
+

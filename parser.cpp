@@ -1167,12 +1167,15 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 		}
 		else
 		{
+			token++;
 			branch.condition = ParseExpression(token, indent+1, info, false);
 
 			if (token->kind != TOKEN_COLON)
 			{
 				Error(info, token->location, "Expected ':' after branch condition, not: %\n", token);
 			}
+
+			token++;
 
 			branch.code = ParseCode(token, indent+1, info);
 		}

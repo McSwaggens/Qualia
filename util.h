@@ -69,6 +69,22 @@ static constexpr void Swap(T& a, T& b)
 	b = c;
 }
 
+static constexpr auto Abs(auto n)
+{
+	return n >= 0 ? n : -n;
+}
+
+static constexpr auto Pow(auto base, auto exponent)
+{
+	return __builtin_powl(base, exponent); // @Bug @FixMe: This isn't correct.
+}
+
+static constexpr auto MaskLowerBits(auto n, auto bits)   { return n & (-1 >> (sizeof(n) * 8 - bits)); }
+static constexpr auto MaskLowerBytes(auto n, auto bytes) { return n & (-1 >> (sizeof(n) - bytes) * 8); }
+
+static constexpr auto MaskUpperBits(auto n, auto bits)   { return n >> (sizeof(n) * 8 - bits); }
+static constexpr auto MaskUpperBytes(auto n, auto bytes) { return n >> (sizeof(n) - bytes) * 8; }
+
 static constexpr bool IsUpperCase(char c)
 {
 	return c >= 'A' && c <= 'Z';
@@ -124,7 +140,7 @@ static constexpr u32 DigitToInt(char c, DigitBase base = Base10)
 
 static constexpr bool IsWhiteSpace(char c)
 {
-	return c == '\t' || c == ' ';
+	return c == '\t' || c == ' '; // @FixMe: Think this needs to be expanded?
 }
 
 static constexpr bool IsPrintable(char c)

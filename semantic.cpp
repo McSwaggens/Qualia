@@ -674,6 +674,10 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 			{
 				expression->type = &primitive_bool;
 			}
+			else if (expression->token->kind == TOKEN_NULL)
+			{
+				expression->type = GetPointer(&empty_tuple, info);
+			}
 			else if (expression->token->kind == TOKEN_STRING_LITERAL)
 			{
 				u64 length = expression->token->info.span.Length();
@@ -875,7 +879,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 			expression->is_pure = expression->left->is_pure && expression->right->is_pure;
 			expression->is_referential_value = false;
 
-			if (!AreTypesCompatible(expression->left->type, expression->right->type))
+			if (!AreTypesCompatible(expression->left->type, expression->right->type) && !(IsNumericalType(expression->left->type) && IsNumericalType(expression->right->type)))
 			{
 				Error(info, expression->token->location, "% and % are incompatible types.\n", expression->left->type, expression->right->type);
 			}
@@ -1304,13 +1308,36 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 					{
 						ParseExpression(branch->condition, &code->scope, info);
 					}
+
+					branch->code.is_inside_loop = code->is_inside_loop;
+
+					if (branch->token->kind == TOKEN_WHILE || branch->token->kind == TOKEN_FOR)
+					{
+						branch->code.is_inside_loop = true;
+					}
+
+					branch->code.has_deferrer_that_returns = code->has_deferrer_that_returns;
+
 					ParseCode(&branch->code, &code->scope, function, info);
+
+					if (branch->code.does_return)
+					{
+						code->does_return = true;
+					}
 				}
 			} break;
 
 			case AST_STATEMENT_DEFER:
 			{
+				code->defers.Add(&statement->defer);
+				statement->defer.code.is_inside_loop = code->is_inside_loop;
 				ParseCode(&statement->defer.code, &code->scope, function, info);
+
+				if (statement->defer.code.does_return)
+				{
+					code->has_deferrer_that_returns = true;
+					code->does_return = true;
+				}
 			} break;
 
 			case AST_STATEMENT_CLAIM:
@@ -1337,7 +1364,6 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 				{
 					Error(info, inc->expression->span, "Expression is an integer or pointer.\n");
 				}
-
 			} break;
 
 			case AST_STATEMENT_DECREMENT:
@@ -1360,6 +1386,11 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 			{
 				code->does_return = true;
 
+				if (code->has_deferrer_that_returns)
+				{
+					Error(info, statement->ret.token->location, "A defer in this scope already has a return statement. This isn't allowed.\n");
+				}
+
 				if (statement->ret.expression)
 				{
 					ParseExpression(statement->ret.expression, &code->scope, info);
@@ -1374,7 +1405,7 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 						Error(info, statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
 					}
 				}
-				else if (function->return_type)
+				else if (function->does_return)
 				{
 					Error(info, statement->ret.token->location, "Expected return value with type: %\n", function->return_type);
 				}
@@ -1382,6 +1413,10 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 
 			case AST_STATEMENT_BREAK:
 			{
+				if (!code->is_inside_loop)
+				{
+					Error(info, statement->brk.token->location, "break isn't inside of a loop.\n");
+				}
 			} break;
 
 			case AST_STATEMENT_EXPRESSION:
@@ -1457,6 +1492,19 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 				if (!AreTypesCompatible(statement->assignment.left->type, statement->assignment.right->type))
 				{
 					Error(info, statement->assignment.token->location, "Left and right types are incompatible.\n");
+				}
+
+				if (statement->kind != AST_STATEMENT_ASSIGNMENT)
+				{
+					if (!IsNumericalType(statement->assignment.left->type))
+					{
+						Error(info, statement->assignment.left->span, "Expression is not numerical.\n");
+					}
+
+					if (!IsNumericalType(statement->assignment.right->type))
+					{
+						Error(info, statement->assignment.right->span, "Expression is not numerical.\n");
+					}
 				}
 			} break;
 		}

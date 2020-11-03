@@ -49,49 +49,67 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 	}
 	else if (IsBinaryExpression(expression->kind))
 	{
-		char left_data[GetExpressionMinSize(expression->left)];
-		char right_data[GetExpressionMinSize(expression->right)];
+		char left[GetExpressionMinSize(expression->left)];
+		char right[GetExpressionMinSize(expression->right)];
 
-		ZeroMemory(left_data, sizeof left_data);
-		ZeroMemory(right_data, sizeof right_data);
+		ZeroMemory(left, sizeof left);
+		ZeroMemory(right, sizeof right);
 
-		Interpret(expression->left,  left_data,  false, frame, interpreter);
-		Interpret(expression->right, right_data, false, frame, interpreter);
+		Interpret(expression->left,  left,  false, frame, interpreter);
+		Interpret(expression->right, right, false, frame, interpreter);
 
 		if (IsIntegerLikeType(expression->left->type) && IsIntegerLikeType(expression->right->type))
 		{
 			u64 n;
-			u64 left  = *Cast(left_data,  u64*);
-			u64 right = *Cast(right_data, u64*);
+			bool is_signed = IsSignedIntegerType(expression->left->type) || IsSignedIntegerType(expression->right->type);
 
 			switch (expression->kind)
 			{
-				case AST_EXPRESSION_BINARY_COMPARE_EQUAL:            n = left == right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:        n = left != right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_LESS:             n = left <  right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    n = left <= right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_GREATER:          n = left >  right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: n = left >= right; break;
-				case AST_EXPRESSION_BINARY_ADD:                      n = left +  right; break;
-				case AST_EXPRESSION_BINARY_SUBTRACT:                 n = left -  right; break;
-				case AST_EXPRESSION_BINARY_MULTIPLY:                 n = left *  right; break;
-				case AST_EXPRESSION_BINARY_DIVIDE:                   n = left /  right; break;
-				case AST_EXPRESSION_BINARY_MODULO:                   n = left %  right; break;
-				case AST_EXPRESSION_BINARY_EXPONENTIAL:              n = (u64)(__builtin_powl(left, right) + 0.5); break; // @TestMe
-				case AST_EXPRESSION_BINARY_BITWISE_OR:               n = left |  right; break;
-				case AST_EXPRESSION_BINARY_BITWISE_XOR:              n = left ^  right; break;
-				case AST_EXPRESSION_BINARY_BITWISE_AND:              n = left &  right; break;
-				case AST_EXPRESSION_BINARY_LEFT_SHIFT:               n = left << right; break;
-				case AST_EXPRESSION_BINARY_RIGHT_SHIFT:              n = left >> right; break;
-				case AST_EXPRESSION_BINARY_AND:                      n = left && right; break;
-				case AST_EXPRESSION_BINARY_OR:                       n = left || right; break;
+				case AST_EXPRESSION_BINARY_COMPARE_LESS:
+					n = is_signed ? (*(s64*)left <  *(s64*)right) : (*(u64*)left <  *(u64*)right);
+					break;
+
+				case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:
+					n = is_signed ? (*(s64*)left <= *(s64*)right) : (*(u64*)left <= *(u64*)right);
+					break;
+
+				case AST_EXPRESSION_BINARY_COMPARE_GREATER:
+					n = is_signed ? (*(s64*)left >  *(s64*)right) : (*(u64*)left >  *(u64*)right);
+					break;
+
+				case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
+					n = is_signed ? (*(s64*)left >= *(s64*)right) : (*(u64*)left >= *(u64*)right);
+					break;
+
+				case AST_EXPRESSION_BINARY_COMPARE_EQUAL:            n = *(u64*)left == *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:        n = *(u64*)left != *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_ADD:                      n = *(u64*)left +  *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_SUBTRACT:                 n = *(u64*)left -  *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_MULTIPLY:                 n = *(u64*)left *  *(u64*)right; break; // @TestMe
+				case AST_EXPRESSION_BINARY_DIVIDE:                   n = *(u64*)left /  *(u64*)right; break; // @TestMe
+				case AST_EXPRESSION_BINARY_MODULO:                   n = *(u64*)left %  *(u64*)right; break; // @TestMe
+				case AST_EXPRESSION_BINARY_EXPONENTIAL:              n = Pow(*(u64*)left, *(u64*)right) + 0.5; break; // @TestMe
+				case AST_EXPRESSION_BINARY_BITWISE_OR:               n = *(u64*)left |  *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_BITWISE_XOR:              n = *(u64*)left ^  *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_BITWISE_AND:              n = *(u64*)left &  *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_LEFT_SHIFT:               n = *(u64*)left << *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_RIGHT_SHIFT:              n = *(u64*)left >> *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_AND:                      n = *(u64*)left && *(u64*)right; break;
+				case AST_EXPRESSION_BINARY_OR:                       n = *(u64*)left || *(u64*)right; break;
 				case AST_EXPRESSION_BINARY_DOT:
 				default: Unreachable();
 			}
 
-			CopyMemory(output, (char*)&n, expression->type->size);
-			n &= -1 >> (64-(expression->type->size * 8));
-			Print("(% % %) = %\n", left, expression->token, right, n);
+			*(u64*)output = (n = MaskLowerBytes(n, expression->type->size));
+
+			if (is_signed)
+			{
+				Print("(% % %) = %\n", *(s64*)left, expression->token, *(s64*)right, (s64)n);
+			}
+			else
+			{
+				Print("(% % %) = %\n", *(u64*)left, expression->token, *(u64*)right, (u64)n);
+			}
 		}
 		else Assert();
 	}
@@ -101,22 +119,34 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		{
 			case AST_EXPRESSION_UNARY_BINARY_NOT:
 			{
-				Assert();
+				s64 n = 0;
+				Interpret(expression->right, (char*)&n, false, frame, interpreter);
+				n = ~n;
+				CopyMemory(output, (char*)&n, expression->type->size);
 			} break;
 
 			case AST_EXPRESSION_UNARY_NOT:
 			{
-				Assert();
+				s64 n = 0;
+				Interpret(expression->right, (char*)&n, false, frame, interpreter);
+				n = -n;
+				*(bool*)output = !n;
 			} break;
 
 			case AST_EXPRESSION_UNARY_MINUS:
 			{
-				Assert();
+				s64 n = 0;
+				Interpret(expression->right, (char*)&n, false, frame, interpreter);
+				n = -n;
+				CopyMemory(output, (char*)&n, expression->type->size);
 			} break;
 
 			case AST_EXPRESSION_UNARY_PLUS:
 			{
-				Assert();
+				s64 n = 0;
+				Interpret(expression->right, (char*)&n, false, frame, interpreter);
+				n = Abs(n);
+				CopyMemory(output, (char*)&n, expression->type->size);
 			} break;
 
 			case AST_EXPRESSION_UNARY_VALUE_OF:
@@ -168,6 +198,10 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		{
 			*(bool*)output = false;
 		}
+		else if (expression->token->kind == TOKEN_NULL)
+		{
+			*(char**)output = null;
+		}
 		else Assert();
 	}
 	else if (expression->kind == AST_EXPRESSION_TUPLE)
@@ -197,6 +231,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter)
 {
+	u32 defer_count = 0;
 	for (Ast_Statement* statement = code->statements;
 		statement < code->statements.End() && !frame->do_return && !frame->do_break;
 		statement++)
@@ -230,8 +265,11 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 			{
 				Ast_Assignment* assignment = &statement->assignment;
 				char* reference;
-				Interpret(assignment->left,  (char*)&reference,   true,  frame, interpreter);
-				Interpret(assignment->right, reference, false, frame, interpreter); // @Bug: Left size could be smaller than right size and thus buffer overflow. #ToLazyToFixRnFamalamajam
+				Interpret(assignment->left, (char*)&reference, true,  frame, interpreter);
+				char data[GetExpressionMinSize(assignment->right)];
+				ZeroMemory(data, sizeof data);
+				Interpret(assignment->right, data, false, frame, interpreter);
+				CopyMemory(reference, data, Min(assignment->left->type->size, assignment->right->type->size));
 			} break;
 
 			case AST_STATEMENT_ASSIGNMENT_ADD:
@@ -260,7 +298,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 						case AST_STATEMENT_ASSIGNMENT_SUBTRACT: left -= right; break;
 						case AST_STATEMENT_ASSIGNMENT_MULTIPLY: left *= right; break;
 						case AST_STATEMENT_ASSIGNMENT_DIVIDE:   left /= right; break;
-						case AST_STATEMENT_ASSIGNMENT_POWER:    left  = (u64)(__builtin_powl(left, right) + 0.5); break; // @TestMe
+						case AST_STATEMENT_ASSIGNMENT_POWER:    left  = Pow(left, right) + 0.5; break; // @TestMe
 						default: Unreachable();
 					}
 
@@ -294,7 +332,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 								Interpret(&branch->code, output, frame, interpreter);
 							}
 
-							if (is_if)
+							if (!passed || is_if)
 							{
 								break;
 							}
@@ -319,11 +357,13 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 			} break;
 
 			case AST_STATEMENT_ALIAS:
+			case AST_STATEMENT_CLAIM:
 				continue;
 
 			case AST_STATEMENT_DEFER:
-			case AST_STATEMENT_CLAIM:
-				Assert();
+			{
+				defer_count++;
+			} break;
 
 			case AST_STATEMENT_RETURN:
 			{
@@ -350,13 +390,18 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				Ast_Increment* inc = &statement->increment;
 				char* ref;
 				Interpret(inc->expression, (char*)&ref, true, frame, interpreter);
+				Type* type = inc->expression->type;
 
-				switch (inc->expression->type->size)
+				if (type->kind == TYPE_SPECIFIER_POINTER)
 				{
-					case 8:  ++*(u8 *)ref; break;
-					case 16: ++*(u16*)ref; break;
-					case 32: ++*(u32*)ref; break;
-					case 64: ++*(u64*)ref; break;
+					*(char**)ref += type->subtype->size;
+				}
+				else switch (type->size)
+				{
+					case 1: ++*(u8 *)ref; break;
+					case 2: ++*(u16*)ref; break;
+					case 4: ++*(u32*)ref; break;
+					case 8: ++*(u64*)ref; break;
 					default: Assert();
 				}
 			} break;
@@ -366,17 +411,36 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				Ast_Decrement* dec = &statement->decrement;
 				char* ref;
 				Interpret(dec->expression, (char*)&ref, true, frame, interpreter);
+				Type* type = dec->expression->type;
 
-				switch (dec->expression->type->size)
+				if (type->kind == TYPE_SPECIFIER_POINTER)
 				{
-					case 8:  --*(u8 *)ref; break;
-					case 16: --*(u16*)ref; break;
-					case 32: --*(u32*)ref; break;
-					case 64: --*(u64*)ref; break;
+					*(char**)ref += type->subtype->size;
+				}
+				else switch (type->size)
+				{
+					case 1: --*(u8 *)ref; break;
+					case 2: --*(u16*)ref; break;
+					case 4: --*(u32*)ref; break;
+					case 8: --*(u64*)ref; break;
 					default: Assert();
 				}
 			} break;
 		}
+	}
+
+	for (u32 i = 0; i < defer_count; i++)
+	{
+		Ast_Defer* defer = code->defers[i];
+
+		// Gross!
+		bool temp_do_return = frame->do_return;
+		bool temp_do_break  = frame->do_break;
+		frame->do_return = false;
+		frame->do_break  = false;
+		Interpret(&defer->code, output, frame, interpreter);
+		frame->do_return = temp_do_return;
+		frame->do_break  = temp_do_break;
 	}
 }
 

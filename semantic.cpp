@@ -524,13 +524,13 @@ static Ast_VariableDeclaration* GetVariable(Token* token, Ast_Scope* scope)
 	return null;
 }
 
-static Ast_Function* GetFunction(Token* token, Ast_Expression* params, Ast_Scope* scope)
+static Ast_Function* GetFunction(Token* token, Type* input_type, Ast_Scope* scope)
 {
 	while (scope)
 	{
 		for (Ast_Function* function = scope->functions; function < scope->functions.End(); function++)
 		{
-			if (params->type == function->type->function.input && CompareStrings(token->info.string, function->name->info.string))
+			if (input_type == function->type->function.input && CompareStrings(token->info.string, function->name->info.string))
 			{
 				return function;
 			}
@@ -712,10 +712,10 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 			expression->is_pure = true;
 			expression->is_referential_value = true;
 
-			if (!expression->begin)
-			{
-				Error(info, expression->span, "Empty tuples aren't allowed.\n");
-			}
+			// if (!expression->begin)
+			// {
+			// 	Error(info, expression->span, "Empty tuples aren't allowed.\n");
+			// }
 
 			for (u32 i = 0; i < expression->end - expression->begin; i++)
 			{
@@ -1024,7 +1024,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 			{
 				// @Note: expression->left could still be a variable and not a function!
 
-				if (Ast_Function* function = GetFunction(expression->left->token, expression->right, scope); function)
+				if (Ast_Function* function = GetFunction(expression->left->token, expression->right->type, scope); function)
 				{
 					expression->left->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
 					expression->left->function = function;
@@ -1513,20 +1513,16 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 
 static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Parse_Info* info)
 {
-	if (params.count == 1)
+	if (params.count == 0)
+	{
+		return &empty_tuple;
+	}
+	else if (params.count == 1)
 	{
 		return params[0].type;
 	}
 
-	Type* first;
-	if (params.count == 0)
-	{
-		first = &empty_tuple;
-	}
-	else
-	{
-		first = params[0].type;
-	}
+	Type* first = params[0].type;
 
 	for (u32 i = 0; i < first->tuple_extensions.count; i++)
 	{

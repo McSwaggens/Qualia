@@ -743,8 +743,18 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 		if (token == closure)
 		{
-			Error(info, open->location, "Empty tuples aren't allowed.\n");
+			left = info->stack.Allocate<Ast_Expression>();
+			left->kind  = AST_EXPRESSION_TUPLE;
+			left->token = open;
+			left->span.begin = open;
+			left->begin = elements;
+			left->end   = elements.End();
 		}
+
+		// if (token == closure)
+		// {
+		// 	Error(info, open->location, "Empty tuples aren't allowed.\n");
+		// }
 
 		while (token < closure)
 		{
@@ -769,6 +779,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 					left = info->stack.Allocate<Ast_Expression>();
 					left->kind  = AST_EXPRESSION_TUPLE;
 					left->token = open;
+					left->span.begin = open;
 					left->begin = elements;
 					left->end   = elements.End();
 				}
@@ -823,19 +834,17 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			Token* open = token;
 			Token* closure = open->GetClosure();
 			List<Ast_Expression*> arguments = null;
+			Ast_Expression* call = info->stack.Allocate<Ast_Expression>();
 
-			Ast_Expression* params = ParseExpression(token, indent, info, false, GetOperatorPrecedence(token->kind));
+			call->right = ParseExpression(token, indent, info, false, GetOperatorPrecedence(token->kind));
+
 			token = closure + 1;
 
-			Ast_Expression* call = info->stack.Allocate<Ast_Expression>();
 			call->kind  = AST_EXPRESSION_CALL;
 			call->span.begin = left->span.begin;
 			call->span.end = token;
 			call->token = open;
 			call->left  = left;
-			call->right = params;
-			// call->begin = arguments;
-			// call->end   = arguments.End();
 			left = call;
 		}
 		else if (token->kind == TOKEN_OPEN_BRACKET)

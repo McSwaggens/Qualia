@@ -1,4 +1,6 @@
 
+Foo(): return
+
 Test():
 	n := -10
 	j := -20
@@ -14,6 +16,9 @@ Test():
 
 		if not b:
 			break
+	then: Foo()
+
+	Foo()
 
 	p : *int = null
 

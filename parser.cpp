@@ -142,46 +142,60 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 	switch (expression->kind)
 	{
 		case AST_EXPRESSION_TERMINAL_VARIABLE:
+		{
+			Ast_Expression_Variable* variable = (Ast_Expression_Variable*)expression;
 			Write(buffer, "(Variable: ");
-			Write(buffer, expression->variable->name);
+			Write(buffer, variable->token);
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_TERMINAL_FUNCTION:
+		{
+			Ast_Expression_Function* function = (Ast_Expression_Function*)expression;
 			Write(buffer, "(Function: ");
-			Write(buffer, expression->function->name);
+			Write(buffer, function->token);
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_TERMINAL_STRUCT:
+		{
+			Ast_Expression_Struct* structure = (Ast_Expression_Struct*)expression;
 			Write(buffer, "(Struct: ");
-			Write(buffer, expression->structure->name);
+			Write(buffer, structure->token);
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_TERMINAL_ENUM:
+		{
+			Ast_Expression_Enum* enumeration = (Ast_Expression_Enum*)expression;
 			Write(buffer, "(Enum: ");
-			Write(buffer, expression->enumeration->name);
+			Write(buffer, enumeration->token);
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER:
+		{
+			Ast_Expression_Struct_Member* member = (Ast_Expression_Struct_Member*)expression;
 			Write(buffer, "(Struct_Member: ");
-			Write(buffer, expression->struct_member->name);
+			Write(buffer, member->token);
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER:
+		{
+			Ast_Expression_Enum_Member* member = (Ast_Expression_Enum_Member*)expression;
 			Write(buffer, "(Enum_Member: ");
-			Write(buffer, expression->enum_member->name);
+			Write(buffer, member->token);
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_TERMINAL_LITERAL:
 		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
 		case AST_EXPRESSION_TERMINAL:
-			Write(buffer, expression->token);
-			break;
+		{
+			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
+			Write(buffer, literal->token);
+		} break;
 
 		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
 		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
@@ -203,14 +217,16 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
 		case AST_EXPRESSION_BINARY_AND:
 		case AST_EXPRESSION_BINARY_OR:
+		{
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			Write(buffer, "(");
-			Write(buffer, expression->left);
+			Write(buffer, binary->left);
 			Write(buffer, " ");
-			Write(buffer, expression->token);
+			Write(buffer, binary->op);
 			Write(buffer, " ");
-			Write(buffer, expression->right);
+			Write(buffer, binary->right);
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_UNARY_VALUE_OF:
 		case AST_EXPRESSION_UNARY_ADDRESS_OF:
@@ -218,58 +234,73 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 		case AST_EXPRESSION_UNARY_PLUS:
 		case AST_EXPRESSION_UNARY_BINARY_NOT:
 		case AST_EXPRESSION_UNARY_NOT:
+		{
+			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			Write(buffer, "(");
-			Write(buffer, expression->token);
+			Write(buffer, unary->op);
 			Write(buffer, " ");
-			Write(buffer, expression->right);
+			Write(buffer, unary->subexpression);
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_SUBSCRIPT:
-			Write(buffer, expression->left);
+		{
+			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
+			Write(buffer, subscript->array);
 			Write(buffer, "[");
-			Write(buffer, expression->right);
+			Write(buffer, subscript->index);
 			Write(buffer, "]");
-			break;
+		} break;
 
 		case AST_EXPRESSION_CALL:
-			Write(buffer, expression->left);
-			Write(buffer, "(");
-			for (Ast_Expression** argument = expression->begin; argument < expression->end; argument++)
+		{
+			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
+			Write(buffer, call->function);
+			if (call->parameters->kind != AST_EXPRESSION_TUPLE)
 			{
-				if (argument != expression->begin) Write(buffer, ", ");
-				Write(buffer, *argument);
+				Write(buffer, "(");
+				Write(buffer, call->parameters);
+				Write(buffer, ")");
 			}
-			Write(buffer, ")");
-			break;
+			else
+			{
+				Write(buffer, call->parameters);
+			}
+		} break;
 
 		case AST_EXPRESSION_TUPLE:
+		{
+			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
 			Write(buffer, "(");
-			for (Ast_Expression** param = expression->begin; param < expression->end; param++)
+			for (u32 i = 0; i < tuple->elements.count; i++)
 			{
-				if (param != expression->begin) Write(buffer, ", ");
-				Write(buffer, *param);
+				if (i) Write(buffer, ", ");
+				Write(buffer, tuple->elements[i]);
 			}
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_IF_ELSE:
+		{
+			Ast_Expression_Ternary* ternary = (Ast_Expression_Ternary*)expression;
 			Write(buffer, "(");
-			Write(buffer, expression->left);
+			Write(buffer, ternary->left);
 			Write(buffer, " if ");
-			Write(buffer, expression->middle);
+			Write(buffer, ternary->middle);
 			Write(buffer, " else ");
-			Write(buffer, expression->right);
+			Write(buffer, ternary->right);
 			Write(buffer, ")");
-			break;
+		} break;
 
 		case AST_EXPRESSION_AS:
+		{
 			Write(buffer, "(AS)");
-			break;
+		} break;
 
 		case AST_EXPRESSION_LAMBDA:
+		{
 			Write(buffer, "(LAMBDA)");
-			break;
+		} break;
 	}
 }
 
@@ -705,35 +736,38 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 	if (IsUnaryOperator(token->kind) && IsOnCorrectScope(token, indent))
 	{
-		left = info->stack.Allocate<Ast_Expression>();
-		if      (token->kind == TOKEN_ASTERISK)    left->kind = AST_EXPRESSION_UNARY_VALUE_OF;
-		else if (token->kind == TOKEN_AMPERSAND)   left->kind = AST_EXPRESSION_UNARY_ADDRESS_OF;
-		else if (token->kind == TOKEN_BITWISE_NOT) left->kind = AST_EXPRESSION_UNARY_BINARY_NOT;
-		else if (token->kind == TOKEN_NOT)         left->kind = AST_EXPRESSION_UNARY_NOT;
-		else if (token->kind == TOKEN_MINUS)       left->kind = AST_EXPRESSION_UNARY_MINUS;
-		else if (token->kind == TOKEN_PLUS)        left->kind = AST_EXPRESSION_UNARY_PLUS;
-		left->span.begin = token;
-		left->token = token++;
-		left->right = ParseExpression(token, indent, info, assignment_break, GetUnaryPrecedence(left->token->kind));
-		left->span.end = token;
+		Ast_Expression_Unary* unary = info->stack.Allocate<Ast_Expression_Unary>();
+		if      (token->kind == TOKEN_ASTERISK)    unary->kind = AST_EXPRESSION_UNARY_VALUE_OF;
+		else if (token->kind == TOKEN_AMPERSAND)   unary->kind = AST_EXPRESSION_UNARY_ADDRESS_OF;
+		else if (token->kind == TOKEN_BITWISE_NOT) unary->kind = AST_EXPRESSION_UNARY_BINARY_NOT;
+		else if (token->kind == TOKEN_NOT)         unary->kind = AST_EXPRESSION_UNARY_NOT;
+		else if (token->kind == TOKEN_MINUS)       unary->kind = AST_EXPRESSION_UNARY_MINUS;
+		else if (token->kind == TOKEN_PLUS)        unary->kind = AST_EXPRESSION_UNARY_PLUS;
+		unary->span.begin = token;
+		unary->op = token++;
+		unary->subexpression = ParseExpression(token, indent, info, assignment_break, GetUnaryPrecedence(unary->op->kind));
+		unary->span.end = token;
+		left = unary;
 	}
 	else if (IsLiteral(token->kind) && IsOnCorrectScope(token, indent))
 	{
-		left = info->stack.Allocate<Ast_Expression>();
-		left->kind  = AST_EXPRESSION_TERMINAL_LITERAL;
-		left->can_constantly_evaluate = true;
-		left->is_pure = true;
-		left->span.begin = token;
-		left->token = token++;
-		left->span.end = token;
+		Ast_Expression_Literal* literal = info->stack.Allocate<Ast_Expression_Literal>();
+		literal->kind  = AST_EXPRESSION_TERMINAL_LITERAL;
+		literal->can_constantly_evaluate = true;
+		literal->is_pure = true;
+		literal->span.begin = token;
+		literal->token = token++;
+		literal->span.end = token;
+		left = literal;
 	}
 	else if (IsTerm(token->kind) && IsOnCorrectScope(token, indent))
 	{
-		left = info->stack.Allocate<Ast_Expression>();
-		left->kind = AST_EXPRESSION_TERMINAL;
-		left->span.begin = token;
-		left->token = token++;
-		left->span.end = token;
+		Ast_Expression_Terminal* term = info->stack.Allocate<Ast_Expression_Terminal>();
+		term->kind = AST_EXPRESSION_TERMINAL;
+		term->span.begin = token;
+		term->token = token++;
+		term->span.end = token;
+		left = term;
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN && IsOnCorrectScope(token, indent))
 	{
@@ -743,12 +777,12 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 		if (token == closure)
 		{
-			left = info->stack.Allocate<Ast_Expression>();
-			left->kind  = AST_EXPRESSION_TUPLE;
-			left->token = open;
-			left->span.begin = open;
-			left->begin = elements;
-			left->end   = elements.End();
+			Ast_Expression_Tuple* tuple = info->stack.Allocate<Ast_Expression_Tuple>();
+			tuple->kind  = AST_EXPRESSION_TUPLE;
+			// tuple->token = open;
+			tuple->span.begin = open;
+			tuple->elements = elements;
+			left = tuple;
 		}
 
 		// if (token == closure)
@@ -776,12 +810,12 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 				if (elements)
 				{
 					elements.Add(element);
-					left = info->stack.Allocate<Ast_Expression>();
-					left->kind  = AST_EXPRESSION_TUPLE;
-					left->token = open;
-					left->span.begin = open;
-					left->begin = elements;
-					left->end   = elements.End();
+					Ast_Expression_Tuple* tuple = info->stack.Allocate<Ast_Expression_Tuple>();
+					tuple->kind  = AST_EXPRESSION_TUPLE;
+					// tuple->token = open;
+					tuple->span.begin = open;
+					tuple->elements = elements;
+					left = tuple;
 				}
 				else left = element;
 			}
@@ -810,10 +844,10 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		// @Indent does unary operators need to be treated differently? (Error check)
 		if (token->kind == TOKEN_IF)
 		{
-			Ast_Expression* if_else = info->stack.Allocate<Ast_Expression>();
+			Ast_Expression_Ternary* if_else = info->stack.Allocate<Ast_Expression_Ternary>();
 			if_else->kind   = AST_EXPRESSION_IF_ELSE;
 			if_else->span.begin = left->span.begin;
-			if_else->token  = token++;
+			if_else->ops[0] = token++;
 			if_else->left   = left;
 			if_else->middle = ParseExpression(token, indent, info, false);
 
@@ -824,7 +858,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 			CheckScope(token, indent, info);
 
-			token++;
+			if_else->ops[1] = token++;
 			if_else->right = ParseExpression(token, indent, info, assignment_break, GetTernaryPrecedence(TOKEN_IF));
 			if_else->span.end = token;
 			left = if_else;
@@ -834,17 +868,17 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			Token* open = token;
 			Token* closure = open->GetClosure();
 			List<Ast_Expression*> arguments = null;
-			Ast_Expression* call = info->stack.Allocate<Ast_Expression>();
+			Ast_Expression_Call* call = info->stack.Allocate<Ast_Expression_Call>();
 
-			call->right = ParseExpression(token, indent, info, false, GetOperatorPrecedence(token->kind));
+			call->parameters = ParseExpression(token, indent, info, false, GetOperatorPrecedence(token->kind));
 
 			token = closure + 1;
 
 			call->kind  = AST_EXPRESSION_CALL;
 			call->span.begin = left->span.begin;
 			call->span.end = token;
-			call->token = open;
-			call->left  = left;
+			// call->token = open;
+			call->function = left;
 			left = call;
 		}
 		else if (token->kind == TOKEN_OPEN_BRACKET)
@@ -852,23 +886,23 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			Token* open = token++;
 			Token* closure = open->GetClosure();
 
-			Ast_Expression* subscript = info->stack.Allocate<Ast_Expression>();
+			Ast_Expression_Subscript* subscript = info->stack.Allocate<Ast_Expression_Subscript>();
 			subscript->kind  = AST_EXPRESSION_SUBSCRIPT;
 			subscript->span.begin = left->span.begin;
 			subscript->span.end = closure+1;
-			subscript->token = open;
-			subscript->left  = left;
+			// subscript->token = open;
+			subscript->array = left;
 
 			if (token != closure)
 			{
-				subscript->right = ParseExpression(token, indent+1, info);
+				subscript->index = ParseExpression(token, indent+1, info);
 
 				if (token != closure)
 				{
 					Error(info, token->location, "Expected ']', not: %\n", token);
 				}
 			}
-			else subscript->right = null;
+			else subscript->index = null;
 
 			CheckScope(token, indent, info);
 			token = closure + 1;
@@ -878,7 +912,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		else
 		{
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
-			Ast_Expression* binary = info->stack.Allocate<Ast_Expression>();
+			Ast_Expression_Binary* binary = info->stack.Allocate<Ast_Expression_Binary>();
 
 			if      (token->kind == TOKEN_EQUAL)            binary->kind = AST_EXPRESSION_BINARY_COMPARE_EQUAL;
 			else if (token->kind == TOKEN_NOT_EQUAL)        binary->kind = AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL;
@@ -903,9 +937,9 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			else Unreachable();
 
 			binary->span.begin = left->span.begin;
-			binary->token = token++;
+			binary->op = token++;
 			binary->left  = left;
-			binary->right = ParseExpression(token, indent, info, assignment_break, GetBinaryPrecedence(binary->token->kind));
+			binary->right = ParseExpression(token, indent, info, assignment_break, GetBinaryPrecedence(binary->op->kind));
 			binary->span.end = token;
 			left = binary;
 		}

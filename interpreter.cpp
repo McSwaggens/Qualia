@@ -13,14 +13,15 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 {
 	if (expression->kind == AST_EXPRESSION_BINARY_DOT)
 	{
-		char data[expression->left->type->size];
-		Interpret(expression->left, data, true, frame, interpreter);
-		Assert(expression->right->kind == AST_EXPRESSION_TERMINAL_STRUCT_MEMBER);
+		Ast_Expression_Binary* binary = expression->GetBinary();
+		char data[binary->left->type->size];
+		Interpret(binary->left, data, true, frame, interpreter);
+		Assert(binary->right->kind == AST_EXPRESSION_TERMINAL_STRUCT_MEMBER);
 
-		if (expression->left->is_referential_value)
+		if (binary->left->is_referential_value)
 		{
 			char* reference = *(char**)data;
-			reference += expression->right->struct_member->offset;
+			reference += binary->right->GetStructMember()->member->offset;
 
 			if (allow_referential)
 			{
@@ -28,42 +29,44 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			}
 			else
 			{
-				CopyMemory(output, reference, expression->type->size);
+				CopyMemory(output, reference, binary->type->size);
 			}
 		}
 		else
 		{
-			CopyMemory(output, data + expression->right->struct_member->offset, expression->right->type->size);
+			CopyMemory(output, data + binary->right->GetStructMember()->member->offset, binary->right->type->size);
 		}
 	}
 	else if (expression->kind == AST_EXPRESSION_TERMINAL_VARIABLE)
 	{
+		Ast_Expression_Variable* variable = expression->GetVariable();
 		if (allow_referential)
 		{
-			*(char**)output = frame->GetData(expression->variable);
+			*(char**)output = frame->GetData(variable->variable);
 		}
 		else
 		{
-			CopyMemory(output, frame->GetData(expression->variable), expression->type->size);
+			CopyMemory(output, frame->GetData(variable->variable), expression->type->size);
 		}
 	}
 	else if (IsBinaryExpression(expression->kind))
 	{
-		char left[GetExpressionMinSize(expression->left)];
-		char right[GetExpressionMinSize(expression->right)];
+		Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
+		char left[GetExpressionMinSize(binary->left)];
+		char right[GetExpressionMinSize(binary->right)];
 
 		ZeroMemory(left, sizeof left);
 		ZeroMemory(right, sizeof right);
 
-		Interpret(expression->left,  left,  false, frame, interpreter);
-		Interpret(expression->right, right, false, frame, interpreter);
+		Interpret(binary->left,  left,  false, frame, interpreter);
+		Interpret(binary->right, right, false, frame, interpreter);
 
-		if (IsIntegerLikeType(expression->left->type) && IsIntegerLikeType(expression->right->type))
+		if (IsIntegerLikeType(binary->left->type) && IsIntegerLikeType(binary->right->type))
 		{
 			u64 n;
-			bool is_signed = IsSignedIntegerType(expression->left->type) || IsSignedIntegerType(expression->right->type);
+			bool is_signed = IsSignedIntegerType(binary->left->type) || IsSignedIntegerType(binary->right->type);
 
-			switch (expression->kind)
+			switch (binary->kind)
 			{
 				case AST_EXPRESSION_BINARY_COMPARE_LESS:
 					n = is_signed ? (*(s64*)left <  *(s64*)right) : (*(u64*)left <  *(u64*)right);
@@ -100,35 +103,36 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 				default: Unreachable();
 			}
 
-			*(u64*)output = (n = MaskLowerBytes(n, expression->type->size));
+			*(u64*)output = (n = MaskLowerBytes(n, binary->type->size));
 
 			if (is_signed)
 			{
-				Print("(% % %) = %\n", *(s64*)left, expression->token, *(s64*)right, (s64)n);
+				Print("(% % %) = %\n", *(s64*)left, binary->op, *(s64*)right, (s64)n);
 			}
 			else
 			{
-				Print("(% % %) = %\n", *(u64*)left, expression->token, *(u64*)right, (u64)n);
+				Print("(% % %) = %\n", *(u64*)left, binary->op, *(u64*)right, (u64)n);
 			}
 		}
 		else Assert();
 	}
 	else if (IsUnaryExpression(expression->kind))
 	{
-		switch (expression->kind)
+		Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
+		switch (unary->kind)
 		{
 			case AST_EXPRESSION_UNARY_BINARY_NOT:
 			{
 				s64 n = 0;
-				Interpret(expression->right, (char*)&n, false, frame, interpreter);
+				Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
 				n = ~n;
-				CopyMemory(output, (char*)&n, expression->type->size);
+				CopyMemory(output, (char*)&n, unary->type->size);
 			} break;
 
 			case AST_EXPRESSION_UNARY_NOT:
 			{
 				s64 n = 0;
-				Interpret(expression->right, (char*)&n, false, frame, interpreter);
+				Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
 				n = -n;
 				*(bool*)output = !n;
 			} break;
@@ -136,36 +140,36 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			case AST_EXPRESSION_UNARY_MINUS:
 			{
 				s64 n = 0;
-				Interpret(expression->right, (char*)&n, false, frame, interpreter);
+				Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
 				n = -n;
-				CopyMemory(output, (char*)&n, expression->type->size);
+				CopyMemory(output, (char*)&n, unary->type->size);
 			} break;
 
 			case AST_EXPRESSION_UNARY_PLUS:
 			{
 				s64 n = 0;
-				Interpret(expression->right, (char*)&n, false, frame, interpreter);
+				Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
 				n = Abs(n);
-				CopyMemory(output, (char*)&n, expression->type->size);
+				CopyMemory(output, (char*)&n, unary->type->size);
 			} break;
 
 			case AST_EXPRESSION_UNARY_VALUE_OF:
 			{
 				char* ref;
-				Interpret(expression->right, (char*)&ref, false, frame, interpreter);
+				Interpret(unary->subexpression, (char*)&ref, false, frame, interpreter);
 				if (allow_referential)
 				{
 					*(char**)output = ref;
 				}
 				else
 				{
-					CopyMemory(output, ref, expression->type->size);
+					CopyMemory(output, ref, unary->type->size);
 				}
 			} break;
 
 			case AST_EXPRESSION_UNARY_ADDRESS_OF:
 			{
-				Interpret(expression->right, output, true, frame, interpreter);
+				Interpret(unary->subexpression, output, true, frame, interpreter);
 			} break;
 
 			default:
@@ -174,31 +178,32 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 	}
 	else if (expression->kind == AST_EXPRESSION_TERMINAL_LITERAL)
 	{
-		if (expression->token->kind == TOKEN_INTEGER_LITERAL)
+		Ast_Expression_Literal* literal = expression->GetLiteral();
+		if (literal->token->kind == TOKEN_INTEGER_LITERAL)
 		{
-			CopyMemory(output, (char*)&expression->token->info.integer.value, expression->type->size);
+			CopyMemory(output, (char*)&literal->token->info.integer.value, literal->type->size);
 		}
-		else if (expression->token->kind == TOKEN_FLOAT_LITERAL)
+		else if (literal->token->kind == TOKEN_FLOAT_LITERAL)
 		{
-			if (expression->type->primitive == TOKEN_FLOAT64)
+			if (literal->type->primitive == TOKEN_FLOAT64)
 			{
-				*(f64*)output = (f64)expression->token->info.floating_point.value;
+				*(f64*)output = (f64)literal->token->info.floating_point.value;
 			}
-			else if (expression->type->primitive == TOKEN_FLOAT32)
+			else if (literal->type->primitive == TOKEN_FLOAT32)
 			{
-				*(f32*)output = (f32)expression->token->info.floating_point.value;
+				*(f32*)output = (f32)literal->token->info.floating_point.value;
 			}
 			else Assert();
 		}
-		else if (expression->token->kind == TOKEN_TRUE)
+		else if (literal->token->kind == TOKEN_TRUE)
 		{
 			*(bool*)output = true;
 		}
-		else if (expression->token->kind == TOKEN_FALSE)
+		else if (literal->token->kind == TOKEN_FALSE)
 		{
 			*(bool*)output = false;
 		}
-		else if (expression->token->kind == TOKEN_NULL)
+		else if (literal->token->kind == TOKEN_NULL)
 		{
 			*(char**)output = null;
 		}
@@ -206,18 +211,21 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 	}
 	else if (expression->kind == AST_EXPRESSION_TUPLE)
 	{
-		for (Ast_Expression** sub = expression->begin; sub < expression->end; sub++)
+		Ast_Expression_Tuple* tuple = expression->GetTuple();
+		for (u32 i = 0; i < tuple->elements.count; i++)
 		{
-			Interpret(*sub, output, false, frame, interpreter);
-			output += (*sub)->type->size;
+			Ast_Expression* element = tuple->elements[i];
+			Interpret(element, output, false, frame, interpreter);
+			output += element->type->size;
 		}
 	}
 	else if (expression->kind == AST_EXPRESSION_CALL)
 	{
-		Ast_Function* function = expression->left->function;
+		Ast_Expression_Call* call = expression->GetCall();
+		Ast_Function* function = call->function->GetFunction()->function;
 
 		char input[function->type->function.input->size];
-		Interpret(expression->right, input, false, frame, interpreter);
+		Interpret(call->parameters, input, false, frame, interpreter);
 
 		char data[function->type->function.output->size];
 		Interpret(function, input, data, interpreter);

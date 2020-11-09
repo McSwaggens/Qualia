@@ -246,35 +246,111 @@ static bool IsBinaryExpression(Ast_Expression_Kind kind)
 struct Ast_Expression
 {
 	Ast_Expression_Kind kind;
-	Token* token;
-	Type* type;
-	Span<Token> span;
 	bool is_pure;
 	bool is_referential_value;
 	bool can_constantly_evaluate;
+	Type* type;
+	Span<Token> span;
 
-	union
-	{
-		Ast_Expression* left;
-		Ast_VariableDeclaration* variable;
-		Ast_Function* function;
-		Ast_Struct* structure;
-		Ast_Enum* enumeration;
-		Ast_Struct_Member* struct_member;
-		Ast_Enum_Member* enum_member;
-	};
+	struct Ast_Expression_Unary*         GetUnary()         { return (Ast_Expression_Unary*)this;         }
+	struct Ast_Expression_Binary*        GetBinary()        { return (Ast_Expression_Binary*)this;        }
+	struct Ast_Expression_Ternary*       GetTernary()       { return (Ast_Expression_Ternary*)this;       }
+	struct Ast_Expression_Call*          GetCall()          { return (Ast_Expression_Call*)this;          }
+	struct Ast_Expression_Tuple*         GetTuple()         { return (Ast_Expression_Tuple*)this;         }
+	struct Ast_Expression_Literal*       GetLiteral()       { return (Ast_Expression_Literal*)this;       }
+	struct Ast_Expression_Subscript*     GetSubscript()     { return (Ast_Expression_Subscript*)this;     }
+	struct Ast_Expression_Terminal*      GetTerminal()      { return (Ast_Expression_Terminal*)this;      }
+	struct Ast_Expression_Variable*      GetVariable()      { return (Ast_Expression_Variable*)this;      }
+	struct Ast_Expression_Function*      GetFunction()      { return (Ast_Expression_Function*)this;      }
+	struct Ast_Expression_Struct*        GetStruct()        { return (Ast_Expression_Struct*)this;        }
+	struct Ast_Expression_Enum*          GetEnum()          { return (Ast_Expression_Enum*)this;          }
+	struct Ast_Expression_Struct_Member* GetStructMember()  { return (Ast_Expression_Struct_Member*)this; }
+	struct Ast_Expression_Enum_Member*   GetEnumMember()    { return (Ast_Expression_Enum_Member*)this;   }
+};
 
-	union
-	{
-		Ast_Expression* right;
-		Ast_Expression** begin;
-	};
+struct Ast_Expression_Unary : Ast_Expression
+{
+	Ast_Expression* subexpression;
+	Token* op;
+};
 
-	union
-	{
-		Ast_Expression* middle;
-		Ast_Expression** end;
-	};
+struct Ast_Expression_Binary : Ast_Expression
+{
+	Ast_Expression* left;
+	Ast_Expression* right;
+	Token* op;
+};
+
+struct Ast_Expression_Ternary : Ast_Expression
+{
+	Ast_Expression* left;
+	Ast_Expression* middle;
+	Ast_Expression* right;
+	Token* ops[2];
+};
+
+struct Ast_Expression_Call : Ast_Expression
+{
+	Ast_Expression* function;
+	Ast_Expression* parameters;
+};
+
+struct Ast_Expression_Tuple : Ast_Expression
+{
+	List<Ast_Expression*> elements;
+};
+
+struct Ast_Expression_Literal : Ast_Expression
+{
+	Token* token;
+};
+
+struct Ast_Expression_Subscript : Ast_Expression
+{
+	Ast_Expression* array;
+	Ast_Expression* index;
+};
+
+struct Ast_Expression_Terminal : Ast_Expression
+{
+	Token* token;
+	void* ptr;
+};
+
+struct Ast_Expression_Variable : Ast_Expression
+{
+	Token* token;
+	Ast_VariableDeclaration* variable;
+};
+
+struct Ast_Expression_Function : Ast_Expression
+{
+	Token* token;
+	Ast_Function* function;
+};
+
+struct Ast_Expression_Struct : Ast_Expression
+{
+	Token* token;
+	Ast_Struct* structure;
+};
+
+struct Ast_Expression_Enum : Ast_Expression
+{
+	Token* token;
+	Ast_Enum* enumeration;
+};
+
+struct Ast_Expression_Struct_Member : Ast_Expression
+{
+	Token* token;
+	Ast_Struct_Member* member;
+};
+
+struct Ast_Expression_Enum_Member : Ast_Expression
+{
+	Token* token;
+	Ast_Enum_Member* member;
 };
 
 struct Ast_Scope

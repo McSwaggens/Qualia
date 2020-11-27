@@ -734,7 +734,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 {
 	Ast_Expression* left;
 
-	if (IsUnaryOperator(token->kind) && IsOnCorrectScope(token, indent))
+	if (IsUnaryOperator(token->kind))
 	{
 		Ast_Expression_Unary* unary = info->stack.Allocate<Ast_Expression_Unary>();
 		if      (token->kind == TOKEN_ASTERISK)    unary->kind = AST_EXPRESSION_UNARY_VALUE_OF;
@@ -745,11 +745,12 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		else if (token->kind == TOKEN_PLUS)        unary->kind = AST_EXPRESSION_UNARY_PLUS;
 		unary->span.begin = token;
 		unary->op = token++;
+		CheckScope(token, indent, info);
 		unary->subexpression = ParseExpression(token, indent, info, assignment_break, GetUnaryPrecedence(unary->op->kind));
 		unary->span.end = token;
 		left = unary;
 	}
-	else if (IsLiteral(token->kind) && IsOnCorrectScope(token, indent))
+	else if (IsLiteral(token->kind))
 	{
 		Ast_Expression_Literal* literal = info->stack.Allocate<Ast_Expression_Literal>();
 		literal->kind  = AST_EXPRESSION_TERMINAL_LITERAL;
@@ -760,7 +761,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		literal->span.end = token;
 		left = literal;
 	}
-	else if (IsTerm(token->kind) && IsOnCorrectScope(token, indent))
+	else if (IsTerm(token->kind))
 	{
 		Ast_Expression_Terminal* term = info->stack.Allocate<Ast_Expression_Terminal>();
 		term->kind = AST_EXPRESSION_TERMINAL;
@@ -769,7 +770,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		term->span.end = token;
 		left = term;
 	}
-	else if (token->kind == TOKEN_OPEN_PAREN && IsOnCorrectScope(token, indent))
+	else if (token->kind == TOKEN_OPEN_PAREN)
 	{
 		Token* open = token++;
 		Token* closure = open->GetClosure();
@@ -792,6 +793,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 		while (token < closure)
 		{
+			CheckScope(token, indent+1, info);
 			Ast_Expression* element = ParseExpression(token, indent+1, info);
 
 			if (token->kind == TOKEN_COMMA)
@@ -849,6 +851,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			if_else->span.begin = left->span.begin;
 			if_else->ops[0] = token++;
 			if_else->left   = left;
+			CheckScope(token, indent, info);
 			if_else->middle = ParseExpression(token, indent, info, false);
 
 			if (token->kind != TOKEN_ELSE)
@@ -859,6 +862,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			CheckScope(token, indent, info);
 
 			if_else->ops[1] = token++;
+			CheckScope(token, indent, info);
 			if_else->right = ParseExpression(token, indent, info, assignment_break, GetTernaryPrecedence(TOKEN_IF));
 			if_else->span.end = token;
 			left = if_else;
@@ -870,6 +874,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			List<Ast_Expression*> arguments = null;
 			Ast_Expression_Call* call = info->stack.Allocate<Ast_Expression_Call>();
 
+			CheckScope(token, indent, info);
 			call->parameters = ParseExpression(token, indent, info, false, GetOperatorPrecedence(token->kind));
 
 			token = closure + 1;
@@ -895,6 +900,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 			if (token != closure)
 			{
+				CheckScope(token, indent+1, info);
 				subscript->index = ParseExpression(token, indent+1, info);
 
 				if (token != closure)
@@ -914,31 +920,35 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
 			Ast_Expression_Binary* binary = info->stack.Allocate<Ast_Expression_Binary>();
 
-			if      (token->kind == TOKEN_EQUAL)            binary->kind = AST_EXPRESSION_BINARY_COMPARE_EQUAL;
-			else if (token->kind == TOKEN_NOT_EQUAL)        binary->kind = AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL;
-			else if (token->kind == TOKEN_LESS)             binary->kind = AST_EXPRESSION_BINARY_COMPARE_LESS;
-			else if (token->kind == TOKEN_LESS_OR_EQUAL)    binary->kind = AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL;
-			else if (token->kind == TOKEN_GREATER)          binary->kind = AST_EXPRESSION_BINARY_COMPARE_GREATER;
-			else if (token->kind == TOKEN_GREATER_OR_EQUAL) binary->kind = AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL;
-			else if (token->kind == TOKEN_AND)              binary->kind = AST_EXPRESSION_BINARY_AND;
-			else if (token->kind == TOKEN_OR)               binary->kind = AST_EXPRESSION_BINARY_OR;
-			else if (token->kind == TOKEN_DOT)              binary->kind = AST_EXPRESSION_BINARY_DOT;
-			else if (token->kind == TOKEN_PLUS)             binary->kind = AST_EXPRESSION_BINARY_ADD;
-			else if (token->kind == TOKEN_MINUS)            binary->kind = AST_EXPRESSION_BINARY_SUBTRACT;
-			else if (token->kind == TOKEN_ASTERISK)         binary->kind = AST_EXPRESSION_BINARY_MULTIPLY;
-			else if (token->kind == TOKEN_DIVIDE)           binary->kind = AST_EXPRESSION_BINARY_DIVIDE;
-			else if (token->kind == TOKEN_MOD)              binary->kind = AST_EXPRESSION_BINARY_MODULO;
-			else if (token->kind == TOKEN_EXPONENT)         binary->kind = AST_EXPRESSION_BINARY_EXPONENTIAL;
-			else if (token->kind == TOKEN_BITWISE_OR)       binary->kind = AST_EXPRESSION_BINARY_BITWISE_OR;
-			else if (token->kind == TOKEN_BITWISE_XOR)      binary->kind = AST_EXPRESSION_BINARY_BITWISE_XOR;
-			else if (token->kind == TOKEN_BITWISE_AND)      binary->kind = AST_EXPRESSION_BINARY_BITWISE_AND;
-			else if (token->kind == TOKEN_LEFT_SHIFT)       binary->kind = AST_EXPRESSION_BINARY_LEFT_SHIFT;
-			else if (token->kind == TOKEN_RIGHT_SHIFT)      binary->kind = AST_EXPRESSION_BINARY_RIGHT_SHIFT;
-			else Unreachable();
+			switch (token->kind)
+			{
+				case TOKEN_EQUAL:            binary->kind = AST_EXPRESSION_BINARY_COMPARE_EQUAL;            break;
+				case TOKEN_NOT_EQUAL:        binary->kind = AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL;        break;
+				case TOKEN_LESS:             binary->kind = AST_EXPRESSION_BINARY_COMPARE_LESS;             break;
+				case TOKEN_LESS_OR_EQUAL:    binary->kind = AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL;    break;
+				case TOKEN_GREATER:          binary->kind = AST_EXPRESSION_BINARY_COMPARE_GREATER;          break;
+				case TOKEN_GREATER_OR_EQUAL: binary->kind = AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL; break;
+				case TOKEN_AND:              binary->kind = AST_EXPRESSION_BINARY_AND;                      break;
+				case TOKEN_OR:               binary->kind = AST_EXPRESSION_BINARY_OR;                       break;
+				case TOKEN_DOT:              binary->kind = AST_EXPRESSION_BINARY_DOT;                      break;
+				case TOKEN_PLUS:             binary->kind = AST_EXPRESSION_BINARY_ADD;                      break;
+				case TOKEN_MINUS:            binary->kind = AST_EXPRESSION_BINARY_SUBTRACT;                 break;
+				case TOKEN_ASTERISK:         binary->kind = AST_EXPRESSION_BINARY_MULTIPLY;                 break;
+				case TOKEN_DIVIDE:           binary->kind = AST_EXPRESSION_BINARY_DIVIDE;                   break;
+				case TOKEN_MOD:              binary->kind = AST_EXPRESSION_BINARY_MODULO;                   break;
+				case TOKEN_EXPONENT:         binary->kind = AST_EXPRESSION_BINARY_EXPONENTIAL;              break;
+				case TOKEN_BITWISE_OR:       binary->kind = AST_EXPRESSION_BINARY_BITWISE_OR;               break;
+				case TOKEN_BITWISE_XOR:      binary->kind = AST_EXPRESSION_BINARY_BITWISE_XOR;              break;
+				case TOKEN_BITWISE_AND:      binary->kind = AST_EXPRESSION_BINARY_BITWISE_AND;              break;
+				case TOKEN_LEFT_SHIFT:       binary->kind = AST_EXPRESSION_BINARY_LEFT_SHIFT;               break;
+				case TOKEN_RIGHT_SHIFT:      binary->kind = AST_EXPRESSION_BINARY_RIGHT_SHIFT;              break;
+				default: Unreachable();
+			}
 
 			binary->span.begin = left->span.begin;
 			binary->op = token++;
 			binary->left  = left;
+			CheckScope(token, indent, info);
 			binary->right = ParseExpression(token, indent, info, assignment_break, GetBinaryPrecedence(binary->op->kind));
 			binary->span.end = token;
 			left = binary;
@@ -1286,7 +1296,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 	}
 	else if (IsExpressionStarter(token->kind))
 	{
-		Ast_Expression* expression = ParseExpression(token, indent, info, true);
+		Ast_Expression* expression = ParseExpression(token, indent+1, info, true);
 
 		if (IsAssignment(token->kind))
 		{

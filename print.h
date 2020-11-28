@@ -15,15 +15,16 @@ void Write(OutputBuffer* buffer, s8  n);
 void Write(OutputBuffer* buffer, s16 n);
 void Write(OutputBuffer* buffer, s32 n);
 void Write(OutputBuffer* buffer, s64 n);
+void Write(OutputBuffer* buffer, s64 n);
+
+void Write(OutputBuffer* buffer, f32 n);
+void Write(OutputBuffer* buffer, f64 n);
 
 // Need this, otherwise sizeof won't work...
 static inline void Write(OutputBuffer* buffer, unsigned long int n)
 {
 	Write(buffer, (u64)n);
 }
-
-void Write(OutputBuffer* buffer, f32 n);
-void Write(OutputBuffer* buffer, f64 n);
 
 static inline void Write(OutputBuffer* buffer, String str)
 {

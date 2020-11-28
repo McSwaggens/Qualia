@@ -115,10 +115,12 @@ Parse_Info LexicalParse(String file_path)
 				token.info.string = String(start, size);
 			}
 		}
-		else if (IsDigit(*cursor))
+		else if (IsDigit(*cursor) || *cursor == '.')
 		{
 			char* start = cursor;
 			u64 value = 0;
+			f64 float_value = 0.0;
+			bool is_float = false;
 
 			if (cursor[0] == '0' && cursor[1] == 'x')
 			{
@@ -215,72 +217,121 @@ Parse_Info LexicalParse(String file_path)
 
 				if (*cursor == '.')
 				{
-					Print("error: Float literals not implemented yet...\n");
-					Fail();
-
-					while (IsDigit(*++cursor, Decimal))
+					// @OptimizeMe: This is a very slow way of doing this.
+					// @Bug: Not even sure if this handles weird floating point edge cases.
+					is_float = true;
+					float_value = value;
+					double m = 0.1;
+					cursor++;
+					while (IsDigit(*cursor, Decimal))
 					{
-						u64 new_value = value * 10 + DigitToInt(*cursor, Decimal);
+						float_value += DigitToInt(*cursor, Decimal) * m;
+						m *= 0.1;
+						if (*++cursor == '_') ++cursor;
+					}
+
+					Print("Float: %\n", float_value);
+				}
+			}
+
+			if (is_float)
+			{
+				token.kind = TOKEN_FLOAT_LITERAL;
+				token.info.floating_point.value = float_value;
+				token.info.floating_point.explicit_bytes = 0;
+
+				if (cursor[0] == 'f')
+				{
+					cursor++;
+
+					if (cursor[0] == '1' && cursor[1] == '6')
+					{
+						cursor += 2;
+						token.info.floating_point.explicit_bytes = 2;
+						Print("16bit floats aren't implemented.\n");
+						Fail();
+					}
+					else if (cursor[0] == '3' && cursor[1] == '2')
+					{
+						cursor += 2;
+						token.info.floating_point.explicit_bytes = 4;
+						token.info.floating_point.value = (f32)token.info.floating_point.value;
+					}
+					else if (cursor[0] == '6' && cursor[1] == '4')
+					{
+						cursor += 2;
+						token.info.floating_point.explicit_bytes = 8;
+						token.info.floating_point.value = (f64)token.info.floating_point.value;
+					}
+
+					// @Todo: Check if the value actually fits inside the explicit type.
+
+					if (IsDigit(*cursor))
+					{
+						Print("error: Unexpected digit in float size suffix: %\n", *cursor);
+						Fail();
 					}
 				}
 			}
-
-			token.kind = TOKEN_INTEGER_LITERAL;
-			token.info.integer.value = value;
-			token.info.integer.is_unsigned = false;
-
-			s32 min_bytes = value <= u8_max ? 1 : value <= u16_max ? 2 : value <= u32_max ? 4 : 8;
-
-			s32 explicit_bytes = 0;
-			if (cursor[0] == 'u' || cursor[0] == 's')
+			else
 			{
-				char* end_of_digits = cursor;
-				token.info.integer.is_unsigned = *cursor++ == 'u';
+				token.kind = TOKEN_INTEGER_LITERAL;
+				token.info.integer.value = value;
+				token.info.integer.is_unsigned = false;
 
-				if (cursor[0] == '8')
-				{
-					explicit_bytes = 1;
-					cursor += 1;
-				}
-				else if (cursor[0] == '1' && cursor[1] == '6')
-				{
-					explicit_bytes = 2;
-					cursor += 2;
-				}
-				else if (cursor[0] == '3' && cursor[1] == '2')
-				{
-					explicit_bytes = 4;
-					cursor += 2;
-				}
-				else if (cursor[0] == '6' && cursor[1] == '4')
-				{
-					explicit_bytes = 8;
-					cursor += 2;
-				}
+				s32 min_bytes = value <= u8_max ? 1 : value <= u16_max ? 2 : value <= u32_max ? 4 : 8;
 
-				if (IsDigit(*cursor))
+				s32 explicit_bytes = 0;
+				if (cursor[0] == 'u' || cursor[0] == 's')
 				{
-					Print("error: Unexpected digit in integer size suffix: %\n", *cursor);
+					char* end_of_digits = cursor;
+					token.info.integer.is_unsigned = *cursor++ == 'u';
+
+					if (cursor[0] == '8')
+					{
+						explicit_bytes = 1;
+						cursor += 1;
+					}
+					else if (cursor[0] == '1' && cursor[1] == '6')
+					{
+						explicit_bytes = 2;
+						cursor += 2;
+					}
+					else if (cursor[0] == '3' && cursor[1] == '2')
+					{
+						explicit_bytes = 4;
+						cursor += 2;
+					}
+					else if (cursor[0] == '6' && cursor[1] == '4')
+					{
+						explicit_bytes = 8;
+						cursor += 2;
+					}
+
+					if (IsDigit(*cursor))
+					{
+						Print("error: Unexpected digit in integer size suffix: %\n", *cursor);
+						Fail();
+					}
+
+					if (min_bytes > explicit_bytes && explicit_bytes)
+					{
+						Print("error: Integer '%' size specifier is too small. Suggestion: use %%\n", Span(start, cursor), Span(start, end_of_digits+1), min_bytes * 8);
+						Fail();
+					}
+				}
+				else if (cursor[-1] == '_')
+				{
+					Print("error: Dangling underscore at the end of literal.\n");
 					Fail();
 				}
 
-				if (min_bytes > explicit_bytes && explicit_bytes)
-				{
-					Print("error: Integer '%' size specifier is too small. Suggestion: use %%\n", Span(start, cursor), Span(start, end_of_digits+1), min_bytes * 8);
-					Fail();
-				}
+				token.info.integer.explicit_bytes = explicit_bytes;
 			}
-			else if (cursor[-1] == '_')
-			{
-				Print("error: Dangling underscore at the end of integer literal.\n");
-				Fail();
-			}
-
-			token.info.integer.explicit_bytes = explicit_bytes;
 
 			if (IsLetter(*cursor) || IsDigit(*cursor) || *cursor == '_')
 			{
-				Print("error: Unexpected character after integer literal: %\n", *cursor);
+				Print("error: Unexpected character after literal: %\n", *cursor);
 				Fail();
 			}
 		}

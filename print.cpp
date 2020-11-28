@@ -33,7 +33,7 @@ void Write(OutputBuffer* buffer, u64 n)
 void Write(OutputBuffer* buffer, s8  n)
 {
 	if (n < 0) buffer->Write('-');
-	Write(buffer, (u64)abs(n));
+	Write(buffer, (u64)Abs(n));
 }
 
 void Write(OutputBuffer* buffer, s16 n)
@@ -45,17 +45,27 @@ void Write(OutputBuffer* buffer, s16 n)
 void Write(OutputBuffer* buffer, s32 n)
 {
 	if (n < 0) buffer->Write('-');
-	Write(buffer, (u64)abs(n));
+	Write(buffer, (u64)Abs(n));
 }
 
 void Write(OutputBuffer* buffer, s64 n)
 {
 	if (n < 0) buffer->Write('-');
-	Write(buffer, (u64)llabs(n));
+	Write(buffer, (u64)Abs(n));
 }
 
-void Write(OutputBuffer* buffer, f32 n);
-void Write(OutputBuffer* buffer, f64 n);
+void Write(OutputBuffer* buffer, f32 f)
+{
+	Write(buffer, (f64)f);
+}
+
+void Write(OutputBuffer* buffer, f64 f)
+{
+	// @FixMe: This really isn't that great, but it's good enough for now.
+	Write(buffer, (s64)f);
+	Write(buffer, '.');
+	Write(buffer, (s64)((f-(s64)f) * Pow(10, 9)));
+}
 
 void Write(OutputBuffer* buffer, Token_Kind kind)
 {
@@ -80,8 +90,7 @@ void Write(OutputBuffer* buffer, Token& token)
 	}
 	else if (token.kind == TOKEN_FLOAT_LITERAL)
 	{
-		// TODO: Implement f64 print function.
-		//Write(buffer, token.info.floating_point.value);
+		Write(buffer, token.info.floating_point.value);
 	}
 	else
 	{

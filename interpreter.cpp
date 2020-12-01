@@ -182,7 +182,11 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 				default: Assert();
 			}
 
-			Print("(% % %) = %\n", *(f64*)left, binary->op, *(f64*)right, *(f64*)output);
+			Print("(% % %) = \n", *(f64*)left, binary->op, *(f64*)right);
+
+			if (binary->type == &primitive_bool) Print("%\n", *(bool*)output);
+			else Print("%\n", *(f64*)output);
+
 			ConvertNumerical((Value*)output, &primitive_float64, binary->type);
 
 		}

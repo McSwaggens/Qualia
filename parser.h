@@ -598,6 +598,20 @@ struct Interpreter
 	MemoryBlock* block;
 };
 
+extern Type empty_tuple;
+extern Type primitive_bool;
+extern Type primitive_int8;
+extern Type primitive_int16;
+extern Type primitive_int32;
+extern Type primitive_int64;
+extern Type primitive_uint8;
+extern Type primitive_uint16;
+extern Type primitive_uint32;
+extern Type primitive_uint64;
+extern Type primitive_float16;
+extern Type primitive_float32;
+extern Type primitive_float64;
+
 Parse_Info LexicalParse(String file_path);
 void ParseFile(String file_path);
 void SemanticParse(Parse_Info* info);
@@ -605,6 +619,8 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter);
 void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter);
 StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
+u32 GetTypePrecedence(Type* type);
+Type* GetDominantType(Type* a, Type* b);
 
 static bool IsPrimitive(Type* type, Token_Kind primitive)
 {
@@ -619,7 +635,7 @@ static bool IsConvertableToBool(Type* type)
 		|| type->kind == TYPE_BASETYPE_ENUM;
 }
 
-static bool IsIntegerType(Type* type)
+static bool IsInteger(Type* type)
 {
 	return IsPrimitive(type, TOKEN_INT8)
 		|| IsPrimitive(type, TOKEN_INT16)
@@ -631,7 +647,7 @@ static bool IsIntegerType(Type* type)
 		|| IsPrimitive(type, TOKEN_UINT64);
 }
 
-static bool IsSignedIntegerType(Type* type)
+static bool IsSignedInteger(Type* type)
 {
 	return IsPrimitive(type, TOKEN_INT8)
 		|| IsPrimitive(type, TOKEN_INT16)
@@ -639,7 +655,7 @@ static bool IsSignedIntegerType(Type* type)
 		|| IsPrimitive(type, TOKEN_INT64);
 }
 
-static bool IsUnsignedIntegerType(Type* type)
+static bool IsUnsignedInteger(Type* type)
 {
 	return IsPrimitive(type, TOKEN_UINT8)
 		|| IsPrimitive(type, TOKEN_UINT16)
@@ -647,23 +663,23 @@ static bool IsUnsignedIntegerType(Type* type)
 		|| IsPrimitive(type, TOKEN_UINT64);
 }
 
-static bool IsFloatType(Type* type)
+static bool IsFloat(Type* type)
 {
 	return IsPrimitive(type, TOKEN_FLOAT16)
 		|| IsPrimitive(type, TOKEN_FLOAT32)
 		|| IsPrimitive(type, TOKEN_FLOAT64);
 }
 
-static bool IsNumericalType(Type* type)
+static bool IsNumerical(Type* type)
 {
 	return type->kind == TYPE_BASETYPE_PRIMITIVE
 		|| type->kind == TYPE_SPECIFIER_POINTER
 		|| type->kind == TYPE_BASETYPE_ENUM;
 }
 
-static bool IsIntegerLikeType(Type* type)
+static bool IsIntegerLike(Type* type)
 {
-	return IsIntegerType(type)
+	return IsInteger(type)
 		|| IsPrimitive(type, TOKEN_BOOL)
 		|| type->kind == TYPE_SPECIFIER_POINTER
 		|| type->kind == TYPE_BASETYPE_ENUM;

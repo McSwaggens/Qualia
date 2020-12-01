@@ -46,10 +46,10 @@ static void Error(Parse_Info* info, Span<Token> where, String format, Args&&... 
 	Fail();
 }
 
-static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info);
-static void ParseScope(Ast_Scope* scope, Parse_Info* info);
-static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info);
-static void ParseFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info);
+static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info);
+static void ScanScope(Ast_Scope* scope, Parse_Info* info);
+static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info);
+static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info);
 static Type* GetTypeFromTupleExpression(Ast_Expression_Tuple* tuple, Parse_Info* info);
 static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info);
 
@@ -379,8 +379,8 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Parse_Info* in
 
 		for (u32 i = 0; i < tuple_count; i++)
 		{
-			Ast_Type* t = &basetype.tuple[i];
-			t->type = GetType(t, scope, info);
+			Ast_Type* type = &basetype.tuple[i];
+			type->type = GetType(type, scope, info);
 		}
 
 		if (tuple_count == 1)
@@ -494,7 +494,7 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info)
 				}
 				else
 				{
-					ParseExpression(specifier->size_expression, scope, info);
+					ScanExpression(specifier->size_expression, scope, info);
 					Assert(specifier->size_expression->kind == AST_EXPRESSION_TERMINAL_LITERAL); // @RemoveMe @Todo: Need to be removed.
 					u64 length = specifier->size_expression->GetLiteral()->token->info.integer.value;
 					type = GetFixedArray(type, length, info);
@@ -510,11 +510,12 @@ static Ast_VariableDeclaration* GetVariable(Token* token, Ast_Scope* scope)
 {
 	while (scope)
 	{
-		for (Ast_VariableDeclaration** variable = scope->variables; variable < scope->variables.End(); variable++)
+		for (u32 i = 0; i < scope->variables.count; i++)
 		{
-			if (CompareStrings(token->info.string, (*variable)->name->info.string))
+			Ast_VariableDeclaration* variable = scope->variables[i];
+			if (CompareStrings(token->info.string, variable->name->info.string))
 			{
-				return *variable;
+				return variable;
 			}
 		}
 
@@ -583,7 +584,55 @@ static Type* FindBaseType(Type* type)
 	return type;
 }
 
-static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info)
+u32 GetTypePrecedence(Type* type)
+{
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_PRIMITIVE:
+			switch (type->primitive)
+			{
+				case TOKEN_UINT8:   return 1;
+				case TOKEN_UINT16:  return 2;
+				case TOKEN_UINT32:  return 3;
+				case TOKEN_UINT64:  return 4;
+
+				case TOKEN_INT8:    return 5;
+				case TOKEN_INT16:   return 6;
+				case TOKEN_INT32:   return 7;
+				case TOKEN_INT64:   return 8;
+
+				case TOKEN_FLOAT16: return 9;
+				case TOKEN_FLOAT32: return 10;
+				case TOKEN_FLOAT64: return 11;
+
+				default:
+					Assert();
+			}
+
+		case TYPE_BASETYPE_ENUM:
+		case TYPE_SPECIFIER_POINTER:
+			return 12;
+
+		case TYPE_BASETYPE_TUPLE:
+		case TYPE_BASETYPE_FUNCTION:
+		case TYPE_BASETYPE_STRUCT:
+		case TYPE_SPECIFIER_OPTIONAL:
+		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
+		case TYPE_SPECIFIER_FIXED_ARRAY:
+			// return 13;
+			Assert();
+	}
+
+	Assert();
+	Unreachable();
+}
+
+Type* GetDominantType(Type* a, Type* b)
+{
+	return GetTypePrecedence(a) >= GetTypePrecedence(b) ? a : b;
+}
+
+static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info)
 {
 	switch (expression->kind)
 	{
@@ -715,15 +764,10 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 			tuple->is_pure = true;
 			tuple->is_referential_value = true;
 
-			// if (!expression->begin)
-			// {
-			// 	Error(info, expression->span, "Empty tuples aren't allowed.\n");
-			// }
-
 			for (u32 i = 0; i < tuple->elements.count; i++)
 			{
 				Ast_Expression* element = tuple->elements[i];
-				ParseExpression(element, scope, info);
+				ScanExpression(element, scope, info);
 
 				if (!element->can_constantly_evaluate)
 				{
@@ -747,7 +791,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 		case AST_EXPRESSION_UNARY_ADDRESS_OF:
 		{
 			Ast_Expression_Unary* unary = expression->GetUnary();
-			ParseExpression(unary->subexpression, scope, info);
+			ScanExpression(unary->subexpression, scope, info);
 			unary->type = GetPointer(unary->subexpression->type, info);
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
@@ -762,7 +806,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 		case AST_EXPRESSION_UNARY_VALUE_OF:
 		{
 			Ast_Expression_Unary* unary = expression->GetUnary();
-			ParseExpression(unary->subexpression, scope, info);
+			ScanExpression(unary->subexpression, scope, info);
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
 			unary->is_referential_value = true;
@@ -778,51 +822,68 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 		case AST_EXPRESSION_UNARY_BINARY_NOT:
 		{
 			Ast_Expression_Unary* unary = expression->GetUnary();
-			ParseExpression(unary->subexpression, scope, info);
+			ScanExpression(unary->subexpression, scope, info);
 			unary->type = unary->subexpression->type;
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
 			unary->is_referential_value = false;
-			// @Todo: Check if numeric type
-			// @Todo: Enforce integer type?
+
+			if (!IsInteger(unary->subexpression->type))
+			{
+				Error(info, unary->subexpression->span, "Type % is not an integer.\n", unary->subexpression->type);
+			}
+
 		} break;
 
 		case AST_EXPRESSION_UNARY_MINUS:
 		{
 			Ast_Expression_Unary* unary = expression->GetUnary();
-			ParseExpression(unary->subexpression, scope, info);
+			ScanExpression(unary->subexpression, scope, info);
 			unary->type = unary->subexpression->type;
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
 			unary->is_referential_value = false;
-			// @Todo: Check if numeric type
+
+			if (!IsNumerical(unary->subexpression->type))
+			{
+				Error(info, unary->subexpression->span, "Type % is not a numerical type.\n", unary->subexpression->type);
+			}
 		} break;
 
 		case AST_EXPRESSION_UNARY_PLUS:
 		{
 			Ast_Expression_Unary* unary = expression->GetUnary();
-			ParseExpression(unary->subexpression, scope, info);
+			ScanExpression(unary->subexpression, scope, info);
 			unary->type = unary->subexpression->type;
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
 			unary->is_referential_value = false;
-			// @Todo: Check if numeric type
+
+			if (!IsNumerical(unary->subexpression->type))
+			{
+				Error(info, unary->subexpression->span, "Type % is not a numerical type.\n", unary->subexpression->type);
+			}
 		} break;
 
 		case AST_EXPRESSION_UNARY_NOT:
 		{
 			Ast_Expression_Unary* unary = expression->GetUnary();
-			ParseExpression(unary->subexpression, scope, info);
+			ScanExpression(unary->subexpression, scope, info);
 			unary->type = &primitive_bool;
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
 			unary->is_referential_value = false;
+
+			if (!IsNumerical(unary->subexpression->type))
+			{
+				Error(info, unary->subexpression->span, "Type % is not a numerical type.\n", unary->subexpression->type);
+			}
 		} break;
 
 		case AST_EXPRESSION_BINARY_DOT:
 		{
 			Ast_Expression_Binary* binary = expression->GetBinary();
-			ParseExpression(binary->left,  scope, info);
+			ScanExpression(binary->left,  scope, info);
 			binary->is_referential_value = binary->left->is_referential_value || binary->left->type->kind == TYPE_SPECIFIER_POINTER;
 
 			// @Todo: Handle inferred function calls.
@@ -886,14 +947,14 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
 		{
 			Ast_Expression_Binary* binary = expression->GetBinary();
-			ParseExpression(binary->left,  scope, info);
-			ParseExpression(binary->right, scope, info);
+			ScanExpression(binary->left,  scope, info);
+			ScanExpression(binary->right, scope, info);
 			binary->type = &primitive_bool;
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!AreTypesCompatible(binary->left->type, binary->right->type) && !(IsNumericalType(binary->left->type) && IsNumericalType(binary->right->type)))
+			if (!AreTypesCompatible(binary->left->type, binary->right->type) && !(IsNumerical(binary->left->type) && IsNumerical(binary->right->type)))
 			{
 				Error(info, binary->span, "% and % are incompatible types.\n", binary->left->type, binary->right->type);
 			}
@@ -905,19 +966,19 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 		case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
 		{
 			Ast_Expression_Binary* binary = expression->GetBinary();
-			ParseExpression(binary->left,  scope, info);
-			ParseExpression(binary->right, scope, info);
+			ScanExpression(binary->left,  scope, info);
+			ScanExpression(binary->right, scope, info);
 			binary->type = &primitive_bool;
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!IsNumericalType(binary->left->type))
+			if (!IsNumerical(binary->left->type))
 			{
 				Error(info, binary->span, "% is not a numerical type.\n", binary->left->type);
 			}
 
-			if (!IsNumericalType(binary->right->type))
+			if (!IsNumerical(binary->right->type))
 			{
 				Error(info, binary->span, "% is not a numerical type.\n", binary->right->type);
 			}
@@ -931,22 +992,23 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 		case AST_EXPRESSION_BINARY_EXPONENTIAL:
 		{
 			Ast_Expression_Binary* binary = expression->GetBinary();
-			ParseExpression(binary->left,  scope, info);
-			ParseExpression(binary->right, scope, info);
-			binary->type = binary->left->type;
+			ScanExpression(binary->left,  scope, info);
+			ScanExpression(binary->right, scope, info);
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!IsNumericalType(binary->left->type))
+			if (!IsNumerical(binary->left->type))
 			{
 				Error(info, binary->span, "% is not a numerical type.\n", binary->left->type);
 			}
 
-			if (!IsNumericalType(binary->right->type))
+			if (!IsNumerical(binary->right->type))
 			{
 				Error(info, binary->span, "% is not a numerical type.\n", binary->right->type);
 			}
+
+			binary->type = GetDominantType(binary->left->type, binary->right->type);
 		} break;
 
 		case AST_EXPRESSION_BINARY_BITWISE_OR:
@@ -954,74 +1016,77 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 		case AST_EXPRESSION_BINARY_BITWISE_AND:
 		{
 			Ast_Expression_Binary* binary = expression->GetBinary();
-			ParseExpression(binary->left,  scope, info);
-			ParseExpression(binary->right, scope, info);
-			binary->type = binary->left->type;
+			ScanExpression(binary->left,  scope, info);
+			ScanExpression(binary->right, scope, info);
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!IsNumericalType(binary->left->type) || IsFloatType(binary->left->type))
+			if (!IsNumerical(binary->left->type) || IsFloat(binary->left->type))
 			{
 				Error(info, binary->span, "Cannot use bitwise AND with type: %\n", binary->left->type);
 			}
 
-			if (!IsNumericalType(binary->right->type) || IsFloatType(binary->right->type))
+			if (!IsNumerical(binary->right->type) || IsFloat(binary->right->type))
 			{
 				Error(info, binary->span, "Cannot use bitwise AND with type: %\n", binary->right->type);
 			}
+
+			binary->type = GetDominantType(binary->left->type, binary->right->type);
 		} break;
 
 		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
 		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
 		{
 			Ast_Expression_Binary* binary = expression->GetBinary();
-			ParseExpression(binary->left,  scope, info);
-			ParseExpression(binary->right, scope, info);
-			binary->type = binary->left->type;
+			ScanExpression(binary->left,  scope, info);
+			ScanExpression(binary->right, scope, info);
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!IsNumericalType(binary->left->type))
+			if (!IsInteger(binary->left->type))
 			{
-				Error(info, binary->span, "% is not a numerical type.\n", binary->left->type);
+				Error(info, binary->span, "% is not an integer.\n", binary->left->type);
 			}
 
-			if (!IsNumericalType(binary->right->type))
+			if (!IsInteger(binary->right->type))
 			{
-				Error(info, binary->span, "% is not a numerical type.\n", binary->right->type);
+				Error(info, binary->span, "% is not an integer.\n", binary->right->type);
 			}
+
+			binary->type = GetDominantType(binary->left->type, binary->right->type);
 		} break;
 
 		case AST_EXPRESSION_BINARY_AND:
 		case AST_EXPRESSION_BINARY_OR:
 		{
 			Ast_Expression_Binary* binary = expression->GetBinary();
-			ParseExpression(binary->left,  scope, info);
-			ParseExpression(binary->right, scope, info);
-			binary->type = binary->left->type;
+			ScanExpression(binary->left,  scope, info);
+			ScanExpression(binary->right, scope, info);
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!IsNumericalType(binary->left->type))
+			if (!IsNumerical(binary->left->type))
 			{
 				Error(info, binary->span, "% is not a numerical type.\n", binary->left->type);
 			}
 
-			if (!IsNumericalType(binary->right->type))
+			if (!IsNumerical(binary->right->type))
 			{
 				Error(info, binary->span, "% is not a numerical type.\n", binary->right->type);
 			}
+
+			binary->type = GetDominantType(binary->left->type, binary->right->type);
 		} break;
 
 		case AST_EXPRESSION_IF_ELSE:
 		{
 			Ast_Expression_Ternary* ternary = expression->GetTernary();
-			ParseExpression(ternary->left,   scope, info);
-			ParseExpression(ternary->middle, scope, info);
-			ParseExpression(ternary->right,  scope, info);
+			ScanExpression(ternary->left,   scope, info);
+			ScanExpression(ternary->middle, scope, info);
+			ScanExpression(ternary->right,  scope, info);
 			ternary->type = ternary->left->type;
 			ternary->can_constantly_evaluate = ternary->left->can_constantly_evaluate && ternary->middle->can_constantly_evaluate && ternary->right->can_constantly_evaluate;
 			ternary->is_pure = ternary->left->is_pure && ternary->middle->is_pure && ternary->right->is_pure;
@@ -1038,7 +1103,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 			Ast_Expression_Call* call = expression->GetCall();
 			if (call->parameters) // @RemoveMe?
 			{
-				ParseExpression(call->parameters, scope, info);
+				ScanExpression(call->parameters, scope, info);
 			}
 
 			if (call->function->kind == AST_EXPRESSION_TERMINAL && call->function->GetTerminal()->token->kind == TOKEN_IDENTIFIER)
@@ -1076,7 +1141,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 			}
 			else
 			{
-				ParseExpression(call->function, scope, info);
+				ScanExpression(call->function, scope, info);
 			}
 		} break;
 
@@ -1084,8 +1149,8 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 		case AST_EXPRESSION_SUBSCRIPT:
 		{
 			Ast_Expression_Subscript* subscript = expression->GetSubscript();
-			ParseExpression(subscript->array,  scope, info);
-			ParseExpression(subscript->index, scope, info);
+			ScanExpression(subscript->array,  scope, info);
+			ScanExpression(subscript->index, scope, info);
 
 			if (subscript->array->type->kind != TYPE_SPECIFIER_FIXED_ARRAY   &&
 				subscript->array->type->kind != TYPE_SPECIFIER_DYNAMIC_ARRAY &&
@@ -1094,7 +1159,7 @@ static void ParseExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_
 				Error(info, subscript->array->span, "Expression with type % is not a valid array.\n", subscript->array->span);
 			}
 
-			if (!IsIntegerType(subscript->index->type))
+			if (!IsInteger(subscript->index->type))
 			{
 				Error(info, subscript->index->span, "Subscript index must be an integer, not: %\n", subscript->index->type);
 			}
@@ -1213,7 +1278,7 @@ static void CalculateStructSize(Ast_Struct* s)
 	s->type.size = size;
 }
 
-static void ParseScope(Ast_Scope* scope, Parse_Info* info)
+static void ScanScope(Ast_Scope* scope, Parse_Info* info)
 {
 	for (Ast_Struct* s = scope->structs; s < scope->structs.End(); s++)
 	{
@@ -1305,20 +1370,20 @@ static void ParseScope(Ast_Scope* scope, Parse_Info* info)
 
 	for (Ast_Function* f = scope->functions; f < scope->functions.End(); f++)
 	{
-		ParseFunction(f, scope, info);
+		ScanFunction(f, scope, info);
 	}
 
 	for (Ast_Function* f = scope->functions; f < scope->functions.End(); f++)
 	{
-		ParseCode(&f->code, scope, f, info);
+		ScanCode(&f->code, scope, f, info);
 	}
 
 }
 
-static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info)
+static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info)
 {
 	code->scope.parent = scope;
-	ParseScope(&code->scope, info);
+	ScanScope(&code->scope, info);
 
 	for (Ast_Statement* statement = code->statements; statement < code->statements.End(); statement++)
 	{
@@ -1330,7 +1395,7 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 				{
 					if (branch->condition)
 					{
-						ParseExpression(branch->condition, &code->scope, info);
+						ScanExpression(branch->condition, &code->scope, info);
 					}
 
 					branch->code.is_inside_loop = code->is_inside_loop;
@@ -1342,7 +1407,7 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 
 					branch->code.has_deferrer_that_returns = code->has_deferrer_that_returns;
 
-					ParseCode(&branch->code, &code->scope, function, info);
+					ScanCode(&branch->code, &code->scope, function, info);
 
 					if (branch->code.does_return)
 					{
@@ -1355,7 +1420,7 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 			{
 				code->defers.Add(&statement->defer);
 				statement->defer.code.is_inside_loop = code->is_inside_loop;
-				ParseCode(&statement->defer.code, &code->scope, function, info);
+				ScanCode(&statement->defer.code, &code->scope, function, info);
 
 				if (statement->defer.code.does_return)
 				{
@@ -1366,7 +1431,7 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 
 			case AST_STATEMENT_CLAIM:
 			{
-				ParseExpression(statement->claim.expression, &code->scope, info);
+				ScanExpression(statement->claim.expression, &code->scope, info);
 			} break;
 
 			case AST_STATEMENT_ALIAS:
@@ -1377,14 +1442,14 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 			case AST_STATEMENT_INCREMENT:
 			{
 				Ast_Increment* inc = &statement->increment;
-				ParseExpression(inc->expression, &code->scope, info);
+				ScanExpression(inc->expression, &code->scope, info);
 
 				if (!inc->expression->is_referential_value)
 				{
 					Error(info, inc->expression->span, "Expression is not a referential value.\n");
 				}
 
-				if (!IsIntegerType(inc->expression->type) && inc->expression->type->kind != TYPE_SPECIFIER_POINTER)
+				if (!IsInteger(inc->expression->type) && inc->expression->type->kind != TYPE_SPECIFIER_POINTER)
 				{
 					Error(info, inc->expression->span, "Expression is an integer or pointer.\n");
 				}
@@ -1393,14 +1458,14 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 			case AST_STATEMENT_DECREMENT:
 			{
 				Ast_Decrement* dec = &statement->decrement;
-				ParseExpression(dec->expression, &code->scope, info);
+				ScanExpression(dec->expression, &code->scope, info);
 
 				if (!dec->expression->is_referential_value)
 				{
 					Error(info, dec->expression->span, "Expression is not a referential value.\n");
 				}
 
-				if (!IsIntegerType(dec->expression->type) && dec->expression->type->kind != TYPE_SPECIFIER_POINTER)
+				if (!IsInteger(dec->expression->type) && dec->expression->type->kind != TYPE_SPECIFIER_POINTER)
 				{
 					Error(info, dec->expression->span, "Expression is an integer or pointer.\n");
 				}
@@ -1417,7 +1482,7 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 
 				if (statement->ret.expression)
 				{
-					ParseExpression(statement->ret.expression, &code->scope, info);
+					ScanExpression(statement->ret.expression, &code->scope, info);
 
 					if (!function->return_type)
 					{
@@ -1445,7 +1510,7 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 
 			case AST_STATEMENT_EXPRESSION:
 			{
-				ParseExpression(statement->expression, &code->scope, info);
+				ScanExpression(statement->expression, &code->scope, info);
 			} break;
 
 			case AST_STATEMENT_VARIABLE_DECLARATION:
@@ -1462,7 +1527,7 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 
 				if (variable->assignment)
 				{
-					ParseExpression(variable->assignment, &code->scope, info);
+					ScanExpression(variable->assignment, &code->scope, info);
 
 					if (!variable->assignment->type)
 					{
@@ -1505,8 +1570,8 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 			case AST_STATEMENT_ASSIGNMENT_DIVIDE:
 			case AST_STATEMENT_ASSIGNMENT_POWER:
 			{
-				ParseExpression(statement->assignment.right, &code->scope, info);
-				ParseExpression(statement->assignment.left,  &code->scope, info);
+				ScanExpression(statement->assignment.right, &code->scope, info);
+				ScanExpression(statement->assignment.left,  &code->scope, info);
 
 				if (!statement->assignment.left->is_referential_value)
 				{
@@ -1520,12 +1585,12 @@ static void ParseCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, 
 
 				if (statement->kind != AST_STATEMENT_ASSIGNMENT)
 				{
-					if (!IsNumericalType(statement->assignment.left->type))
+					if (!IsNumerical(statement->assignment.left->type))
 					{
 						Error(info, statement->assignment.left->span, "Expression is not numerical.\n");
 					}
 
-					if (!IsNumericalType(statement->assignment.right->type))
+					if (!IsNumerical(statement->assignment.right->type))
 					{
 						Error(info, statement->assignment.right->span, "Expression is not numerical.\n");
 					}
@@ -1639,7 +1704,7 @@ static Type* GetTypeFromTupleExpression(Ast_Expression_Tuple* tuple, Parse_Info*
 	return type;
 }
 
-static void ParseFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info)
+static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info)
 {
 	for (Ast_VariableDeclaration* param = function->parameters; param < function->parameters.End(); param++)
 	{
@@ -1703,7 +1768,7 @@ void SemanticParse(Parse_Info* info)
 {
 	Ast_Root* root = info->ast_root;
 	root->scope.parent = null;
-	ParseScope(&root->scope, info);
+	ScanScope(&root->scope, info);
 
 	for (u32 i = 0; i < root->scope.functions.count; i++)
 	{

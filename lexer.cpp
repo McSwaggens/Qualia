@@ -229,8 +229,6 @@ Parse_Info LexicalParse(String file_path)
 						m *= 0.1;
 						if (*++cursor == '_') ++cursor;
 					}
-
-					Print("Float: %\n", float_value);
 				}
 			}
 

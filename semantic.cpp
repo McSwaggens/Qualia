@@ -1741,7 +1741,7 @@ static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* i
 		function->return_type = &empty_tuple;
 	}
 
-	Type* param_type = GetTypeFromParams(function->parameters.ToArray(), info);
+	Type* param_type = GetTypeFromParams(function->parameters, info);
 
 	for (u32 i = 0; i < param_type->function_extensions.count; i++)
 	{

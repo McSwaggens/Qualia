@@ -3,6 +3,7 @@
 #include "print.h"
 #include "memory.h"
 #include "assert.h"
+#include "pooled_array.h"
 
 void Write(OutputBuffer* buffer, Type* type)
 {
@@ -611,7 +612,7 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 	CheckScope(token, indent, info);
 	token++;
 
-	List<Ast_Struct_Member> members = null;
+	Pooled_Array<Ast_Struct_Member> members = NewPooledArray<Ast_Struct_Member>();
 
  	while (IsOnCorrectScope(token, indent+1))
 	{
@@ -654,7 +655,7 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 		}
 	}
 
-	structure.members = members;
+	structure.members = members.Lock(&info->stack);
 
 	return structure;
 }
@@ -681,7 +682,7 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 	CheckScope(token, indent, info);
 	token++;
 
-	List<Ast_Enum_Member> members = null;
+	Pooled_Array<Ast_Enum_Member> members = NewPooledArray<Ast_Enum_Member>();
 
 	while (IsOnCorrectScope(token, indent+1))
 	{
@@ -725,7 +726,7 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 		}
 	}
 
-	enumeration.members = members;
+	enumeration.members = members.Lock(&info->stack);
 
 	return enumeration;
 }
@@ -774,7 +775,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 	{
 		Token* open = token++;
 		Token* closure = open->GetClosure();
-		List<Ast_Expression*> elements = null;
+		Pooled_Array<Ast_Expression*> elements = NewPooledArray<Ast_Expression*>();
 
 		if (token == closure)
 		{
@@ -782,7 +783,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			tuple->kind  = AST_EXPRESSION_TUPLE;
 			// tuple->token = open;
 			tuple->span.begin = open;
-			tuple->elements = elements;
+			tuple->elements = null;
 			left = tuple;
 		}
 
@@ -809,14 +810,13 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			}
 			else if (token == closure)
 			{
-				if (elements)
+				if (!elements.IsEmpty())
 				{
 					elements.Add(element);
 					Ast_Expression_Tuple* tuple = info->stack.Allocate<Ast_Expression_Tuple>();
 					tuple->kind  = AST_EXPRESSION_TUPLE;
-					// tuple->token = open;
 					tuple->span.begin = open;
-					tuple->elements = elements;
+					tuple->elements = elements.Lock(&info->stack);
 					left = tuple;
 				}
 				else left = element;
@@ -961,7 +961,8 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 {
 	Ast_Type type;
-	type.specifiers = null;
+
+	Pooled_Array<Ast_Specifier> specifiers = NewPooledArray<Ast_Specifier>();
 
 	while (IsSpecifier(token->kind))
 	{
@@ -995,9 +996,10 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 			token++;
 		}
 
-		type.specifiers.Add(specifier);
+		specifiers.Add(specifier);
 	}
 
+	type.specifiers = specifiers.Lock(&info->stack);
 	type.basetype.token = token;
 
 	if (IsPrimitive(token->kind))
@@ -1111,7 +1113,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 {
 	Token* closure = open_paren->GetClosure();
 	Token* token = open_paren+1;
-	function->parameters = null;
+	Pooled_Array<Ast_VariableDeclaration> params = NewPooledArray<Ast_VariableDeclaration>();
 
 	CheckScope(open_paren, indent, info);
 	CheckScope(closure, indent, info);
@@ -1147,7 +1149,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 		param.explicit_type = info->stack.Allocate<Ast_Type>();
 		*param.explicit_type = ParseType(token, indent+2, info);
 
-		function->parameters.Add(param);
+		params.Add(param);
 
 		if (token->kind != TOKEN_COMMA && token != closure)
 		{
@@ -1160,6 +1162,8 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 			token++;
 		}
 	}
+
+	function->parameters = params.Lock(&info->stack);
 }
 
 static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* info)
@@ -1446,6 +1450,11 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 	Ast_Code code;
 	ZeroMemory(&code);
 
+	Pooled_Array<Ast_Statement> statements = NewPooledArray<Ast_Statement>();
+	Pooled_Array<Ast_Struct>    structs    = NewPooledArray<Ast_Struct>();
+	Pooled_Array<Ast_Enum>      enums      = NewPooledArray<Ast_Enum>();
+	Pooled_Array<Ast_Function>  functions  = NewPooledArray<Ast_Function>();
+
 	while (IsOnCorrectScope(token, indent))
 	{
 		Ast_Attribute attribute;
@@ -1462,13 +1471,13 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 		{
 			Ast_Struct structure = ParseStruct(token, indent, info);
 			structure.attribute = attribute;
-			code.scope.structs.Add(structure);
+			structs.Add(structure);
 		}
 		else if (token->kind == TOKEN_ENUM)
 		{
 			Ast_Enum enumeration = ParseEnum(token, indent, info);
 			enumeration.attribute = attribute;
-			code.scope.enums.Add(enumeration);
+			enums.Add(enumeration);
 		}
 		else if (token->kind == TOKEN_IDENTIFIER && token[1].kind == TOKEN_OPEN_PAREN
 			&&  (token[1].GetClosure()[1].kind == TOKEN_COLON || token[1].GetClosure()[1].kind == TOKEN_ARROW))
@@ -1476,12 +1485,12 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 			Ast_Function function = ParseFunction(token, indent, info);
 			function.attribute = attribute;
 			function.is_global = false;
-			code.scope.functions.Add(function);
+			functions.Add(function);
 		}
 		else
 		{
 			Ast_Statement statement = ParseStatement(token, indent, info);
-			code.statements.Add(statement);
+			statements.Add(statement);
 
 			if (token->kind != TOKEN_SEMICOLON && !token->newline)
 			{
@@ -1506,6 +1515,11 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 			break;
 		}
 	}
+
+	code.statements = statements.Lock(&info->stack);
+	code.scope.enums = enums.Lock(&info->stack);
+	code.scope.structs = structs.Lock(&info->stack);
+	code.scope.functions = functions.Lock(&info->stack);
 
 	return code;
 }
@@ -1547,6 +1561,11 @@ static Ast_Function ParseFunction(Token*& token, u32 indent, Parse_Info* info)
 
 static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 {
+	Pooled_Array<Ast_Import>    imports    = NewPooledArray<Ast_Import>();
+	Pooled_Array<Ast_Struct>    structs    = NewPooledArray<Ast_Struct>();
+	Pooled_Array<Ast_Enum>      enums      = NewPooledArray<Ast_Enum>();
+	Pooled_Array<Ast_Function>  functions  = NewPooledArray<Ast_Function>();
+
 	while (token->kind != TOKEN_EOF)
 	{
 		Ast_Attribute attribute;
@@ -1573,7 +1592,7 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 			CheckScope(token, 1, info);
 			import.module = token;
 			token++;
-			root->imports.Add(import);
+			imports.Add(import);
 
 			if (token->kind == TOKEN_SEMICOLON)
 			{
@@ -1592,26 +1611,31 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 		{
 			Ast_Struct structure = ParseStruct(token, 0, info);
 			structure.attribute = attribute;
-			root->scope.structs.Add(structure);
+			structs.Add(structure);
 		}
 		else if (token->kind == TOKEN_ENUM)
 		{
 			Ast_Enum enumeration = ParseEnum(token, 0, info);
 			enumeration.attribute = attribute;
-			root->scope.enums.Add(enumeration);
+			enums.Add(enumeration);
 		}
 		else if (token[0].kind == TOKEN_IDENTIFIER && token[1].kind == TOKEN_OPEN_PAREN)
 		{
 			Ast_Function function = ParseFunction(token, 0, info);
 			function.attribute = attribute;
 			function.is_global = true;
-			root->scope.functions.Add(function);
+			functions.Add(function);
 		}
 		else
 		{
 			Error(info, token->location, "Unexpected token in global scope: %\n", token);
 		}
 	}
+
+	root->imports = imports.Lock(&info->stack);
+	root->scope.functions = functions.Lock(&info->stack);
+	root->scope.structs = structs.Lock(&info->stack);
+	root->scope.enums = enums.Lock(&info->stack);
 }
 
 void ParseFile(String file_path)

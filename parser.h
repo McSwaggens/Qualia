@@ -128,7 +128,7 @@ struct Ast_BaseType
 
 struct Ast_Type
 {
-	List<Ast_Specifier> specifiers;
+	Array<Ast_Specifier> specifiers;
 	Ast_BaseType basetype;
 	Type* type;
 };
@@ -297,7 +297,7 @@ struct Ast_Expression_Call : Ast_Expression
 
 struct Ast_Expression_Tuple : Ast_Expression
 {
-	List<Ast_Expression*> elements;
+	Array<Ast_Expression*> elements;
 };
 
 struct Ast_Expression_Literal : Ast_Expression
@@ -357,16 +357,16 @@ struct Ast_Scope
 {
 	Ast_Scope* parent;
 	// Aliases?
-	List<Ast_Function> functions;
-	List<Ast_Struct> structs;
-	List<Ast_Enum> enums;
+	Array<Ast_Function> functions;
+	Array<Ast_Struct> structs;
+	Array<Ast_Enum> enums;
 	List<Ast_VariableDeclaration*> variables;
 	List<StackFrame> stack_frames;
 };
 
 struct Ast_Code
 {
-	List<Ast_Statement> statements;
+	Array<Ast_Statement> statements;
 	List<Ast_Defer*> defers;
 	Ast_Scope scope;
 	u64 frame_size;
@@ -519,7 +519,7 @@ struct Ast_Statement
 struct Ast_Function
 {
 	Token* name;
-	List<Ast_VariableDeclaration> parameters;
+	Array<Ast_VariableDeclaration> parameters;
 	Type* type;
 	Ast_Type* ast_return_type;
 	Type* return_type;
@@ -555,7 +555,7 @@ struct Ast_Struct
 {
 	Token* name;
 	Type type;
-	List<Ast_Struct_Member> members;
+	Array<Ast_Struct_Member> members;
 	List<Ast_Struct*> closure;
 	Ast_Attribute attribute;
 };
@@ -564,13 +564,13 @@ struct Ast_Enum
 {
 	Token* name;
 	Type type;
-	List<Ast_Enum_Member> members;
+	Array<Ast_Enum_Member> members;
 	Ast_Attribute attribute;
 };
 
 struct Ast_Root
 {
-	List<Ast_Import> imports;
+	Array<Ast_Import> imports;
 	Ast_Scope scope;
 };
 

@@ -297,38 +297,38 @@ static consteval Type NewEmptyTupleType()
 	return type;
 }
 
-Type empty_tuple       = NewEmptyTupleType();
-Type primitive_bool    = NewPrimitiveType(TOKEN_BOOL,    1);
-Type primitive_int8    = NewPrimitiveType(TOKEN_INT8,    1);
-Type primitive_int16   = NewPrimitiveType(TOKEN_INT16,   2);
-Type primitive_int32   = NewPrimitiveType(TOKEN_INT32,   4);
-Type primitive_int64   = NewPrimitiveType(TOKEN_INT64,   8);
-Type primitive_uint8   = NewPrimitiveType(TOKEN_UINT8,   1);
-Type primitive_uint16  = NewPrimitiveType(TOKEN_UINT16,  2);
-Type primitive_uint32  = NewPrimitiveType(TOKEN_UINT32,  4);
-Type primitive_uint64  = NewPrimitiveType(TOKEN_UINT64,  8);
-Type primitive_float16 = NewPrimitiveType(TOKEN_FLOAT16, 2);
-Type primitive_float32 = NewPrimitiveType(TOKEN_FLOAT32, 4);
-Type primitive_float64 = NewPrimitiveType(TOKEN_FLOAT64, 8);
+Type empty_tuple  = NewEmptyTupleType();
+Type type_bool    = NewPrimitiveType(TOKEN_BOOL,    1);
+Type type_int8    = NewPrimitiveType(TOKEN_INT8,    1);
+Type type_int16   = NewPrimitiveType(TOKEN_INT16,   2);
+Type type_int32   = NewPrimitiveType(TOKEN_INT32,   4);
+Type type_int64   = NewPrimitiveType(TOKEN_INT64,   8);
+Type type_uint8   = NewPrimitiveType(TOKEN_UINT8,   1);
+Type type_uint16  = NewPrimitiveType(TOKEN_UINT16,  2);
+Type type_uint32  = NewPrimitiveType(TOKEN_UINT32,  4);
+Type type_uint64  = NewPrimitiveType(TOKEN_UINT64,  8);
+Type type_float16 = NewPrimitiveType(TOKEN_FLOAT16, 2);
+Type type_float32 = NewPrimitiveType(TOKEN_FLOAT32, 4);
+Type type_float64 = NewPrimitiveType(TOKEN_FLOAT64, 8);
 
 static constexpr Type* GetPrimitiveType(Token_Kind kind)
 {
 	switch (kind)
 	{
-		case TOKEN_BOOL:    return &primitive_bool;
-		case TOKEN_INT:     return &primitive_int64;
-		case TOKEN_INT8:    return &primitive_int8;
-		case TOKEN_INT16:   return &primitive_int16;
-		case TOKEN_INT32:   return &primitive_int32;
-		case TOKEN_INT64:   return &primitive_int64;
-		case TOKEN_UINT:    return &primitive_uint64;
-		case TOKEN_UINT8:   return &primitive_uint8;
-		case TOKEN_UINT16:  return &primitive_uint16;
-		case TOKEN_UINT32:  return &primitive_uint32;
-		case TOKEN_UINT64:  return &primitive_uint64;
-		case TOKEN_FLOAT16: return &primitive_float16;
-		case TOKEN_FLOAT32: return &primitive_float32;
-		case TOKEN_FLOAT64: return &primitive_float64;
+		case TOKEN_BOOL:    return &type_bool;
+		case TOKEN_INT:     return &type_int64;
+		case TOKEN_INT8:    return &type_int8;
+		case TOKEN_INT16:   return &type_int16;
+		case TOKEN_INT32:   return &type_int32;
+		case TOKEN_INT64:   return &type_int64;
+		case TOKEN_UINT:    return &type_uint64;
+		case TOKEN_UINT8:   return &type_uint8;
+		case TOKEN_UINT16:  return &type_uint16;
+		case TOKEN_UINT32:  return &type_uint32;
+		case TOKEN_UINT64:  return &type_uint64;
+		case TOKEN_FLOAT16: return &type_float16;
+		case TOKEN_FLOAT32: return &type_float32;
+		case TOKEN_FLOAT64: return &type_float64;
 		default: Unreachable();
 	}
 }
@@ -684,11 +684,11 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 				{
 					switch (literal->token->info.integer.explicit_bytes)
 					{
-						case 0: literal->type = &primitive_uint64; break;
-						case 1: literal->type = &primitive_uint8;  break;
-						case 2: literal->type = &primitive_uint16; break;
-						case 4: literal->type = &primitive_uint32; break;
-						case 8: literal->type = &primitive_uint64; break;
+						case 0: literal->type = &type_uint64; break;
+						case 1: literal->type = &type_uint8;  break;
+						case 2: literal->type = &type_uint16; break;
+						case 4: literal->type = &type_uint32; break;
+						case 8: literal->type = &type_uint64; break;
 						default: Unreachable();
 					}
 				}
@@ -696,11 +696,11 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 				{
 					switch (literal->token->info.integer.explicit_bytes)
 					{
-						case 0: literal->type = &primitive_int64; break;
-						case 1: literal->type = &primitive_int8;  break;
-						case 2: literal->type = &primitive_int16; break;
-						case 4: literal->type = &primitive_int32; break;
-						case 8: literal->type = &primitive_int64; break;
+						case 0: literal->type = &type_int64; break;
+						case 1: literal->type = &type_int8;  break;
+						case 2: literal->type = &type_int16; break;
+						case 4: literal->type = &type_int32; break;
+						case 8: literal->type = &type_int64; break;
 						default: Unreachable();
 					}
 				}
@@ -709,25 +709,25 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			{
 				if (literal->token->info.floating_point.explicit_bytes == 0)
 				{
-					literal->type = &primitive_float32; // @Fixme?
+					literal->type = &type_float32; // @Fixme?
 				}
 				else if (literal->token->info.floating_point.explicit_bytes == 2)
 				{
-					literal->type = &primitive_float16;
+					literal->type = &type_float16;
 				}
 				else if (literal->token->info.floating_point.explicit_bytes == 4)
 				{
-					literal->type = &primitive_float32;
+					literal->type = &type_float32;
 				}
 				else if (literal->token->info.floating_point.explicit_bytes == 8)
 				{
-					literal->type = &primitive_float64;
+					literal->type = &type_float64;
 				}
 				else Unreachable();
 			}
 			else if (literal->token->kind == TOKEN_TRUE || literal->token->kind == TOKEN_FALSE)
 			{
-				literal->type = &primitive_bool;
+				literal->type = &type_bool;
 			}
 			else if (literal->token->kind == TOKEN_NULL)
 			{
@@ -738,11 +738,11 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 				u64 length = literal->token->info.span.Length();
 				bool found = false;
 
-				for (u32 i = 0; i < primitive_uint8.fixed_arrays.count; i++)
+				for (u32 i = 0; i < type_uint8.fixed_arrays.count; i++)
 				{
-					if (primitive_uint8.fixed_arrays[i]->length == length)
+					if (type_uint8.fixed_arrays[i]->length == length)
 					{
-						literal->type = primitive_uint8.fixed_arrays[i];
+						literal->type = type_uint8.fixed_arrays[i];
 						found = true;
 						break;
 					}
@@ -754,8 +754,8 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 					ZeroMemory(type);
 					type->kind = TYPE_SPECIFIER_FIXED_ARRAY;
 					type->length = length;
-					type->subtype = &primitive_uint8;
-					primitive_uint8.fixed_arrays.Add(type);
+					type->subtype = &type_uint8;
+					type_uint8.fixed_arrays.Add(type);
 					literal->type = type;
 				}
 			}
@@ -873,7 +873,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
-			unary->type = &primitive_bool;
+			unary->type = &type_bool;
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
 			unary->is_referential_value = false;
@@ -953,7 +953,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
 			ScanExpression(binary->right, scope, info);
-			binary->type = &primitive_bool;
+			binary->type = &type_bool;
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
@@ -972,7 +972,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
 			ScanExpression(binary->right, scope, info);
-			binary->type = &primitive_bool;
+			binary->type = &type_bool;
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;

@@ -584,18 +584,18 @@ struct Interpreter
 };
 
 extern Type empty_tuple;
-extern Type primitive_bool;
-extern Type primitive_int8;
-extern Type primitive_int16;
-extern Type primitive_int32;
-extern Type primitive_int64;
-extern Type primitive_uint8;
-extern Type primitive_uint16;
-extern Type primitive_uint32;
-extern Type primitive_uint64;
-extern Type primitive_float16;
-extern Type primitive_float32;
-extern Type primitive_float64;
+extern Type type_bool;
+extern Type type_int8;
+extern Type type_int16;
+extern Type type_int32;
+extern Type type_int64;
+extern Type type_uint8;
+extern Type type_uint16;
+extern Type type_uint32;
+extern Type type_uint64;
+extern Type type_float16;
+extern Type type_float32;
+extern Type type_float64;
 
 Parse_Info LexicalParse(String file_path);
 void ParseFile(String file_path);

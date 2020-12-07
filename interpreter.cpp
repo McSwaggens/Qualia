@@ -214,10 +214,10 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 			Print("% % % = ", l, binary->op, r);
 
-			if (binary->type == &primitive_bool) Print("%\n", *(bool*)output);
+			if (binary->type == &type_bool) Print("%\n", *(bool*)output);
 			else Print("%\n", *(f64*)output);
 
-			ConvertNumerical((Value*)output, &primitive_float64, binary->type);
+			ConvertNumerical((Value*)output, &type_float64, binary->type);
 
 		}
 		else if (IsIntegerLike(dominant))
@@ -258,7 +258,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 				Print("% % % = ", l, binary->op, r);
 
 				*(s64*)output = n;
-				ConvertNumerical((Value*)output, &primitive_int64, binary->type);
+				ConvertNumerical((Value*)output, &type_int64, binary->type);
 			}
 			else
 			{
@@ -292,10 +292,10 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 				Print("% % %", l, binary->op, r);
 
 				*(u64*)output = n;
-				ConvertNumerical((Value*)output, &primitive_uint64, binary->type);
+				ConvertNumerical((Value*)output, &type_uint64, binary->type);
 			}
 
-			if (binary->type == &primitive_bool) Print("%\n", (bool)n);
+			if (binary->type == &type_bool) Print("%\n", (bool)n);
 			else if (is_signed) Print("%\n", (s64)n);
 			else Print("%\n", (u64)n);
 		}

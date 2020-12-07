@@ -273,8 +273,25 @@ static Type* GetFixedArray(Type* type, u64 length, Parse_Info* info)
 static consteval Type NewPrimitiveType(Token_Kind kind, u64 size)
 {
 	Type type;
-	type.kind = TYPE_BASETYPE_PRIMITIVE;
-	type.primitive = kind;
+
+	switch (kind)
+	{
+		case TOKEN_BOOL:    type.kind = TYPE_BASETYPE_BOOL;    break;
+		case TOKEN_INT8:    type.kind = TYPE_BASETYPE_INT8;    break;
+		case TOKEN_INT16:   type.kind = TYPE_BASETYPE_INT16;   break;
+		case TOKEN_INT32:   type.kind = TYPE_BASETYPE_INT32;   break;
+		case TOKEN_INT64:   type.kind = TYPE_BASETYPE_INT64;   break;
+		case TOKEN_UINT8:   type.kind = TYPE_BASETYPE_UINT8;   break;
+		case TOKEN_UINT16:  type.kind = TYPE_BASETYPE_UINT16;  break;
+		case TOKEN_UINT32:  type.kind = TYPE_BASETYPE_UINT32;  break;
+		case TOKEN_UINT64:  type.kind = TYPE_BASETYPE_UINT64;  break;
+		case TOKEN_FLOAT16: type.kind = TYPE_BASETYPE_FLOAT16; break;
+		case TOKEN_FLOAT32: type.kind = TYPE_BASETYPE_FLOAT32; break;
+		case TOKEN_FLOAT64: type.kind = TYPE_BASETYPE_FLOAT64; break;
+		default:
+			Unreachable();
+	}
+
 	type.size = size;
 	type.length = 0;
 	type.specifiers = null;
@@ -572,7 +589,7 @@ static Ast_Enum_Member* FindEnumMember(Ast_Enum* ast_enum, String name)
 
 static bool IsBaseType(Type* type)
 {
-	return type->kind == TYPE_BASETYPE_PRIMITIVE
+	return IsPrimitive(type)
 		|| type->kind == TYPE_BASETYPE_STRUCT
 		|| type->kind == TYPE_BASETYPE_ENUM
 		|| type->kind == TYPE_BASETYPE_FUNCTION
@@ -597,26 +614,19 @@ u32 GetTypePrecedence(Type* type)
 		case TYPE_SPECIFIER_FIXED_ARRAY:
 			return 0;
 
-		case TYPE_BASETYPE_PRIMITIVE:
-			switch (type->primitive)
-			{
-				case TOKEN_UINT8:   return 1;
-				case TOKEN_UINT16:  return 2;
-				case TOKEN_UINT32:  return 3;
-				case TOKEN_UINT64:  return 4;
+		case TYPE_BASETYPE_UINT8:   return 1;
+		case TYPE_BASETYPE_UINT16:  return 2;
+		case TYPE_BASETYPE_UINT32:  return 3;
+		case TYPE_BASETYPE_UINT64:  return 4;
 
-				case TOKEN_INT8:    return 5;
-				case TOKEN_INT16:   return 6;
-				case TOKEN_INT32:   return 7;
-				case TOKEN_INT64:   return 8;
+		case TYPE_BASETYPE_INT8:    return 5;
+		case TYPE_BASETYPE_INT16:   return 6;
+		case TYPE_BASETYPE_INT32:   return 7;
+		case TYPE_BASETYPE_INT64:   return 8;
 
-				case TOKEN_FLOAT16: return 9;
-				case TOKEN_FLOAT32: return 10;
-				case TOKEN_FLOAT64: return 11;
-
-				default:
-					Assert();
-			}
+		case TYPE_BASETYPE_FLOAT16: return 9;
+		case TYPE_BASETYPE_FLOAT32: return 10;
+		case TYPE_BASETYPE_FLOAT64: return 11;
 
 		case TYPE_BASETYPE_ENUM:
 		case TYPE_SPECIFIER_POINTER:
@@ -663,7 +673,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 				{
 					expression->kind = AST_EXPRESSION_TERMINAL_ENUM;
 				}
-				else if (type->kind == TYPE_BASETYPE_PRIMITIVE)
+				else if (IsPrimitive(type))
 				{
 					expression->kind = AST_EXPRESSION_TERMINAL_PRIMITIVE;
 				}

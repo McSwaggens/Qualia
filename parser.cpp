@@ -35,9 +35,53 @@ void Write(OutputBuffer* buffer, Type* type)
 		Write(buffer, "[]");
 		Write(buffer, type->subtype);
 	}
-	else if (type->kind == TYPE_BASETYPE_PRIMITIVE)
+	else if (type->kind == TYPE_BASETYPE_BOOL)
 	{
-		Write(buffer, type->primitive);
+		Write(buffer, TOKEN_BOOL);
+	}
+	else if (type->kind == TYPE_BASETYPE_INT8)
+	{
+		Write(buffer, TOKEN_INT8);
+	}
+	else if (type->kind == TYPE_BASETYPE_INT16)
+	{
+		Write(buffer, TOKEN_INT16);
+	}
+	else if (type->kind == TYPE_BASETYPE_INT32)
+	{
+		Write(buffer, TOKEN_INT32);
+	}
+	else if (type->kind == TYPE_BASETYPE_INT64)
+	{
+		Write(buffer, TOKEN_INT64);
+	}
+	else if (type->kind == TYPE_BASETYPE_UINT8)
+	{
+		Write(buffer, TOKEN_UINT8);
+	}
+	else if (type->kind == TYPE_BASETYPE_UINT16)
+	{
+		Write(buffer, TOKEN_UINT16);
+	}
+	else if (type->kind == TYPE_BASETYPE_UINT32)
+	{
+		Write(buffer, TOKEN_UINT32);
+	}
+	else if (type->kind == TYPE_BASETYPE_UINT64)
+	{
+		Write(buffer, TOKEN_UINT64);
+	}
+	else if (type->kind == TYPE_BASETYPE_FLOAT16)
+	{
+		Write(buffer, TOKEN_FLOAT16);
+	}
+	else if (type->kind == TYPE_BASETYPE_FLOAT32)
+	{
+		Write(buffer, TOKEN_FLOAT32);
+	}
+	else if (type->kind == TYPE_BASETYPE_FLOAT64)
+	{
+		Write(buffer, TOKEN_FLOAT64);
 	}
 	else if (type->kind == TYPE_BASETYPE_FUNCTION)
 	{

@@ -11,22 +11,22 @@ static u64 GetExpressionMinSize(Ast_Expression* expression)
 
 static u64 ConvertNumericalToUnsignedInt(Value* value, Type* type)
 {
-	switch (type->primitive)
+	switch (type->kind)
 	{
-		case TOKEN_BOOL:    return value->value_bool;
-		case TOKEN_INT8:    return value->value_int8;
-		case TOKEN_INT16:   return value->value_int16;
-		case TOKEN_INT32:   return value->value_int32;
-		case TOKEN_INT64:   return value->value_int64;
+		case TYPE_BASETYPE_BOOL:    return value->value_bool;
+		case TYPE_BASETYPE_INT8:    return value->value_int8;
+		case TYPE_BASETYPE_INT16:   return value->value_int16;
+		case TYPE_BASETYPE_INT32:   return value->value_int32;
+		case TYPE_BASETYPE_INT64:   return value->value_int64;
 
-		case TOKEN_UINT8:   return value->value_uint8;
-		case TOKEN_UINT16:  return value->value_uint16;
-		case TOKEN_UINT32:  return value->value_uint32;
-		case TOKEN_UINT64:  return value->value_uint64;
+		case TYPE_BASETYPE_UINT8:   return value->value_uint8;
+		case TYPE_BASETYPE_UINT16:  return value->value_uint16;
+		case TYPE_BASETYPE_UINT32:  return value->value_uint32;
+		case TYPE_BASETYPE_UINT64:  return value->value_uint64;
 
-		case TOKEN_FLOAT16: Assert();
-		case TOKEN_FLOAT32: return value->value_float32;
-		case TOKEN_FLOAT64: return value->value_float64;
+		case TYPE_BASETYPE_FLOAT16: Assert();
+		case TYPE_BASETYPE_FLOAT32: return value->value_float32;
+		case TYPE_BASETYPE_FLOAT64: return value->value_float64;
 
 		default:
 
@@ -42,22 +42,22 @@ static u64 ConvertNumericalToUnsignedInt(Value* value, Type* type)
 
 static s64 ConvertNumericalToSignedInt(Value* value, Type* type)
 {
-	switch (type->primitive)
+	switch (type->kind)
 	{
-		case TOKEN_BOOL:    return value->value_bool;
-		case TOKEN_INT8:    return value->value_int8;
-		case TOKEN_INT16:   return value->value_int16;
-		case TOKEN_INT32:   return value->value_int32;
-		case TOKEN_INT64:   return value->value_int64;
+		case TYPE_BASETYPE_BOOL:    return value->value_bool;
+		case TYPE_BASETYPE_INT8:    return value->value_int8;
+		case TYPE_BASETYPE_INT16:   return value->value_int16;
+		case TYPE_BASETYPE_INT32:   return value->value_int32;
+		case TYPE_BASETYPE_INT64:   return value->value_int64;
 
-		case TOKEN_UINT8:   return value->value_uint8;
-		case TOKEN_UINT16:  return value->value_uint16;
-		case TOKEN_UINT32:  return value->value_uint32;
-		case TOKEN_UINT64:  return value->value_uint64;
+		case TYPE_BASETYPE_UINT8:   return value->value_uint8;
+		case TYPE_BASETYPE_UINT16:  return value->value_uint16;
+		case TYPE_BASETYPE_UINT32:  return value->value_uint32;
+		case TYPE_BASETYPE_UINT64:  return value->value_uint64;
 
-		case TOKEN_FLOAT16: Assert();
-		case TOKEN_FLOAT32: return value->value_float32;
-		case TOKEN_FLOAT64: return value->value_float64;
+		case TYPE_BASETYPE_FLOAT16: Assert();
+		case TYPE_BASETYPE_FLOAT32: return value->value_float32;
+		case TYPE_BASETYPE_FLOAT64: return value->value_float64;
 
 		default:
 
@@ -73,22 +73,22 @@ static s64 ConvertNumericalToSignedInt(Value* value, Type* type)
 
 static f64 ConvertNumericalToFloat(Value* value, Type* type)
 {
-	switch (type->primitive)
+	switch (type->kind)
 	{
-		case TOKEN_BOOL:    return value->value_bool;
-		case TOKEN_INT8:    return value->value_int8;
-		case TOKEN_INT16:   return value->value_int16;
-		case TOKEN_INT32:   return value->value_int32;
-		case TOKEN_INT64:   return value->value_int64;
+		case TYPE_BASETYPE_BOOL:    return value->value_bool;
+		case TYPE_BASETYPE_INT8:    return value->value_int8;
+		case TYPE_BASETYPE_INT16:   return value->value_int16;
+		case TYPE_BASETYPE_INT32:   return value->value_int32;
+		case TYPE_BASETYPE_INT64:   return value->value_int64;
 
-		case TOKEN_UINT8:   return value->value_uint8;
-		case TOKEN_UINT16:  return value->value_uint16;
-		case TOKEN_UINT32:  return value->value_uint32;
-		case TOKEN_UINT64:  return value->value_uint64;
+		case TYPE_BASETYPE_UINT8:   return value->value_uint8;
+		case TYPE_BASETYPE_UINT16:  return value->value_uint16;
+		case TYPE_BASETYPE_UINT32:  return value->value_uint32;
+		case TYPE_BASETYPE_UINT64:  return value->value_uint64;
 
-		case TOKEN_FLOAT16: Assert();
-		case TOKEN_FLOAT32: return value->value_float32;
-		case TOKEN_FLOAT64: return value->value_float64;
+		case TYPE_BASETYPE_FLOAT16: Assert();
+		case TYPE_BASETYPE_FLOAT32: return value->value_float32;
+		case TYPE_BASETYPE_FLOAT64: return value->value_float64;
 
 		default:
 
@@ -106,21 +106,21 @@ static void ConvertNumerical(Value* value, Type* from, Type* to)
 {
 	if (from == to) return;
 
-	switch (to->primitive)
+	switch (to->kind)
 	{
-		case TOKEN_INT8:  value->value_int8  = ConvertNumericalToSignedInt(value, from); break;
-		case TOKEN_INT16: value->value_int16 = ConvertNumericalToSignedInt(value, from); break;
-		case TOKEN_INT32: value->value_int32 = ConvertNumericalToSignedInt(value, from); break;
-		case TOKEN_INT64: value->value_int64 = ConvertNumericalToSignedInt(value, from); break;
+		case TYPE_BASETYPE_INT8:  value->value_int8  = ConvertNumericalToSignedInt(value, from); break;
+		case TYPE_BASETYPE_INT16: value->value_int16 = ConvertNumericalToSignedInt(value, from); break;
+		case TYPE_BASETYPE_INT32: value->value_int32 = ConvertNumericalToSignedInt(value, from); break;
+		case TYPE_BASETYPE_INT64: value->value_int64 = ConvertNumericalToSignedInt(value, from); break;
 
-		case TOKEN_UINT8:  value->value_uint8  = ConvertNumericalToUnsignedInt(value, from); break;
-		case TOKEN_UINT16: value->value_uint16 = ConvertNumericalToUnsignedInt(value, from); break;
-		case TOKEN_UINT32: value->value_uint32 = ConvertNumericalToUnsignedInt(value, from); break;
-		case TOKEN_UINT64: value->value_uint64 = ConvertNumericalToUnsignedInt(value, from); break;
+		case TYPE_BASETYPE_UINT8:  value->value_uint8  = ConvertNumericalToUnsignedInt(value, from); break;
+		case TYPE_BASETYPE_UINT16: value->value_uint16 = ConvertNumericalToUnsignedInt(value, from); break;
+		case TYPE_BASETYPE_UINT32: value->value_uint32 = ConvertNumericalToUnsignedInt(value, from); break;
+		case TYPE_BASETYPE_UINT64: value->value_uint64 = ConvertNumericalToUnsignedInt(value, from); break;
 
-		case TOKEN_FLOAT16: Assert();
-		case TOKEN_FLOAT32: value->value_float32 = ConvertNumericalToFloat(value, from); break;
-		case TOKEN_FLOAT64: value->value_float64 = ConvertNumericalToFloat(value, from); break;
+		case TYPE_BASETYPE_FLOAT16: Assert();
+		case TYPE_BASETYPE_FLOAT32: value->value_float32 = ConvertNumericalToFloat(value, from); break;
+		case TYPE_BASETYPE_FLOAT64: value->value_float64 = ConvertNumericalToFloat(value, from); break;
 
 		default:
 
@@ -379,17 +379,18 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 	else if (expression->kind == AST_EXPRESSION_TERMINAL_LITERAL)
 	{
 		Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
+
 		if (literal->token->kind == TOKEN_INTEGER_LITERAL)
 		{
 			CopyMemory(output, (char*)&literal->token->info.integer.value, literal->type->size);
 		}
 		else if (literal->token->kind == TOKEN_FLOAT_LITERAL)
 		{
-			if (literal->type->primitive == TOKEN_FLOAT64)
+			if (literal->type->kind == TYPE_BASETYPE_FLOAT64)
 			{
 				*(f64*)output = (f64)literal->token->info.floating_point.value;
 			}
-			else if (literal->type->primitive == TOKEN_FLOAT32)
+			else if (literal->type->kind== TYPE_BASETYPE_FLOAT32)
 			{
 				*(f32*)output = (f32)literal->token->info.floating_point.value;
 			}
@@ -412,6 +413,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 	else if (expression->kind == AST_EXPRESSION_TUPLE)
 	{
 		Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
+
 		for (u32 i = 0; i < tuple->elements.count; i++)
 		{
 			Ast_Expression* element = tuple->elements[i];

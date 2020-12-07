@@ -33,9 +33,20 @@ void Write(OutputBuffer* buffer, Type* type);
 
 enum Type_Kind
 {
+	TYPE_BASETYPE_BOOL,
+	TYPE_BASETYPE_UINT8,
+	TYPE_BASETYPE_UINT16,
+	TYPE_BASETYPE_UINT32,
+	TYPE_BASETYPE_UINT64,
+	TYPE_BASETYPE_INT8,
+	TYPE_BASETYPE_INT16,
+	TYPE_BASETYPE_INT32,
+	TYPE_BASETYPE_INT64,
+	TYPE_BASETYPE_FLOAT16,
+	TYPE_BASETYPE_FLOAT32,
+	TYPE_BASETYPE_FLOAT64,
 	TYPE_BASETYPE_STRUCT,
 	TYPE_BASETYPE_ENUM,
-	TYPE_BASETYPE_PRIMITIVE,
 	TYPE_BASETYPE_TUPLE,
 	TYPE_BASETYPE_FUNCTION,
 	TYPE_SPECIFIER_POINTER,
@@ -52,7 +63,6 @@ struct Type
 	{
 		Ast_Struct* structure;
 		Ast_Enum*   enumeration;
-		Token_Kind  primitive;
 
 		struct
 		{
@@ -607,82 +617,181 @@ StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
 u32 GetTypePrecedence(Type* type);
 Type* GetDominantType(Type* a, Type* b);
 
-static bool IsPrimitive(Type* type, Token_Kind primitive)
+static bool IsPrimitive(Type* type)
 {
-	return type->kind == TYPE_BASETYPE_PRIMITIVE && type->primitive == primitive;
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_BOOL:
+		case TYPE_BASETYPE_UINT8:
+		case TYPE_BASETYPE_UINT16:
+		case TYPE_BASETYPE_UINT32:
+		case TYPE_BASETYPE_UINT64:
+		case TYPE_BASETYPE_INT8:
+		case TYPE_BASETYPE_INT16:
+		case TYPE_BASETYPE_INT32:
+		case TYPE_BASETYPE_INT64:
+		case TYPE_BASETYPE_FLOAT16:
+		case TYPE_BASETYPE_FLOAT32:
+		case TYPE_BASETYPE_FLOAT64:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool IsConvertableToBool(Type* type)
 {
-	return type->kind == TYPE_BASETYPE_PRIMITIVE
-		|| type->kind == TYPE_SPECIFIER_POINTER
-		|| type->kind == TYPE_SPECIFIER_OPTIONAL
-		|| type->kind == TYPE_BASETYPE_ENUM;
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_BOOL:
+		case TYPE_BASETYPE_UINT8:
+		case TYPE_BASETYPE_UINT16:
+		case TYPE_BASETYPE_UINT32:
+		case TYPE_BASETYPE_UINT64:
+		case TYPE_BASETYPE_INT8:
+		case TYPE_BASETYPE_INT16:
+		case TYPE_BASETYPE_INT32:
+		case TYPE_BASETYPE_INT64:
+		case TYPE_SPECIFIER_POINTER:
+		case TYPE_SPECIFIER_OPTIONAL:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool IsInteger(Type* type)
 {
-	return IsPrimitive(type, TOKEN_INT8)
-		|| IsPrimitive(type, TOKEN_INT16)
-		|| IsPrimitive(type, TOKEN_INT32)
-		|| IsPrimitive(type, TOKEN_INT64)
-		|| IsPrimitive(type, TOKEN_UINT8)
-		|| IsPrimitive(type, TOKEN_UINT16)
-		|| IsPrimitive(type, TOKEN_UINT32)
-		|| IsPrimitive(type, TOKEN_UINT64);
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_UINT8:
+		case TYPE_BASETYPE_UINT16:
+		case TYPE_BASETYPE_UINT32:
+		case TYPE_BASETYPE_UINT64:
+		case TYPE_BASETYPE_INT8:
+		case TYPE_BASETYPE_INT16:
+		case TYPE_BASETYPE_INT32:
+		case TYPE_BASETYPE_INT64:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool IsSignedInteger(Type* type)
 {
-	return IsPrimitive(type, TOKEN_INT8)
-		|| IsPrimitive(type, TOKEN_INT16)
-		|| IsPrimitive(type, TOKEN_INT32)
-		|| IsPrimitive(type, TOKEN_INT64);
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_INT8:
+		case TYPE_BASETYPE_INT16:
+		case TYPE_BASETYPE_INT32:
+		case TYPE_BASETYPE_INT64:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool IsUnsignedInteger(Type* type)
 {
-	return IsPrimitive(type, TOKEN_UINT8)
-		|| IsPrimitive(type, TOKEN_UINT16)
-		|| IsPrimitive(type, TOKEN_UINT32)
-		|| IsPrimitive(type, TOKEN_UINT64);
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_UINT8:
+		case TYPE_BASETYPE_UINT16:
+		case TYPE_BASETYPE_UINT32:
+		case TYPE_BASETYPE_UINT64:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool IsFloat(Type* type)
 {
-	return IsPrimitive(type, TOKEN_FLOAT16)
-		|| IsPrimitive(type, TOKEN_FLOAT32)
-		|| IsPrimitive(type, TOKEN_FLOAT64);
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_FLOAT16:
+		case TYPE_BASETYPE_FLOAT32:
+		case TYPE_BASETYPE_FLOAT64:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool IsNumerical(Type* type)
 {
-	return type->kind == TYPE_BASETYPE_PRIMITIVE
-		|| type->kind == TYPE_SPECIFIER_POINTER
-		|| type->kind == TYPE_BASETYPE_ENUM;
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_BOOL:
+		case TYPE_BASETYPE_UINT8:
+		case TYPE_BASETYPE_UINT16:
+		case TYPE_BASETYPE_UINT32:
+		case TYPE_BASETYPE_UINT64:
+		case TYPE_BASETYPE_INT8:
+		case TYPE_BASETYPE_INT16:
+		case TYPE_BASETYPE_INT32:
+		case TYPE_BASETYPE_INT64:
+		case TYPE_BASETYPE_FLOAT16:
+		case TYPE_BASETYPE_FLOAT32:
+		case TYPE_BASETYPE_FLOAT64:
+		case TYPE_SPECIFIER_POINTER:
+		case TYPE_BASETYPE_ENUM:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool IsIntegerLike(Type* type)
 {
-	return IsInteger(type)
-		|| IsPrimitive(type, TOKEN_BOOL)
-		|| type->kind == TYPE_SPECIFIER_POINTER
-		|| type->kind == TYPE_BASETYPE_ENUM;
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_BOOL:
+		case TYPE_BASETYPE_UINT8:
+		case TYPE_BASETYPE_UINT16:
+		case TYPE_BASETYPE_UINT32:
+		case TYPE_BASETYPE_UINT64:
+		case TYPE_BASETYPE_INT8:
+		case TYPE_BASETYPE_INT16:
+		case TYPE_BASETYPE_INT32:
+		case TYPE_BASETYPE_INT64:
+		case TYPE_BASETYPE_FLOAT16:
+		case TYPE_BASETYPE_FLOAT32:
+		case TYPE_BASETYPE_FLOAT64:
+		case TYPE_SPECIFIER_POINTER:
+		case TYPE_BASETYPE_ENUM:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool IsPointer(Type* type)
 {
-	return type->kind == TYPE_SPECIFIER_POINTER;
+	switch (type->kind)
+	{
+		case TYPE_SPECIFIER_POINTER:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool IsOptional(Type* type)
 {
-	return type->kind == TYPE_SPECIFIER_OPTIONAL;
+	switch (type->kind)
+	{
+		case TYPE_SPECIFIER_OPTIONAL:
+			return true;
+		default:
+			return false;
+	}
 }
 
 static bool AreTypesCompatible(Type* a, Type* b)
 {
-	return a == b || (a->kind == TYPE_BASETYPE_PRIMITIVE && b->kind == TYPE_BASETYPE_PRIMITIVE)
+	return a == b || (IsPrimitive(a) && IsPrimitive(b))
 		|| (IsPointer(a) && IsPointer(b)); // @TestMe: This might produce semantic bugs somewhere.
 }
 

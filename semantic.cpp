@@ -588,6 +588,14 @@ u32 GetTypePrecedence(Type* type)
 {
 	switch (type->kind)
 	{
+		case TYPE_BASETYPE_TUPLE:
+		case TYPE_BASETYPE_FUNCTION:
+		case TYPE_BASETYPE_STRUCT:
+		case TYPE_SPECIFIER_OPTIONAL:
+		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
+		case TYPE_SPECIFIER_FIXED_ARRAY:
+			return 0;
+
 		case TYPE_BASETYPE_PRIMITIVE:
 			switch (type->primitive)
 			{
@@ -612,15 +620,6 @@ u32 GetTypePrecedence(Type* type)
 		case TYPE_BASETYPE_ENUM:
 		case TYPE_SPECIFIER_POINTER:
 			return 12;
-
-		case TYPE_BASETYPE_TUPLE:
-		case TYPE_BASETYPE_FUNCTION:
-		case TYPE_BASETYPE_STRUCT:
-		case TYPE_SPECIFIER_OPTIONAL:
-		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
-		case TYPE_SPECIFIER_FIXED_ARRAY:
-			// return 13;
-			Assert();
 	}
 
 	Assert();

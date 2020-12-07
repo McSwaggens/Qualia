@@ -1,34 +1,28 @@
-
-Foo(): return
-
 Test():
-	n := -10
-	j := -20
-	b := true
 
-	0.123456789 + 0.987654321
+	struct Foo:
+		x : int
+		y : int
 
-	(0.5 + 0.5 = 1)
+	struct Bar:
+		a : int
+		b : Foo
 
-	defer:
-		n+j
+	bar0 : Bar
+	bar1 : Bar
+	bar2 : Bar
 
-	while true:
-		defer: j = 666+0
-		inc n
-		b = n < 10
+	bar0.a   = 123
+	bar0.b.x = 456
+	bar0.b.y = 789
 
-		if not b:
-			break
-	then: Foo()
+	bar1.a   = 123
+	bar1.b.x = 456
+	bar1.b.y = 789
 
-	Foo()
+	bar2.a   = 42
+	bar2.b.x = 42
+	bar2.b.y = 42
 
-	p : *int = null
-
-	if p = null:
-		p = &n
-		*p = 456
-	else:
-		*p = 123
-
+	b0_1 := bar0 = bar1
+	b0_2 := bar0 = bar2

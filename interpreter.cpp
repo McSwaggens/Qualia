@@ -187,9 +187,6 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		Interpret(binary->left,  left,  false, frame, interpreter);
 		Interpret(binary->right, right, false, frame, interpreter);
 
-		Assert(IsNumerical(binary->left->type));
-		Assert(IsNumerical(binary->right->type));
-
 		Type* dominant = GetDominantType(binary->left->type, binary->right->type);
 
 		if (IsFloat(dominant))
@@ -213,7 +210,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 				default: Assert();
 			}
 
-			Print("% % % = ", l, binary->op, *(f64*)right);
+			Print("% % % = ", l, binary->op, r);
 
 			if (binary->type == &primitive_bool) Print("%\n", *(bool*)output);
 			else Print("%\n", *(f64*)output);
@@ -256,7 +253,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 					default: Assert();
 				}
 
-				Print("% % % = ", l, binary->op, r, (s64)n);
+				Print("% % % = ", l, binary->op, r);
 
 				*(s64*)output = n;
 				ConvertNumerical((Value*)output, &primitive_int64, binary->type);
@@ -290,7 +287,8 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 					default: Assert();
 				}
 
-				Print("% % % = ", l, binary->op, r, (u64)n);
+				Print("% % %", l, binary->op, r);
+
 				*(u64*)output = n;
 				ConvertNumerical((Value*)output, &primitive_uint64, binary->type);
 			}
@@ -299,7 +297,23 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			else if (is_signed) Print("%\n", (s64)n);
 			else Print("%\n", (u64)n);
 		}
-		else Assert();
+		else
+		{
+			Assert(binary->left->type == binary->right->type);
+
+			bool b;
+
+			switch (binary->kind)
+			{
+				case AST_EXPRESSION_BINARY_COMPARE_EQUAL:     b =  CompareMemory(left, right, binary->left->type->size); break;
+				case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL: b = !CompareMemory(left, right, binary->left->type->size); break;
+				default: Assert();
+			}
+
+			*(bool*)output = b;
+
+			Print("% % % = %\n", binary->left, binary->op, binary->right, b);
+		}
 	}
 	else if (IsUnaryExpression(expression->kind))
 	{

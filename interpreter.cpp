@@ -325,14 +325,13 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 				s64 n = 0;
 				Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
 				n = ~n;
-				CopyMemory(output, (char*)&n, unary->type->size);
+				*(s64*)output = n;
 			} break;
 
 			case AST_EXPRESSION_UNARY_NOT:
 			{
 				s64 n = 0;
 				Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
-				n = -n;
 				*(bool*)output = !n;
 			} break;
 

@@ -620,9 +620,11 @@ u32 GetTypePrecedence(Type* type)
 		case TYPE_BASETYPE_ENUM:
 		case TYPE_SPECIFIER_POINTER:
 			return 12;
+
+		default:
+			Assert();
 	}
 
-	Assert();
 	Unreachable();
 }
 

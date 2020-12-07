@@ -270,28 +270,10 @@ static Type* GetFixedArray(Type* type, u64 length, Parse_Info* info)
 	return new_type;
 }
 
-static consteval Type NewPrimitiveType(Token_Kind kind, u64 size)
+static consteval Type NewPrimitiveType(Type_Kind kind, u64 size)
 {
 	Type type;
-
-	switch (kind)
-	{
-		case TOKEN_BOOL:    type.kind = TYPE_BASETYPE_BOOL;    break;
-		case TOKEN_INT8:    type.kind = TYPE_BASETYPE_INT8;    break;
-		case TOKEN_INT16:   type.kind = TYPE_BASETYPE_INT16;   break;
-		case TOKEN_INT32:   type.kind = TYPE_BASETYPE_INT32;   break;
-		case TOKEN_INT64:   type.kind = TYPE_BASETYPE_INT64;   break;
-		case TOKEN_UINT8:   type.kind = TYPE_BASETYPE_UINT8;   break;
-		case TOKEN_UINT16:  type.kind = TYPE_BASETYPE_UINT16;  break;
-		case TOKEN_UINT32:  type.kind = TYPE_BASETYPE_UINT32;  break;
-		case TOKEN_UINT64:  type.kind = TYPE_BASETYPE_UINT64;  break;
-		case TOKEN_FLOAT16: type.kind = TYPE_BASETYPE_FLOAT16; break;
-		case TOKEN_FLOAT32: type.kind = TYPE_BASETYPE_FLOAT32; break;
-		case TOKEN_FLOAT64: type.kind = TYPE_BASETYPE_FLOAT64; break;
-		default:
-			Unreachable();
-	}
-
+	type.kind = kind;
 	type.size = size;
 	type.length = 0;
 	type.specifiers = null;
@@ -315,18 +297,18 @@ static consteval Type NewEmptyTupleType()
 }
 
 Type empty_tuple  = NewEmptyTupleType();
-Type type_bool    = NewPrimitiveType(TOKEN_BOOL,    1);
-Type type_int8    = NewPrimitiveType(TOKEN_INT8,    1);
-Type type_int16   = NewPrimitiveType(TOKEN_INT16,   2);
-Type type_int32   = NewPrimitiveType(TOKEN_INT32,   4);
-Type type_int64   = NewPrimitiveType(TOKEN_INT64,   8);
-Type type_uint8   = NewPrimitiveType(TOKEN_UINT8,   1);
-Type type_uint16  = NewPrimitiveType(TOKEN_UINT16,  2);
-Type type_uint32  = NewPrimitiveType(TOKEN_UINT32,  4);
-Type type_uint64  = NewPrimitiveType(TOKEN_UINT64,  8);
-Type type_float16 = NewPrimitiveType(TOKEN_FLOAT16, 2);
-Type type_float32 = NewPrimitiveType(TOKEN_FLOAT32, 4);
-Type type_float64 = NewPrimitiveType(TOKEN_FLOAT64, 8);
+Type type_bool    = NewPrimitiveType(TYPE_BASETYPE_BOOL,    1);
+Type type_int8    = NewPrimitiveType(TYPE_BASETYPE_INT8,    1);
+Type type_int16   = NewPrimitiveType(TYPE_BASETYPE_INT16,   2);
+Type type_int32   = NewPrimitiveType(TYPE_BASETYPE_INT32,   4);
+Type type_int64   = NewPrimitiveType(TYPE_BASETYPE_INT64,   8);
+Type type_uint8   = NewPrimitiveType(TYPE_BASETYPE_UINT8,   1);
+Type type_uint16  = NewPrimitiveType(TYPE_BASETYPE_UINT16,  2);
+Type type_uint32  = NewPrimitiveType(TYPE_BASETYPE_UINT32,  4);
+Type type_uint64  = NewPrimitiveType(TYPE_BASETYPE_UINT64,  8);
+Type type_float16 = NewPrimitiveType(TYPE_BASETYPE_FLOAT16, 2);
+Type type_float32 = NewPrimitiveType(TYPE_BASETYPE_FLOAT32, 4);
+Type type_float64 = NewPrimitiveType(TYPE_BASETYPE_FLOAT64, 8);
 
 static constexpr Type* GetPrimitiveType(Token_Kind kind)
 {

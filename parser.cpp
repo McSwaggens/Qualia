@@ -13,99 +13,67 @@ void Write(OutputBuffer* buffer, Type* type)
 		return;
 	}
 
-	if (type->kind == TYPE_SPECIFIER_POINTER)
+	switch (type->kind)
 	{
-		Write(buffer, "*");
-		Write(buffer, type->subtype);
-	}
-	else if (type->kind == TYPE_SPECIFIER_OPTIONAL)
-	{
-		Write(buffer, "?");
-		Write(buffer, type->subtype);
-	}
-	else if (type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
-	{
-		Write(buffer, '[');
-		Write(buffer, type->length);
-		Write(buffer, ']');
-		Write(buffer, type->subtype);
-	}
-	else if (type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY)
-	{
-		Write(buffer, "[]");
-		Write(buffer, type->subtype);
-	}
-	else if (type->kind == TYPE_BASETYPE_BOOL)
-	{
-		Write(buffer, TOKEN_BOOL);
-	}
-	else if (type->kind == TYPE_BASETYPE_INT8)
-	{
-		Write(buffer, TOKEN_INT8);
-	}
-	else if (type->kind == TYPE_BASETYPE_INT16)
-	{
-		Write(buffer, TOKEN_INT16);
-	}
-	else if (type->kind == TYPE_BASETYPE_INT32)
-	{
-		Write(buffer, TOKEN_INT32);
-	}
-	else if (type->kind == TYPE_BASETYPE_INT64)
-	{
-		Write(buffer, TOKEN_INT64);
-	}
-	else if (type->kind == TYPE_BASETYPE_UINT8)
-	{
-		Write(buffer, TOKEN_UINT8);
-	}
-	else if (type->kind == TYPE_BASETYPE_UINT16)
-	{
-		Write(buffer, TOKEN_UINT16);
-	}
-	else if (type->kind == TYPE_BASETYPE_UINT32)
-	{
-		Write(buffer, TOKEN_UINT32);
-	}
-	else if (type->kind == TYPE_BASETYPE_UINT64)
-	{
-		Write(buffer, TOKEN_UINT64);
-	}
-	else if (type->kind == TYPE_BASETYPE_FLOAT16)
-	{
-		Write(buffer, TOKEN_FLOAT16);
-	}
-	else if (type->kind == TYPE_BASETYPE_FLOAT32)
-	{
-		Write(buffer, TOKEN_FLOAT32);
-	}
-	else if (type->kind == TYPE_BASETYPE_FLOAT64)
-	{
-		Write(buffer, TOKEN_FLOAT64);
-	}
-	else if (type->kind == TYPE_BASETYPE_FUNCTION)
-	{
-		Write(buffer, type->function.input);
-		Write(buffer, " -> ");
-		Write(buffer, type->function.output);
-	}
-	else if (type->kind == TYPE_BASETYPE_TUPLE)
-	{
-		Write(buffer, '(');
-		for (u32 i = 0; i < type->tuple.count; i++)
-		{
-			if (i) Write(buffer, ", ");
-			Write(buffer, type->tuple[i]);
-		}
-		Write(buffer, ')');
-	}
-	else if (type->kind == TYPE_BASETYPE_STRUCT)
-	{
-		Write(buffer, type->structure->name);
-	}
-	else if (type->kind == TYPE_BASETYPE_ENUM)
-	{
-		Write(buffer, type->enumeration->name);
+		case TYPE_SPECIFIER_POINTER:
+			Write(buffer, "*");
+			Write(buffer, type->subtype);
+			break;
+
+		case TYPE_SPECIFIER_OPTIONAL:
+			Write(buffer, "?");
+			Write(buffer, type->subtype);
+			break;
+
+		case TYPE_SPECIFIER_FIXED_ARRAY:
+			Write(buffer, '[');
+			Write(buffer, type->length);
+			Write(buffer, ']');
+			Write(buffer, type->subtype);
+			break;
+
+		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
+			Write(buffer, "[]");
+			Write(buffer, type->subtype);
+			break;
+
+		case TYPE_BASETYPE_BOOL:    Write(buffer, TOKEN_BOOL);    break; 
+		case TYPE_BASETYPE_INT8:    Write(buffer, TOKEN_INT8);    break; 
+		case TYPE_BASETYPE_INT16:   Write(buffer, TOKEN_INT16);   break; 
+		case TYPE_BASETYPE_INT32:   Write(buffer, TOKEN_INT32);   break; 
+		case TYPE_BASETYPE_INT64:   Write(buffer, TOKEN_INT64);   break; 
+		case TYPE_BASETYPE_UINT8:   Write(buffer, TOKEN_UINT8);   break; 
+		case TYPE_BASETYPE_UINT16:  Write(buffer, TOKEN_UINT16);  break; 
+		case TYPE_BASETYPE_UINT32:  Write(buffer, TOKEN_UINT32);  break; 
+		case TYPE_BASETYPE_UINT64:  Write(buffer, TOKEN_UINT64);  break; 
+		case TYPE_BASETYPE_FLOAT16: Write(buffer, TOKEN_FLOAT16); break; 
+		case TYPE_BASETYPE_FLOAT32: Write(buffer, TOKEN_FLOAT32); break; 
+		case TYPE_BASETYPE_FLOAT64: Write(buffer, TOKEN_FLOAT64); break; 
+
+		case TYPE_BASETYPE_FUNCTION:
+			Write(buffer, type->function.input);
+			Write(buffer, " -> ");
+			Write(buffer, type->function.output);
+			break;
+
+		case TYPE_BASETYPE_TUPLE:
+			Write(buffer, '(');
+			for (u32 i = 0; i < type->tuple.count; i++)
+			{
+				if (i) Write(buffer, ", ");
+				Write(buffer, type->tuple[i]);
+			}
+			Write(buffer, ')');
+			break;
+
+		case TYPE_BASETYPE_STRUCT:
+			Write(buffer, type->structure->name);
+			break;
+
+		case TYPE_BASETYPE_ENUM:
+			Write(buffer, type->enumeration->name);
+			break;
+
 	}
 }
 
@@ -124,55 +92,47 @@ void Write(OutputBuffer* buffer, Ast_Type type)
 {
 	for (Ast_Specifier* specifier = type.specifiers; specifier < type.specifiers.End(); specifier++)
 	{
-		if (specifier->kind == AST_SPECIFIER_POINTER)
+		switch (specifier->kind)
 		{
-			Write(buffer, "*");
-		}
-		else if (specifier->kind == AST_SPECIFIER_OPTIONAL)
-		{
-			Write(buffer, "?");
-		}
-		else if (specifier->kind == AST_SPECIFIER_ARRAY)
-		{
-			Write(buffer, "[");
-			Write(buffer, specifier->size_expression);
-			Write(buffer, "]");
+			case AST_SPECIFIER_POINTER:  Write(buffer, "*"); break;
+			case AST_SPECIFIER_OPTIONAL: Write(buffer, "?"); break;
+			case AST_SPECIFIER_ARRAY:
+			{
+				Write(buffer, "[");
+				Write(buffer, specifier->size_expression);
+				Write(buffer, "]");
+			} break;
 		}
 	}
 
-	if (type.basetype.kind == AST_BASETYPE_PRIMITIVE)
+	switch (type.basetype.kind)
 	{
-		Write(buffer, type.basetype.token);
-	}
-	else if (type.basetype.kind == AST_BASETYPE_USERTYPE)
-	{
-		Write(buffer, type.basetype.token);
-	}
-	else if (type.basetype.kind == AST_BASETYPE_TUPLE)
-	{
-		Write(buffer, "(");
+		case AST_BASETYPE_PRIMITIVE: Write(buffer, type.basetype.token);
+		case AST_BASETYPE_USERTYPE:  Write(buffer, type.basetype.token);
+		case AST_BASETYPE_ENUM:      Write(buffer, type.basetype.enumeration->name);
+		case AST_BASETYPE_STRUCT:    Write(buffer, type.basetype.structure->name);
 
-		for (Ast_Type* t = type.basetype.tuple; t < type.basetype.tuple; t++)
+		case AST_BASETYPE_TUPLE:
 		{
-			if (t != type.basetype.tuple) Write(buffer, ", ");
-			Write(buffer, t);
-		}
+			Write(buffer, "(");
 
-		Write(buffer, ")");
-	}
-	else if (type.basetype.kind == AST_BASETYPE_FUNCTION)
-	{
-		Write(buffer, "(");
+			for (Ast_Type* t = type.basetype.tuple; t < type.basetype.tuple.End(); t++)
+			{
+				if (t != type.basetype.tuple) Write(buffer, ", ");
+				Write(buffer, t);
+			}
 
-		for (Ast_Type* t = type.basetype.function.input; t < type.basetype.function.input; t++)
+			Write(buffer, ")");
+		} break;
+
+		case AST_BASETYPE_FUNCTION:
 		{
-			if (t != type.basetype.function.input) Write(buffer, ", ");
-			Write(buffer, t);
-		}
-
-		Write(buffer, ") -> (");
-		Write(buffer, type.basetype.function.output);
-		Write(buffer, ")");
+			Write(buffer, "(");
+			Write(buffer, type.basetype.function.input);
+			Write(buffer, ") -> (");
+			Write(buffer, type.basetype.function.output);
+			Write(buffer, ")");
+		} break;
 	}
 }
 

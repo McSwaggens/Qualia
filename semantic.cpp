@@ -496,7 +496,8 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info)
 				{
 					ScanExpression(specifier->size_expression, scope, info);
 					Assert(specifier->size_expression->kind == AST_EXPRESSION_TERMINAL_LITERAL); // @RemoveMe @Todo: Need to be removed.
-					u64 length = specifier->size_expression->GetLiteral()->token->info.integer.value;
+					Ast_Expression_Literal* literal = (Ast_Expression_Literal*)specifier->size_expression;
+					u64 length = literal->token->info.integer.value;
 					type = GetFixedArray(type, length, info);
 				}
 			}
@@ -639,11 +640,12 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 	{
 		case AST_EXPRESSION_TERMINAL:
 		{
-			Ast_Expression_Terminal* terminal = expression->GetTerminal();
+			Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)expression;
+
 			if (Ast_VariableDeclaration* variable; terminal->token->kind == TOKEN_IDENTIFIER && (variable = GetVariable(terminal->token, scope)))
 			{
 				expression->kind = AST_EXPRESSION_TERMINAL_VARIABLE;
-				expression->GetVariable()->variable = variable;
+				((Ast_Expression_Variable*)expression)->variable = variable;
 				expression->type = variable->type;
 				expression->is_referential_value = true;
 				expression->is_pure = variable->is_pure;
@@ -674,7 +676,8 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_TERMINAL_LITERAL:
 		{
-			Ast_Expression_Literal* literal = expression->GetLiteral();
+			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
+
 			if (literal->token->kind == TOKEN_INTEGER_LITERAL)
 			{
 				if (literal->token->info.integer.is_unsigned)
@@ -760,7 +763,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_TUPLE:
 		{
-			Ast_Expression_Tuple* tuple = expression->GetTuple();
+			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
 			tuple->can_constantly_evaluate = true;
 			tuple->is_pure = true;
 			tuple->is_referential_value = true;
@@ -791,7 +794,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_UNARY_ADDRESS_OF:
 		{
-			Ast_Expression_Unary* unary = expression->GetUnary();
+			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
 			unary->type = GetPointer(unary->subexpression->type, info);
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
@@ -806,7 +809,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_UNARY_VALUE_OF:
 		{
-			Ast_Expression_Unary* unary = expression->GetUnary();
+			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
@@ -822,7 +825,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_UNARY_BINARY_NOT:
 		{
-			Ast_Expression_Unary* unary = expression->GetUnary();
+			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
 			unary->type = unary->subexpression->type;
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
@@ -838,7 +841,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_UNARY_MINUS:
 		{
-			Ast_Expression_Unary* unary = expression->GetUnary();
+			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
 			unary->type = unary->subexpression->type;
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
@@ -853,7 +856,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_UNARY_PLUS:
 		{
-			Ast_Expression_Unary* unary = expression->GetUnary();
+			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
 			unary->type = unary->subexpression->type;
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
@@ -868,7 +871,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_UNARY_NOT:
 		{
-			Ast_Expression_Unary* unary = expression->GetUnary();
+			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
 			unary->type = &primitive_bool;
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
@@ -883,7 +886,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_BINARY_DOT:
 		{
-			Ast_Expression_Binary* binary = expression->GetBinary();
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
 			binary->is_referential_value = binary->left->is_referential_value || binary->left->type->kind == TYPE_SPECIFIER_POINTER;
 
@@ -895,7 +898,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			{
 				if (binary->right->kind == AST_EXPRESSION_TERMINAL)
 				{
-					Ast_Expression_Terminal* terminal = binary->right->GetTerminal();
+					Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)binary->right;
 
 					if (terminal->token->kind != TOKEN_IDENTIFIER)
 					{
@@ -918,7 +921,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			}
 			else
 			{
-				Ast_Expression_Terminal* terminal = binary->right->GetTerminal();
+				Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)binary->right;
 				while (type->kind == TYPE_SPECIFIER_POINTER) type = type->subtype;
 
 				if (type->kind == TYPE_BASETYPE_STRUCT)
@@ -934,7 +937,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 					binary->type = member->type.type;
 					terminal->kind = AST_EXPRESSION_TERMINAL_STRUCT_MEMBER;
-					terminal->GetStructMember()->member = member;
+					((Ast_Expression_Struct_Member*)terminal)->member = member;
 					terminal->type = member->type.type;
 				}
 				else
@@ -947,7 +950,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
 		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
 		{
-			Ast_Expression_Binary* binary = expression->GetBinary();
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
 			ScanExpression(binary->right, scope, info);
 			binary->type = &primitive_bool;
@@ -966,7 +969,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		case AST_EXPRESSION_BINARY_COMPARE_GREATER:
 		case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
 		{
-			Ast_Expression_Binary* binary = expression->GetBinary();
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
 			ScanExpression(binary->right, scope, info);
 			binary->type = &primitive_bool;
@@ -992,7 +995,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		case AST_EXPRESSION_BINARY_MODULO:
 		case AST_EXPRESSION_BINARY_EXPONENTIAL:
 		{
-			Ast_Expression_Binary* binary = expression->GetBinary();
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
 			ScanExpression(binary->right, scope, info);
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
@@ -1016,7 +1019,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		case AST_EXPRESSION_BINARY_BITWISE_XOR:
 		case AST_EXPRESSION_BINARY_BITWISE_AND:
 		{
-			Ast_Expression_Binary* binary = expression->GetBinary();
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
 			ScanExpression(binary->right, scope, info);
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
@@ -1039,7 +1042,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
 		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
 		{
-			Ast_Expression_Binary* binary = expression->GetBinary();
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
 			ScanExpression(binary->right, scope, info);
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
@@ -1062,7 +1065,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		case AST_EXPRESSION_BINARY_AND:
 		case AST_EXPRESSION_BINARY_OR:
 		{
-			Ast_Expression_Binary* binary = expression->GetBinary();
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
 			ScanExpression(binary->right, scope, info);
 			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
@@ -1084,7 +1087,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_IF_ELSE:
 		{
-			Ast_Expression_Ternary* ternary = expression->GetTernary();
+			Ast_Expression_Ternary* ternary = (Ast_Expression_Ternary*)expression;
 			ScanExpression(ternary->left,   scope, info);
 			ScanExpression(ternary->middle, scope, info);
 			ScanExpression(ternary->right,  scope, info);
@@ -1101,29 +1104,32 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 		case AST_EXPRESSION_CALL:
 		{
-			Ast_Expression_Call* call = expression->GetCall();
-			if (call->parameters) // @RemoveMe?
+			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
+
+			if (call->parameters) // @RemoveMe? Is this just empty tuple? So this is never null?
 			{
 				ScanExpression(call->parameters, scope, info);
 			}
 
-			if (call->function->kind == AST_EXPRESSION_TERMINAL && call->function->GetTerminal()->token->kind == TOKEN_IDENTIFIER)
+			Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)call->function;
+
+			if (call->function->kind == AST_EXPRESSION_TERMINAL && terminal->token->kind == TOKEN_IDENTIFIER)
 			{
 				// @Note: call->function could still be a variable and not a function!
 
-				Ast_Expression_Terminal* terminal = call->function->GetTerminal();
-
 				if (Ast_Function* function = GetFunction(terminal->token, call->parameters->type, scope); function)
 				{
+					Ast_Expression_Function* function_expression = (Ast_Expression_Function*)call->function;
 					call->function->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
-					call->function->GetFunction()->function = function;
+					function_expression->function = function;
 					call->type = function->return_type;
 					if (!call->type) call->type = &empty_tuple;
 				}
-				else if (Ast_VariableDeclaration* variable = GetVariable(call->function->GetTerminal()->token, scope); variable)
+				else if (Ast_VariableDeclaration* variable = GetVariable(terminal->token, scope); variable)
 				{
+					Ast_Expression_Variable* variable_expression = (Ast_Expression_Variable*)call->function;
 					call->function->kind = AST_EXPRESSION_TERMINAL_VARIABLE;
-					call->function->GetVariable()->variable = variable;
+					variable_expression->variable = variable;
 					call->type = variable->type->function.output;
 					if (!call->type) call->type = &empty_tuple;
 					call->is_referential_value = true;
@@ -1132,12 +1138,12 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 					if (variable->type->kind != TYPE_BASETYPE_FUNCTION)
 					{
-						Error(info, call->function->GetVariable()->token->location, "Variable % with type % cannot be called like a function.\n", variable->name, variable->type);
+						Error(info, variable_expression->token->location, "Variable % with type % cannot be called like a function.\n", variable->name, variable->type);
 					}
 				}
 				else
 				{
-					Error(info, call->function->GetTerminal()->token->location, "Function % not found.\n", call->function->GetTerminal()->token);
+					Error(info, terminal->token->location, "Function % not found.\n", terminal->token);
 				}
 			}
 			else
@@ -1149,8 +1155,8 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		case AST_EXPRESSION_LAMBDA:
 		case AST_EXPRESSION_SUBSCRIPT:
 		{
-			Ast_Expression_Subscript* subscript = expression->GetSubscript();
-			ScanExpression(subscript->array,  scope, info);
+			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
+			ScanExpression(subscript->array, scope, info);
 			ScanExpression(subscript->index, scope, info);
 
 			if (subscript->array->type->kind != TYPE_SPECIFIER_FIXED_ARRAY   &&

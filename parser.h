@@ -251,21 +251,6 @@ struct Ast_Expression
 	bool can_constantly_evaluate;
 	Type* type;
 	Span<Token> span;
-
-	struct Ast_Expression_Unary*         GetUnary()         { return (Ast_Expression_Unary*)this;         }
-	struct Ast_Expression_Binary*        GetBinary()        { return (Ast_Expression_Binary*)this;        }
-	struct Ast_Expression_Ternary*       GetTernary()       { return (Ast_Expression_Ternary*)this;       }
-	struct Ast_Expression_Call*          GetCall()          { return (Ast_Expression_Call*)this;          }
-	struct Ast_Expression_Tuple*         GetTuple()         { return (Ast_Expression_Tuple*)this;         }
-	struct Ast_Expression_Literal*       GetLiteral()       { return (Ast_Expression_Literal*)this;       }
-	struct Ast_Expression_Subscript*     GetSubscript()     { return (Ast_Expression_Subscript*)this;     }
-	struct Ast_Expression_Terminal*      GetTerminal()      { return (Ast_Expression_Terminal*)this;      }
-	struct Ast_Expression_Variable*      GetVariable()      { return (Ast_Expression_Variable*)this;      }
-	struct Ast_Expression_Function*      GetFunction()      { return (Ast_Expression_Function*)this;      }
-	struct Ast_Expression_Struct*        GetStruct()        { return (Ast_Expression_Struct*)this;        }
-	struct Ast_Expression_Enum*          GetEnum()          { return (Ast_Expression_Enum*)this;          }
-	struct Ast_Expression_Struct_Member* GetStructMember()  { return (Ast_Expression_Struct_Member*)this; }
-	struct Ast_Expression_Enum_Member*   GetEnumMember()    { return (Ast_Expression_Enum_Member*)this;   }
 };
 
 struct Ast_Expression_Unary : Ast_Expression

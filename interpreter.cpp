@@ -138,7 +138,9 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 {
 	if (expression->kind == AST_EXPRESSION_BINARY_DOT)
 	{
-		Ast_Expression_Binary* binary = expression->GetBinary();
+		Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
+		Ast_Expression_Struct_Member* struct_member = (Ast_Expression_Struct_Member*)binary->right;
+
 		char data[binary->left->type->size];
 		Interpret(binary->left, data, true, frame, interpreter);
 		Assert(binary->right->kind == AST_EXPRESSION_TERMINAL_STRUCT_MEMBER);
@@ -146,7 +148,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		if (binary->left->is_referential_value)
 		{
 			char* reference = *(char**)data;
-			reference += binary->right->GetStructMember()->member->offset;
+			reference += struct_member->member->offset;
 
 			if (allow_referential)
 			{
@@ -159,12 +161,12 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		}
 		else
 		{
-			CopyMemory(output, data + binary->right->GetStructMember()->member->offset, binary->right->type->size);
+			CopyMemory(output, data + struct_member->member->offset, binary->right->type->size);
 		}
 	}
 	else if (expression->kind == AST_EXPRESSION_TERMINAL_VARIABLE)
 	{
-		Ast_Expression_Variable* variable = expression->GetVariable();
+		Ast_Expression_Variable* variable = (Ast_Expression_Variable*)expression;
 		if (allow_referential)
 		{
 			*(char**)output = frame->GetData(variable->variable);
@@ -376,7 +378,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 	}
 	else if (expression->kind == AST_EXPRESSION_TERMINAL_LITERAL)
 	{
-		Ast_Expression_Literal* literal = expression->GetLiteral();
+		Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
 		if (literal->token->kind == TOKEN_INTEGER_LITERAL)
 		{
 			CopyMemory(output, (char*)&literal->token->info.integer.value, literal->type->size);
@@ -409,7 +411,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 	}
 	else if (expression->kind == AST_EXPRESSION_TUPLE)
 	{
-		Ast_Expression_Tuple* tuple = expression->GetTuple();
+		Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
 		for (u32 i = 0; i < tuple->elements.count; i++)
 		{
 			Ast_Expression* element = tuple->elements[i];
@@ -419,8 +421,10 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 	}
 	else if (expression->kind == AST_EXPRESSION_CALL)
 	{
-		Ast_Expression_Call* call = expression->GetCall();
-		Ast_Function* function = call->function->GetFunction()->function;
+		// @Todo @Bug: Make this work for "external" functions.
+		//        ...  Maybe make them not work in compile time?
+		Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
+		Ast_Function* function = ((Ast_Expression_Function*)call->function)->function;
 
 		char input[function->type->function.input->size];
 		Interpret(call->parameters, input, false, frame, interpreter);

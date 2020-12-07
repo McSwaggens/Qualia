@@ -40,6 +40,37 @@ static u64 ConvertNumericalToUnsignedInt(Value* value, Type* type)
 	}
 }
 
+static s64 ConvertNumericalToSignedInt(Value* value, Type* type)
+{
+	switch (type->primitive)
+	{
+		case TOKEN_BOOL:    return value->value_bool;
+		case TOKEN_INT8:    return value->value_int8;
+		case TOKEN_INT16:   return value->value_int16;
+		case TOKEN_INT32:   return value->value_int32;
+		case TOKEN_INT64:   return value->value_int64;
+
+		case TOKEN_UINT8:   return value->value_uint8;
+		case TOKEN_UINT16:  return value->value_uint16;
+		case TOKEN_UINT32:  return value->value_uint32;
+		case TOKEN_UINT64:  return value->value_uint64;
+
+		case TOKEN_FLOAT16: Assert();
+		case TOKEN_FLOAT32: return value->value_float32;
+		case TOKEN_FLOAT64: return value->value_float64;
+
+		default:
+
+			if (IsIntegerLike(type))
+			{
+				return value->value_uint64;
+			}
+
+			Assert();
+			Unreachable();
+	}
+}
+
 static f64 ConvertNumericalToFloat(Value* value, Type* type)
 {
 	switch (type->primitive)
@@ -77,10 +108,10 @@ static void ConvertNumerical(Value* value, Type* from, Type* to)
 
 	switch (to->primitive)
 	{
-		case TOKEN_INT8:  value->value_int8  = ConvertNumericalToUnsignedInt(value, from); break;
-		case TOKEN_INT16: value->value_int16 = ConvertNumericalToUnsignedInt(value, from); break;
-		case TOKEN_INT32: value->value_int32 = ConvertNumericalToUnsignedInt(value, from); break;
-		case TOKEN_INT64: value->value_int64 = ConvertNumericalToUnsignedInt(value, from); break;
+		case TOKEN_INT8:  value->value_int8  = ConvertNumericalToSignedInt(value, from); break;
+		case TOKEN_INT16: value->value_int16 = ConvertNumericalToSignedInt(value, from); break;
+		case TOKEN_INT32: value->value_int32 = ConvertNumericalToSignedInt(value, from); break;
+		case TOKEN_INT64: value->value_int64 = ConvertNumericalToSignedInt(value, from); break;
 
 		case TOKEN_UINT8:  value->value_uint8  = ConvertNumericalToUnsignedInt(value, from); break;
 		case TOKEN_UINT16: value->value_uint16 = ConvertNumericalToUnsignedInt(value, from); break;
@@ -163,26 +194,26 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 		if (IsFloat(dominant))
 		{
-			*(f64*)left  = ConvertNumericalToFloat((Value*)left,  binary->left->type);
-			*(f64*)right = ConvertNumericalToFloat((Value*)right, binary->right->type);
+			f64 l = ConvertNumericalToFloat((Value*)left,  binary->left->type);
+			f64 r = ConvertNumericalToFloat((Value*)right, binary->right->type);
 
 			switch (binary->kind)
 			{
-				case AST_EXPRESSION_BINARY_COMPARE_LESS:             *(bool*)output = *(f64*)left <  *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    *(bool*)output = *(f64*)left <= *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_GREATER:          *(bool*)output = *(f64*)left >  *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: *(bool*)output = *(f64*)left >= *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_EQUAL:            *(bool*)output = *(f64*)left == *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:        *(bool*)output = *(f64*)left != *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_ADD:         *(f64*)output = *(f64*)left +  *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_SUBTRACT:    *(f64*)output = *(f64*)left -  *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_MULTIPLY:    *(f64*)output = *(f64*)left *  *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_DIVIDE:      *(f64*)output = *(f64*)left /  *(f64*)right; break;
-				case AST_EXPRESSION_BINARY_EXPONENTIAL: *(f64*)output = Pow(*(f64*)left, *(f64*)right); break;
+				case AST_EXPRESSION_BINARY_COMPARE_LESS:             *(bool*)output = l <  r; break;
+				case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    *(bool*)output = l <= r; break;
+				case AST_EXPRESSION_BINARY_COMPARE_GREATER:          *(bool*)output = l >  r; break;
+				case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: *(bool*)output = l >= r; break;
+				case AST_EXPRESSION_BINARY_COMPARE_EQUAL:            *(bool*)output = l == r; break;
+				case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:        *(bool*)output = l != r; break;
+				case AST_EXPRESSION_BINARY_ADD:         *(f64*)output = l +  r; break;
+				case AST_EXPRESSION_BINARY_SUBTRACT:    *(f64*)output = l -  r; break;
+				case AST_EXPRESSION_BINARY_MULTIPLY:    *(f64*)output = l *  r; break;
+				case AST_EXPRESSION_BINARY_DIVIDE:      *(f64*)output = l /  r; break;
+				case AST_EXPRESSION_BINARY_EXPONENTIAL: *(f64*)output = Pow(l, r); break;
 				default: Assert();
 			}
 
-			Print("(% % %) = \n", *(f64*)left, binary->op, *(f64*)right);
+			Print("% % % = ", l, binary->op, *(f64*)right);
 
 			if (binary->type == &primitive_bool) Print("%\n", *(bool*)output);
 			else Print("%\n", *(f64*)output);
@@ -195,46 +226,74 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			u64 n;
 			bool is_signed = IsSignedInteger(dominant);
 
-			switch (binary->kind)
+
+			if (is_signed)
 			{
-				case AST_EXPRESSION_BINARY_COMPARE_LESS:
-					n = is_signed ? (*(s64*)left <  *(s64*)right) : (*(u64*)left <  *(u64*)right);
-					break;
+				s64 l = ConvertNumericalToSignedInt((Value*)left,  binary->left->type);
+				s64 r = ConvertNumericalToSignedInt((Value*)right, binary->right->type);
 
-				case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:
-					n = is_signed ? (*(s64*)left <= *(s64*)right) : (*(u64*)left <= *(u64*)right);
-					break;
+				switch (binary->kind)
+				{
+					case AST_EXPRESSION_BINARY_COMPARE_LESS:             n = l <  r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    n = l <= r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER:          n = l >  r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: n = l >= r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_EQUAL:            n = l == r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:        n = l != r; break;
+					case AST_EXPRESSION_BINARY_ADD:         n = l +  r; break;
+					case AST_EXPRESSION_BINARY_SUBTRACT:    n = l -  r; break;
+					case AST_EXPRESSION_BINARY_MULTIPLY:    n = l *  r; break;
+					case AST_EXPRESSION_BINARY_DIVIDE:      n = l /  r; break;
+					case AST_EXPRESSION_BINARY_MODULO:      n = l %  r; break;
+					case AST_EXPRESSION_BINARY_EXPONENTIAL: n = Pow(l, r) + 0.5; break;
+					case AST_EXPRESSION_BINARY_BITWISE_OR:  n = l |  r; break;
+					case AST_EXPRESSION_BINARY_BITWISE_XOR: n = l ^  r; break;
+					case AST_EXPRESSION_BINARY_BITWISE_AND: n = l &  r; break;
+					case AST_EXPRESSION_BINARY_LEFT_SHIFT:  n = l << r; break;
+					case AST_EXPRESSION_BINARY_RIGHT_SHIFT: n = l >> r; break;
+					case AST_EXPRESSION_BINARY_AND:         n = l && r; break;
+					case AST_EXPRESSION_BINARY_OR:          n = l || r; break;
+					default: Assert();
+				}
 
-				case AST_EXPRESSION_BINARY_COMPARE_GREATER:
-					n = is_signed ? (*(s64*)left >  *(s64*)right) : (*(u64*)left >  *(u64*)right);
-					break;
+				Print("% % % = ", l, binary->op, r, (s64)n);
 
-				case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
-					n = is_signed ? (*(s64*)left >= *(s64*)right) : (*(u64*)left >= *(u64*)right);
-					break;
-
-				case AST_EXPRESSION_BINARY_COMPARE_EQUAL:     n = *(u64*)left == *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL: n = *(u64*)left != *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_ADD:               n = *(u64*)left +  *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_SUBTRACT:          n = *(u64*)left -  *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_MULTIPLY:          n = *(u64*)left *  *(u64*)right; break; // @TestMe
-				case AST_EXPRESSION_BINARY_DIVIDE:            n = *(u64*)left /  *(u64*)right; break; // @TestMe
-				case AST_EXPRESSION_BINARY_MODULO:            n = *(u64*)left %  *(u64*)right; break; // @TestMe
-				case AST_EXPRESSION_BINARY_EXPONENTIAL:       n = Pow(*(u64*)left, *(u64*)right) + 0.5; break; // @TestMe
-				case AST_EXPRESSION_BINARY_BITWISE_OR:        n = *(u64*)left |  *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_BITWISE_XOR:       n = *(u64*)left ^  *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_BITWISE_AND:       n = *(u64*)left &  *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_LEFT_SHIFT:        n = *(u64*)left << *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_RIGHT_SHIFT:       n = *(u64*)left >> *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_AND:               n = *(u64*)left && *(u64*)right; break;
-				case AST_EXPRESSION_BINARY_OR:                n = *(u64*)left || *(u64*)right; break;
-				default: Assert();
+				*(s64*)output = n;
+				ConvertNumerical((Value*)output, &primitive_int64, binary->type);
 			}
+			else
+			{
+				u64 l = ConvertNumericalToUnsignedInt((Value*)left,  binary->left->type);
+				u64 r = ConvertNumericalToUnsignedInt((Value*)right, binary->right->type);
 
-			*(u64*)output = (n = MaskLowerBytes(n, binary->type->size));
+				switch (binary->kind)
+				{
+					case AST_EXPRESSION_BINARY_COMPARE_LESS:             n = l <  r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    n = l <= r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER:          n = l >  r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: n = l >= r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_EQUAL:            n = l == r; break;
+					case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:        n = l != r; break;
+					case AST_EXPRESSION_BINARY_ADD:         n = l +  r; break;
+					case AST_EXPRESSION_BINARY_SUBTRACT:    n = l -  r; break;
+					case AST_EXPRESSION_BINARY_MULTIPLY:    n = l *  r; break;
+					case AST_EXPRESSION_BINARY_DIVIDE:      n = l /  r; break;
+					case AST_EXPRESSION_BINARY_MODULO:      n = l %  r; break;
+					case AST_EXPRESSION_BINARY_EXPONENTIAL: n = Pow(l, r) + 0.5; break;
+					case AST_EXPRESSION_BINARY_BITWISE_OR:  n = l |  r; break;
+					case AST_EXPRESSION_BINARY_BITWISE_XOR: n = l ^  r; break;
+					case AST_EXPRESSION_BINARY_BITWISE_AND: n = l &  r; break;
+					case AST_EXPRESSION_BINARY_LEFT_SHIFT:  n = l << r; break;
+					case AST_EXPRESSION_BINARY_RIGHT_SHIFT: n = l >> r; break;
+					case AST_EXPRESSION_BINARY_AND:         n = l && r; break;
+					case AST_EXPRESSION_BINARY_OR:          n = l || r; break;
+					default: Assert();
+				}
 
-			if (is_signed) Print("(% % %) = ", *(s64*)left, binary->op, *(s64*)right, (s64)n);
-			else           Print("(% % %) = ", *(u64*)left, binary->op, *(u64*)right, (u64)n);
+				Print("% % % = ", l, binary->op, r, (u64)n);
+				*(u64*)output = n;
+				ConvertNumerical((Value*)output, &primitive_uint64, binary->type);
+			}
 
 			if (binary->type == &primitive_bool) Print("%\n", (bool)n);
 			else if (is_signed) Print("%\n", (s64)n);

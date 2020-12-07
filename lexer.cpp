@@ -115,7 +115,7 @@ Parse_Info LexicalParse(String file_path)
 				token.info.string = String(start, size);
 			}
 		}
-		else if (IsDigit(*cursor) || *cursor == '.')
+		else if (IsDigit(cursor[0]) || (cursor[0] == '.' && IsDigit(cursor[1])))
 		{
 			char* start = cursor;
 			u64 value = 0;

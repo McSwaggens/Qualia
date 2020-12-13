@@ -1372,6 +1372,14 @@ static void ScanScope(Ast_Scope* scope, Parse_Info* info)
 	for (Ast_Function* f = scope->functions; f < scope->functions.End(); f++)
 	{
 		ScanFunction(f, scope, info);
+
+		for (Ast_Function* other = scope->functions; other < f; other++)
+		{
+			if (f->type == other->type && CompareStrings(f->name->info.string, other->name->info.string))
+			{
+				Error(info, f->name->location, "Function '%' with type % already exists.\n", f->name, f->type);
+			}
+		}
 	}
 
 	for (Ast_Function* f = scope->functions; f < scope->functions.End(); f++)

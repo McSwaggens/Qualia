@@ -596,23 +596,25 @@ u32 GetTypePrecedence(Type* type)
 		case TYPE_SPECIFIER_FIXED_ARRAY:
 			return 0;
 
-		case TYPE_BASETYPE_UINT8:   return 1;
-		case TYPE_BASETYPE_UINT16:  return 2;
-		case TYPE_BASETYPE_UINT32:  return 3;
-		case TYPE_BASETYPE_UINT64:  return 4;
+		case TYPE_BASETYPE_BOOL:    return 1;
 
-		case TYPE_BASETYPE_INT8:    return 5;
-		case TYPE_BASETYPE_INT16:   return 6;
-		case TYPE_BASETYPE_INT32:   return 7;
-		case TYPE_BASETYPE_INT64:   return 8;
+		case TYPE_BASETYPE_UINT8:   return 2;
+		case TYPE_BASETYPE_UINT16:  return 3;
+		case TYPE_BASETYPE_UINT32:  return 4;
+		case TYPE_BASETYPE_UINT64:  return 5;
 
-		case TYPE_BASETYPE_FLOAT16: return 9;
-		case TYPE_BASETYPE_FLOAT32: return 10;
-		case TYPE_BASETYPE_FLOAT64: return 11;
+		case TYPE_BASETYPE_INT8:    return 6;
+		case TYPE_BASETYPE_INT16:   return 7;
+		case TYPE_BASETYPE_INT32:   return 8;
+		case TYPE_BASETYPE_INT64:   return 9;
+
+		case TYPE_BASETYPE_FLOAT16: return 10;
+		case TYPE_BASETYPE_FLOAT32: return 11;
+		case TYPE_BASETYPE_FLOAT64: return 12;
 
 		case TYPE_BASETYPE_ENUM:
 		case TYPE_SPECIFIER_POINTER:
-			return 12;
+			return 13;
 
 		default:
 			Assert();

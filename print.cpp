@@ -64,7 +64,7 @@ void Write(OutputBuffer* buffer, f64 f)
 	// @FixMe: This really isn't that great, but it's good enough for now.
 	Write(buffer, (s64)f);
 	Write(buffer, '.');
-	Write(buffer, (s64)((f-(s64)f) * Pow(10, 9)));
+	Write(buffer, (s64)Abs((f-(s64)f) * Pow(10, 9)));
 }
 
 void Write(OutputBuffer* buffer, Token_Kind kind)

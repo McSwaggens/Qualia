@@ -1,26 +1,11 @@
-
 Test():
-	struct Foo:
-		a : int
-		b : int
+	a : int = 1
+	b : int = 2
+	c : int = 3
+	d : bool = false
 
-	struct Bar:
-		c : *uint8
-		d : float32
-		e : *Bar
+	if a < b and not a > c or !d:
+		1+2
+	else:
+		3+4
 
-	foo0 : Foo
-	foo1 : Foo
-
-	bar0 : Bar
-	bar1 : Bar
-
-	bar0.d = 123.456
-
-	foo1 = foo0
-	bar1 = bar0
-
-	foo0.a = bar0.d
-
-	bar0.d + 0
-	foo0.a + 0

@@ -742,12 +742,19 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 	if (IsUnaryOperator(token->kind))
 	{
 		Ast_Expression_Unary* unary = info->stack.Allocate<Ast_Expression_Unary>();
-		if      (token->kind == TOKEN_ASTERISK)    unary->kind = AST_EXPRESSION_UNARY_VALUE_OF;
-		else if (token->kind == TOKEN_AMPERSAND)   unary->kind = AST_EXPRESSION_UNARY_ADDRESS_OF;
-		else if (token->kind == TOKEN_BITWISE_NOT) unary->kind = AST_EXPRESSION_UNARY_BINARY_NOT;
-		else if (token->kind == TOKEN_NOT)         unary->kind = AST_EXPRESSION_UNARY_NOT;
-		else if (token->kind == TOKEN_MINUS)       unary->kind = AST_EXPRESSION_UNARY_MINUS;
-		else if (token->kind == TOKEN_PLUS)        unary->kind = AST_EXPRESSION_UNARY_PLUS;
+
+		switch (token->kind)
+		{
+			case TOKEN_ASTERISK:         unary->kind = AST_EXPRESSION_UNARY_VALUE_OF;   break;
+			case TOKEN_AMPERSAND:        unary->kind = AST_EXPRESSION_UNARY_ADDRESS_OF; break;
+			case TOKEN_BITWISE_NOT:      unary->kind = AST_EXPRESSION_UNARY_BINARY_NOT; break;
+			case TOKEN_NOT:              unary->kind = AST_EXPRESSION_UNARY_NOT;        break;
+			case TOKEN_MINUS:            unary->kind = AST_EXPRESSION_UNARY_MINUS;      break;
+			case TOKEN_PLUS:             unary->kind = AST_EXPRESSION_UNARY_PLUS;       break;
+			case TOKEN_EXCLAMATION_MARK: unary->kind = AST_EXPRESSION_UNARY_NOT;        break;
+			default: Assert();
+		}
+
 		unary->span.begin = token;
 		unary->op = token++;
 		CheckScope(token, indent, info);

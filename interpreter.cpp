@@ -64,6 +64,12 @@ static void ConvertNumerical(Value* value, Type_Kind from, Type_Kind to)
 	}
 }
 
+static void ConvertValue(Value* value, Type* from, Type* to)
+{
+	if (from == to) return;
+	else if (IsPrimitive(from) && IsPrimitive(to)) ConvertNumerical(value, from->kind, to->kind);
+}
+
 void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter)
 {
 	switch (expression->kind)
@@ -497,7 +503,8 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 					char data[GetExpressionMinSize(variable->assignment)];
 					ZeroMemory(data, sizeof data);
 					Interpret(variable->assignment, data, false, frame, interpreter);
-					CopyMemory(frame->GetData(variable), data, Min(variable->type->size, variable->assignment->type->size));
+					ConvertNumerical((Value*)data, variable->assignment->type->kind, variable->type->kind);
+					CopyMemory(frame->GetData(variable), data, variable->type->size);
 				}
 			} break;
 
@@ -509,7 +516,8 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				char data[GetExpressionMinSize(assignment->right)];
 				ZeroMemory(data, sizeof data);
 				Interpret(assignment->right, data, false, frame, interpreter);
-				CopyMemory(reference, data, Min(assignment->left->type->size, assignment->right->type->size));
+				ConvertNumerical((Value*)data, assignment->right->type->kind, assignment->left->type->kind);
+				CopyMemory(reference, data, assignment->left->type->size);
 			} break;
 
 			case AST_STATEMENT_ASSIGNMENT_ADD:

@@ -1,17 +1,26 @@
 
-Test() -> int:
-	return 0
-
-// Test():
-// 	return
-
 Test():
-	-1 + 0xffffffffffffff00 + 0
+	struct Foo:
+		a : int
+		b : int
 
-	f := 0.5
-	dec f
-	dec f
-	dec f
-	f+0
-	+f + 0
+	struct Bar:
+		c : *uint8
+		d : float32
+		e : *Bar
 
+	foo0 : Foo
+	foo1 : Foo
+
+	bar0 : Bar
+	bar1 : Bar
+
+	bar0.d = 123.456
+
+	foo1 = foo0
+	bar1 = bar0
+
+	foo0.a = bar0.d
+
+	bar0.d + 0
+	foo0.a + 0

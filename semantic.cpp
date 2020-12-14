@@ -310,7 +310,7 @@ Type type_float16 = NewPrimitiveType(TYPE_BASETYPE_FLOAT16, 2);
 Type type_float32 = NewPrimitiveType(TYPE_BASETYPE_FLOAT32, 4);
 Type type_float64 = NewPrimitiveType(TYPE_BASETYPE_FLOAT64, 8);
 
-static constexpr Type* GetPrimitiveType(Token_Kind kind)
+static constexpr Type* GetPrimitiveTypeFromTokenKind(Token_Kind kind)
 {
 	switch (kind)
 	{
@@ -328,7 +328,63 @@ static constexpr Type* GetPrimitiveType(Token_Kind kind)
 		case TOKEN_FLOAT16: return &type_float16;
 		case TOKEN_FLOAT32: return &type_float32;
 		case TOKEN_FLOAT64: return &type_float64;
-		default: Unreachable();
+
+		default:
+			Assert();
+			Unreachable();
+	}
+}
+
+static constexpr Type* GetPrimitiveTypeFromKind(Type_Kind kind)
+{
+	switch (kind)
+	{
+		case TYPE_BASETYPE_BOOL:    return &type_bool;
+		case TYPE_BASETYPE_UINT8:   return &type_uint8;
+		case TYPE_BASETYPE_UINT16:  return &type_uint16;
+		case TYPE_BASETYPE_UINT32:  return &type_uint32;
+		case TYPE_BASETYPE_UINT64:  return &type_uint64;
+		case TYPE_BASETYPE_INT8:    return &type_int8;
+		case TYPE_BASETYPE_INT16:   return &type_int16;
+		case TYPE_BASETYPE_INT32:   return &type_int32;
+		case TYPE_BASETYPE_INT64:   return &type_int64;
+		case TYPE_BASETYPE_FLOAT16: return &type_float16;
+		case TYPE_BASETYPE_FLOAT32: return &type_float32;
+		case TYPE_BASETYPE_FLOAT64: return &type_float64;
+
+		default:
+			Assert();
+			Unreachable();
+	}
+}
+
+static constexpr Type_Kind GetUnsignedVersionOf(Type_Kind kind)
+{
+	switch (kind)
+	{
+		case TYPE_BASETYPE_INT8:  return TYPE_BASETYPE_UINT8;
+		case TYPE_BASETYPE_INT16: return TYPE_BASETYPE_UINT16;
+		case TYPE_BASETYPE_INT32: return TYPE_BASETYPE_UINT32;
+		case TYPE_BASETYPE_INT64: return TYPE_BASETYPE_UINT64;
+
+		default:
+			Assert();
+			Unreachable();
+	}
+}
+
+static constexpr Type_Kind GetSignedVersionOf(Type_Kind kind)
+{
+	switch (kind)
+	{
+		case TYPE_BASETYPE_UINT8:  return TYPE_BASETYPE_INT8;
+		case TYPE_BASETYPE_UINT16: return TYPE_BASETYPE_INT16;
+		case TYPE_BASETYPE_UINT32: return TYPE_BASETYPE_INT32;
+		case TYPE_BASETYPE_UINT64: return TYPE_BASETYPE_INT64;
+
+		default:
+			Assert();
+			Unreachable();
 	}
 }
 
@@ -357,7 +413,7 @@ static Type* GetBaseType(Token* token, Ast_Scope* scope)
 			scope = scope->parent;
 		}
 	}
-	else return GetPrimitiveType(token->kind);
+	else return GetPrimitiveTypeFromTokenKind(token->kind);
 	return null;
 }
 
@@ -365,7 +421,7 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Parse_Info* in
 {
 	if (basetype.kind == AST_BASETYPE_PRIMITIVE)
 	{
-		return GetPrimitiveType(basetype.token->kind);
+		return GetPrimitiveTypeFromTokenKind(basetype.token->kind);
 	}
 	else if (basetype.kind == AST_BASETYPE_TUPLE)
 	{
@@ -901,7 +957,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 					if (CompareStrings(terminal->token->info.string, "length"))
 					{
-						binary->type = GetPrimitiveType(TOKEN_UINT);
+						binary->type = GetPrimitiveTypeFromTokenKind(TOKEN_UINT);
 					}
 					else
 					{
@@ -1458,9 +1514,9 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, P
 					Error(info, inc->expression->span, "Expression is not a referential value.\n");
 				}
 
-				if (!IsInteger(inc->expression->type) && inc->expression->type->kind != TYPE_SPECIFIER_POINTER)
+				if (!IsInteger(inc->expression->type) && !IsFloat(inc->expression->type) && inc->expression->type->kind != TYPE_SPECIFIER_POINTER)
 				{
-					Error(info, inc->expression->span, "Expression is an integer or pointer.\n");
+					Error(info, inc->expression->span, "Expression is an integer, float or pointer.\n");
 				}
 			} break;
 
@@ -1474,9 +1530,9 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, P
 					Error(info, dec->expression->span, "Expression is not a referential value.\n");
 				}
 
-				if (!IsInteger(dec->expression->type) && dec->expression->type->kind != TYPE_SPECIFIER_POINTER)
+				if (!IsInteger(dec->expression->type) && !IsFloat(dec->expression->type) && dec->expression->type->kind != TYPE_SPECIFIER_POINTER)
 				{
-					Error(info, dec->expression->span, "Expression is an integer or pointer.\n");
+					Error(info, dec->expression->span, "Expression is an integer, float or pointer.\n");
 				}
 			} break;
 

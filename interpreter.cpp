@@ -636,12 +636,33 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				{
 					*(char**)ref += type->subtype->size;
 				}
-				else switch (type->size)
+				else switch (type->kind)
 				{
-					case 1: ++*(u8 *)ref; break;
-					case 2: ++*(u16*)ref; break;
-					case 4: ++*(u32*)ref; break;
-					case 8: ++*(u64*)ref; break;
+					case TYPE_BASETYPE_INT8:
+					case TYPE_BASETYPE_UINT8:
+						++*(u8*)ref; break;
+
+					case TYPE_BASETYPE_INT16:
+					case TYPE_BASETYPE_UINT16:
+						++*(u16*)ref; break;
+
+					case TYPE_BASETYPE_INT32:
+					case TYPE_BASETYPE_UINT32:
+						++*(u32*)ref; break;
+
+					case TYPE_BASETYPE_INT64:
+					case TYPE_BASETYPE_UINT64:
+						++*(u64*)ref; break;
+
+					case TYPE_BASETYPE_FLOAT16:
+						Assert();
+
+					case TYPE_BASETYPE_FLOAT32:
+						++*(f32*)ref; break;
+
+					case TYPE_BASETYPE_FLOAT64:
+						++*(f64*)ref; break;
+
 					default: Assert();
 				}
 			} break;
@@ -657,12 +678,33 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				{
 					*(char**)ref += type->subtype->size;
 				}
-				else switch (type->size)
+				else switch (type->kind)
 				{
-					case 1: --*(u8 *)ref; break;
-					case 2: --*(u16*)ref; break;
-					case 4: --*(u32*)ref; break;
-					case 8: --*(u64*)ref; break;
+					case TYPE_BASETYPE_INT8:
+					case TYPE_BASETYPE_UINT8:
+						--*(u8*)ref; break;
+
+					case TYPE_BASETYPE_INT16:
+					case TYPE_BASETYPE_UINT16:
+						--*(u16*)ref; break;
+
+					case TYPE_BASETYPE_INT32:
+					case TYPE_BASETYPE_UINT32:
+						--*(u32*)ref; break;
+
+					case TYPE_BASETYPE_INT64:
+					case TYPE_BASETYPE_UINT64:
+						--*(u64*)ref; break;
+
+					case TYPE_BASETYPE_FLOAT16:
+						Assert();
+
+					case TYPE_BASETYPE_FLOAT32:
+						--*(f32*)ref; break;
+
+					case TYPE_BASETYPE_FLOAT64:
+						--*(f64*)ref; break;
+
 					default: Assert();
 				}
 			} break;

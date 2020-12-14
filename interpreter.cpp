@@ -295,8 +295,11 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			s64 n = 0;
 			Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
+			ConvertNumerical((Value*)&n, unary->subexpression->type->kind, unary->type->kind);
 			n = ~n;
-			*(s64*)output = n;
+			CopyMemory(output, (char*)&n, unary->type->size);
+			// @Todo: Not really sure which one to keep...
+			// *(s64*)output = n;
 		} break;
 
 		case AST_EXPRESSION_UNARY_NOT:
@@ -391,6 +394,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			char* ref;
 			Interpret(unary->subexpression, (char*)&ref, false, frame, interpreter);
+
 			if (allow_referential)
 			{
 				*(char**)output = ref;
@@ -411,35 +415,45 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		{
 			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
 
-			if (literal->token->kind == TOKEN_INTEGER_LITERAL)
+			switch (literal->token->kind)
 			{
-				CopyMemory(output, (char*)&literal->token->info.integer.value, literal->type->size);
-			}
-			else if (literal->token->kind == TOKEN_FLOAT_LITERAL)
-			{
-				if (literal->type->kind == TYPE_BASETYPE_FLOAT32)
+				case TOKEN_INTEGER_LITERAL:
 				{
-					*(f32*)output = (f32)literal->token->info.floating_point.value;
-				}
-				else if (literal->type->kind == TYPE_BASETYPE_FLOAT64)
+					CopyMemory(output, (char*)&literal->token->info.integer.value, literal->type->size);
+				} break;
+
+				case TOKEN_FLOAT_LITERAL:
 				{
-					*(f64*)output = (f64)literal->token->info.floating_point.value;
-				}
-				else Assert();
+					if (literal->type->kind == TYPE_BASETYPE_FLOAT32)
+					{
+						*(f32*)output = (f32)literal->token->info.floating_point.value;
+					}
+					else if (literal->type->kind == TYPE_BASETYPE_FLOAT64)
+					{
+						*(f64*)output = (f64)literal->token->info.floating_point.value;
+					}
+					else Assert();
+				} break;
+
+				case TOKEN_TRUE:
+				{
+					*(bool*)output = true;
+				} break;
+
+				case TOKEN_FALSE:
+				{
+					*(bool*)output = false;
+				} break;
+
+				case TOKEN_NULL:
+				{
+					*(char**)output = null;
+				} break;
+
+				default:
+					Assert();
+					Unreachable();
 			}
-			else if (literal->token->kind == TOKEN_TRUE)
-			{
-				*(bool*)output = true;
-			}
-			else if (literal->token->kind == TOKEN_FALSE)
-			{
-				*(bool*)output = false;
-			}
-			else if (literal->token->kind == TOKEN_NULL)
-			{
-				*(char**)output = null;
-			}
-			else Assert();
 		} break;
 
 		case AST_EXPRESSION_TUPLE:

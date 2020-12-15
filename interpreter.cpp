@@ -117,6 +117,56 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			}
 		} break;
 
+		case AST_EXPRESSION_BINARY_AND:
+		{
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
+
+			char left[GetExpressionMinSize(binary->left)];
+			ZeroMemory(left,  sizeof left);
+			Interpret(binary->left,  left,  false, frame, interpreter);
+			bool l = ConvertNumerical<bool>((Value*)left,  binary->left->type->kind);
+
+			if (!l)
+			{
+				*(bool*)output = false;
+				break;
+			}
+
+			char right[GetExpressionMinSize(binary->right)];
+			ZeroMemory(right, sizeof right);
+			Interpret(binary->right, right, false, frame, interpreter);
+			bool r = ConvertNumerical<bool>((Value*)right, binary->right->type->kind);
+
+			*(bool*)output = r;
+
+			Print("% % % = %\n", *(bool*)left, binary->op, *(bool*)right, *(bool*)output);
+		} break;
+
+		case AST_EXPRESSION_BINARY_OR:
+		{
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
+
+			char left[GetExpressionMinSize(binary->left)];
+			ZeroMemory(left,  sizeof left);
+			Interpret(binary->left,  left,  false, frame, interpreter);
+			bool l = ConvertNumerical<bool>((Value*)left,  binary->left->type->kind);
+
+			if (l)
+			{
+				*(bool*)output = true;
+				break;
+			}
+
+			char right[GetExpressionMinSize(binary->right)];
+			ZeroMemory(right, sizeof right);
+			Interpret(binary->right, right, false, frame, interpreter);
+			bool r = ConvertNumerical<bool>((Value*)right, binary->right->type->kind);
+
+			*(bool*)output = r;
+
+			Print("% % % = %\n", *(bool*)left, binary->op, *(bool*)right, *(bool*)output);
+		} break;
+
 		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
 		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
 		case AST_EXPRESSION_BINARY_COMPARE_LESS:
@@ -134,8 +184,6 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		case AST_EXPRESSION_BINARY_BITWISE_AND:
 		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
 		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
-		case AST_EXPRESSION_BINARY_AND:
-		case AST_EXPRESSION_BINARY_OR:
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
@@ -150,24 +198,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 			Type* dominant = GetDominantType(binary->left->type, binary->right->type);
 
-			if (expression->kind == AST_EXPRESSION_BINARY_AND ||
-				expression->kind == AST_EXPRESSION_BINARY_OR)
-			{
-				bool l = ConvertNumerical<bool>((Value*)left,  binary->left->type->kind);
-				bool r = ConvertNumerical<bool>((Value*)right, binary->right->type->kind);
-
-				if (expression->kind == AST_EXPRESSION_BINARY_AND)
-				{
-					*(bool*)output = l && r;
-				}
-				else
-				{
-					*(bool*)output = l || r;
-				}
-
-				Print("% % % = %\n", *(bool*)left, binary->op, *(bool*)right, *(bool*)output);
-			}
-			else if (IsFloat(dominant))
+			if (IsFloat(dominant))
 			{
 				f64 l = ConvertNumerical<f64>((Value*)left,  binary->left->type->kind);
 				f64 r = ConvertNumerical<f64>((Value*)right, binary->right->type->kind);

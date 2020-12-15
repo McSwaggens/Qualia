@@ -64,12 +64,6 @@ static void ConvertNumerical(Value* value, Type_Kind from, Type_Kind to)
 	}
 }
 
-static void ConvertValue(Value* value, Type* from, Type* to)
-{
-	if (from == to) return;
-	else if (IsPrimitive(from) && IsPrimitive(to)) ConvertNumerical(value, from->kind, to->kind);
-}
-
 void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter)
 {
 	switch (expression->kind)
@@ -139,7 +133,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 			*(bool*)output = r;
 
-			Print("% % % = %\n", *(bool*)left, binary->op, *(bool*)right, *(bool*)output);
+			Print("% % % = %\n", l, binary->op, r, *(bool*)output);
 		} break;
 
 		case AST_EXPRESSION_BINARY_OR:
@@ -164,7 +158,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 			*(bool*)output = r;
 
-			Print("% % % = %\n", *(bool*)left, binary->op, *(bool*)right, *(bool*)output);
+			Print("% % % = %\n", l, binary->op, r, *(bool*)output);
 		} break;
 
 		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
@@ -466,20 +460,9 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 					else Assert();
 				} break;
 
-				case TOKEN_TRUE:
-				{
-					*(bool*)output = true;
-				} break;
-
-				case TOKEN_FALSE:
-				{
-					*(bool*)output = false;
-				} break;
-
-				case TOKEN_NULL:
-				{
-					*(char**)output = null;
-				} break;
+				case TOKEN_TRUE:  *(bool*)output = true;  break;
+				case TOKEN_FALSE: *(bool*)output = false; break;
+				case TOKEN_NULL: *(char**)output = null;  break;
 
 				default:
 					Assert();

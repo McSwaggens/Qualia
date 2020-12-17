@@ -38,27 +38,29 @@ static T ConvertNumerical(Value* value, Type_Kind type)
 	}
 }
 
-static void ConvertNumerical(Value* value, Type_Kind from, Type_Kind to)
+static void Convert(Value* value, Type* from, Type* to)
 {
 	if (from == to) return;
 
-	switch (to)
+	switch (to->kind)
 	{
-		case TYPE_BASETYPE_BOOL:    value->value_bool = ConvertNumerical<bool>(value, from); break;
+		case TYPE_BASETYPE_BOOL: value->value_bool = ConvertNumerical<bool>(value, from->kind); break;
 
-		case TYPE_BASETYPE_INT8:    value->value_int8  = ConvertNumerical<s64>(value, from); break;
-		case TYPE_BASETYPE_INT16:   value->value_int16 = ConvertNumerical<s64>(value, from); break;
-		case TYPE_BASETYPE_INT32:   value->value_int32 = ConvertNumerical<s64>(value, from); break;
-		case TYPE_BASETYPE_INT64:   value->value_int64 = ConvertNumerical<s64>(value, from); break;
+		case TYPE_BASETYPE_INT8:  value->value_int8  = ConvertNumerical<s64>(value, from->kind); break;
+		case TYPE_BASETYPE_INT16: value->value_int16 = ConvertNumerical<s64>(value, from->kind); break;
+		case TYPE_BASETYPE_INT32: value->value_int32 = ConvertNumerical<s64>(value, from->kind); break;
+		case TYPE_BASETYPE_INT64: value->value_int64 = ConvertNumerical<s64>(value, from->kind); break;
 
-		case TYPE_BASETYPE_UINT8:   value->value_uint8  = ConvertNumerical<u64>(value, from); break;
-		case TYPE_BASETYPE_UINT16:  value->value_uint16 = ConvertNumerical<u64>(value, from); break;
-		case TYPE_BASETYPE_UINT32:  value->value_uint32 = ConvertNumerical<u64>(value, from); break;
-		case TYPE_BASETYPE_UINT64:  value->value_uint64 = ConvertNumerical<u64>(value, from); break;
+		case TYPE_BASETYPE_UINT8:  value->value_uint8  = ConvertNumerical<u64>(value, from->kind); break;
+		case TYPE_BASETYPE_UINT16: value->value_uint16 = ConvertNumerical<u64>(value, from->kind); break;
+		case TYPE_BASETYPE_UINT32: value->value_uint32 = ConvertNumerical<u64>(value, from->kind); break;
+		case TYPE_BASETYPE_UINT64: value->value_uint64 = ConvertNumerical<u64>(value, from->kind); break;
+
+		case TYPE_SPECIFIER_POINTER: value->value_uint64 = ConvertNumerical<u64>(value, from->kind); break;
 
 		case TYPE_BASETYPE_FLOAT16: Assert();
-		case TYPE_BASETYPE_FLOAT32: value->value_float32 = ConvertNumerical<f64>(value, from); break;
-		case TYPE_BASETYPE_FLOAT64: value->value_float64 = ConvertNumerical<f64>(value, from); break;
+		case TYPE_BASETYPE_FLOAT32: value->value_float32 = ConvertNumerical<f64>(value, from->kind); break;
+		case TYPE_BASETYPE_FLOAT64: value->value_float64 = ConvertNumerical<f64>(value, from->kind); break;
 
 		default: Assert();
 	}
@@ -192,7 +194,34 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 			Type* dominant = GetDominantType(binary->left->type, binary->right->type);
 
-			if (IsFloat(dominant))
+			if (IsPointer(dominant) && (IsInteger(binary->left->type) || IsInteger(binary->right->type))
+				&& (binary->kind == AST_EXPRESSION_BINARY_ADD || binary->kind == AST_EXPRESSION_BINARY_SUBTRACT))
+			{
+				u64 l = ConvertNumerical<u64>((Value*)left,  binary->left->type->kind);
+				u64 r = ConvertNumerical<u64>((Value*)right, binary->right->type->kind);
+
+				if (IsInteger(binary->left->type))
+				{
+					l *= dominant->subtype->size;
+				}
+				else
+				{
+					r *= dominant->subtype->size;
+				}
+
+				switch (binary->kind)
+				{
+					case AST_EXPRESSION_BINARY_ADD:      *(u64*)output = l + r; break;
+					case AST_EXPRESSION_BINARY_SUBTRACT: *(u64*)output = l - r; break;
+
+					default:
+						Assert();
+						Unreachable();
+				}
+
+				Print("% % % = %\n", l, binary->op, r, *(u64*)output);
+			}
+			else if (IsFloat(dominant))
 			{
 				f64 l = ConvertNumerical<f64>((Value*)left,  binary->left->type->kind);
 				f64 r = ConvertNumerical<f64>((Value*)right, binary->right->type->kind);
@@ -220,7 +249,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 				if (binary->type != &type_bool)
 				{
-					ConvertNumerical((Value*)output, TYPE_BASETYPE_FLOAT64, binary->type->kind);
+					Convert((Value*)output, &type_float64, binary->type);
 				}
 			}
 			else if (IsIntegerLike(dominant))
@@ -254,7 +283,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 					}
 
 					*(s64*)output = n;
-					ConvertNumerical((Value*)output, TYPE_BASETYPE_INT64, binary->type->kind);
+					Convert((Value*)output, &type_int64, binary->type);
 
 					Print("% % % = ", l, binary->op, r);
 					if (binary->type == &type_bool) Print("%\n", (bool)n);
@@ -289,7 +318,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 					}
 
 					*(u64*)output = n;
-					ConvertNumerical((Value*)output, TYPE_BASETYPE_UINT64, binary->type->kind);
+					Convert((Value*)output, &type_uint64, binary->type);
 
 					Print("% % % = ", l, binary->op, r);
 					if (binary->type == &type_bool) Print("%\n", (bool)n);
@@ -320,7 +349,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			s64 n = 0;
 			Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
-			ConvertNumerical((Value*)&n, unary->subexpression->type->kind, unary->type->kind);
+			Convert((Value*)&n, unary->subexpression->type, unary->type);
 			n = ~n;
 			CopyMemory(output, (char*)&n, unary->type->size);
 			// @Todo: Not really sure which one to keep...
@@ -531,7 +560,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 					char data[GetExpressionMinSize(variable->assignment)];
 					ZeroMemory(data, sizeof data);
 					Interpret(variable->assignment, data, false, frame, interpreter);
-					ConvertNumerical((Value*)data, variable->assignment->type->kind, variable->type->kind);
+					Convert((Value*)data, variable->assignment->type, variable->type);
 					CopyMemory(frame->GetData(variable), data, variable->type->size);
 				}
 			} break;
@@ -544,7 +573,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				char data[GetExpressionMinSize(assignment->right)];
 				ZeroMemory(data, sizeof data);
 				Interpret(assignment->right, data, false, frame, interpreter);
-				ConvertNumerical((Value*)data, assignment->right->type->kind, assignment->left->type->kind);
+				Convert((Value*)data, assignment->right->type, assignment->left->type);
 				CopyMemory(reference, data, assignment->left->type->size);
 			} break;
 

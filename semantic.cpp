@@ -388,6 +388,14 @@ static constexpr Type_Kind GetSignedVersionOf(Type_Kind kind)
 	}
 }
 
+static bool IsConvertableTo(Type* from, Type* to)
+{
+	if (from == to) return true;
+	if (IsNumerical(from) && IsNumerical(to)) return true;
+
+	return false;
+}
+
 static Type* GetBaseType(Token* token, Ast_Scope* scope)
 {
 	if (token->kind == TOKEN_IDENTIFIER)
@@ -1612,7 +1620,7 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, P
 
 					if (variable->assignment)
 					{
-						if (!AreTypesCompatible(variable->type, variable->assignment->type))
+						if (!IsConvertableTo(variable->assignment->type, variable->type))
 						{
 							Error(info, variable->name->location, "Cannot assign expression with type % to variable with type %\n", variable->assignment->type, variable->type);
 						}

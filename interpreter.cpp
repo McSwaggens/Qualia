@@ -77,6 +77,9 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 			char data[binary->left->type->size];
 			Interpret(binary->left, data, true, frame, interpreter);
+
+			for (Type* t = binary->left->type; t->kind == TYPE_SPECIFIER_POINTER; t = t->subtype, *(char**)data = **(char***)data);
+
 			Assert(binary->right->kind == AST_EXPRESSION_TERMINAL_STRUCT_MEMBER);
 
 			if (binary->left->is_referential_value)

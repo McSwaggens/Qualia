@@ -120,7 +120,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
-			char left[GetExpressionMinSize(binary->left)];
+			char left[binary->left->type->size];
 			ZeroMemory(left,  sizeof left);
 			Interpret(binary->left,  left,  false, frame, interpreter);
 			bool l = ConvertNumerical<bool>((Value*)left,  binary->left->type->kind);
@@ -131,7 +131,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 				break;
 			}
 
-			char right[GetExpressionMinSize(binary->right)];
+			char right[binary->right->type->size];
 			ZeroMemory(right, sizeof right);
 			Interpret(binary->right, right, false, frame, interpreter);
 			bool r = ConvertNumerical<bool>((Value*)right, binary->right->type->kind);
@@ -145,7 +145,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
-			char left[GetExpressionMinSize(binary->left)];
+			char left[binary->left->type->size];
 			ZeroMemory(left,  sizeof left);
 			Interpret(binary->left,  left,  false, frame, interpreter);
 			bool l = ConvertNumerical<bool>((Value*)left,  binary->left->type->kind);
@@ -156,7 +156,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 				break;
 			}
 
-			char right[GetExpressionMinSize(binary->right)];
+			char right[binary->right->type->size];
 			ZeroMemory(right, sizeof right);
 			Interpret(binary->right, right, false, frame, interpreter);
 			bool r = ConvertNumerical<bool>((Value*)right, binary->right->type->kind);
@@ -744,7 +744,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 
 				if (type->kind == TYPE_SPECIFIER_POINTER)
 				{
-					*(char**)ref += type->subtype->size;
+					*(char**)ref -= type->subtype->size;
 				}
 				else switch (type->kind)
 				{

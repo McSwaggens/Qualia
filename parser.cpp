@@ -107,10 +107,10 @@ void Write(OutputBuffer* buffer, Ast_Type type)
 
 	switch (type.basetype.kind)
 	{
-		case AST_BASETYPE_PRIMITIVE: Write(buffer, type.basetype.token);
-		case AST_BASETYPE_USERTYPE:  Write(buffer, type.basetype.token);
-		case AST_BASETYPE_ENUM:      Write(buffer, type.basetype.enumeration->name);
-		case AST_BASETYPE_STRUCT:    Write(buffer, type.basetype.structure->name);
+		case AST_BASETYPE_PRIMITIVE: Write(buffer, type.basetype.token); break;
+		case AST_BASETYPE_USERTYPE:  Write(buffer, type.basetype.token); break;
+		case AST_BASETYPE_ENUM:      Write(buffer, type.basetype.enumeration->name); break;
+		case AST_BASETYPE_STRUCT:    Write(buffer, type.basetype.structure->name); break;
 
 		case AST_BASETYPE_TUPLE:
 		{

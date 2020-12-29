@@ -393,6 +393,21 @@ static bool IsConvertableTo(Type* from, Type* to)
 	if (from == to) return true;
 	if (IsNumerical(from) && IsNumerical(to)) return true;
 
+	if (from->kind == TYPE_BASETYPE_TUPLE && to->kind == TYPE_BASETYPE_TUPLE)
+	{
+		if (from->tuple.count != to->tuple.count) return false;
+
+		for (u32 i = 0; i < from->tuple.count; i++)
+		{
+			if (!IsConvertableTo(from->tuple[i], to->tuple[i]))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	return false;
 }
 
@@ -595,7 +610,7 @@ static Ast_Function* GetFunction(Token* token, Type* input_type, Ast_Scope* scop
 	{
 		for (Ast_Function* function = scope->functions; function < scope->functions.End(); function++)
 		{
-			if (input_type == function->type->function.input && CompareStrings(token->info.string, function->name->info.string))
+			if (CompareStrings(token->info.string, function->name->info.string) && IsConvertableTo(input_type, function->type->function.input))
 			{
 				return function;
 			}

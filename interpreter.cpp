@@ -4,11 +4,6 @@
 #include "util.h"
 #include "memory.h"
 
-static u64 GetExpressionMinSize(Ast_Expression* expression)
-{
-	return Max(expression->type->size, 8ull);
-}
-
 template<typename T>
 static T ConvertNumerical(Value* value, Type_Kind type)
 {
@@ -38,29 +33,49 @@ static T ConvertNumerical(Value* value, Type_Kind type)
 	}
 }
 
-static void Convert(Value* value, Type* from, Type* to)
+void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value)
 {
-	if (from == to) return;
-
-	switch (to->kind)
+	if (from_type == to_type)
 	{
-		case TYPE_BASETYPE_BOOL: value->value_bool = ConvertNumerical<bool>(value, from->kind); break;
+		CopyMemory(to_value->data, from_value->data, from_type->size);
+	}
+	else switch (to_type->kind)
+	{
+		case TYPE_BASETYPE_BOOL: to_value->value_bool = ConvertNumerical<bool>(from_value, from_type->kind); break;
 
-		case TYPE_BASETYPE_INT8:  value->value_int8  = ConvertNumerical<s64>(value, from->kind); break;
-		case TYPE_BASETYPE_INT16: value->value_int16 = ConvertNumerical<s64>(value, from->kind); break;
-		case TYPE_BASETYPE_INT32: value->value_int32 = ConvertNumerical<s64>(value, from->kind); break;
-		case TYPE_BASETYPE_INT64: value->value_int64 = ConvertNumerical<s64>(value, from->kind); break;
+		case TYPE_BASETYPE_INT8:  to_value->value_int8  = ConvertNumerical<s64>(from_value, from_type->kind); break;
+		case TYPE_BASETYPE_INT16: to_value->value_int16 = ConvertNumerical<s64>(from_value, from_type->kind); break;
+		case TYPE_BASETYPE_INT32: to_value->value_int32 = ConvertNumerical<s64>(from_value, from_type->kind); break;
+		case TYPE_BASETYPE_INT64: to_value->value_int64 = ConvertNumerical<s64>(from_value, from_type->kind); break;
 
-		case TYPE_BASETYPE_UINT8:  value->value_uint8  = ConvertNumerical<u64>(value, from->kind); break;
-		case TYPE_BASETYPE_UINT16: value->value_uint16 = ConvertNumerical<u64>(value, from->kind); break;
-		case TYPE_BASETYPE_UINT32: value->value_uint32 = ConvertNumerical<u64>(value, from->kind); break;
-		case TYPE_BASETYPE_UINT64: value->value_uint64 = ConvertNumerical<u64>(value, from->kind); break;
+		case TYPE_BASETYPE_UINT8:  to_value->value_uint8  = ConvertNumerical<u64>(from_value, from_type->kind); break;
+		case TYPE_BASETYPE_UINT16: to_value->value_uint16 = ConvertNumerical<u64>(from_value, from_type->kind); break;
+		case TYPE_BASETYPE_UINT32: to_value->value_uint32 = ConvertNumerical<u64>(from_value, from_type->kind); break;
+		case TYPE_BASETYPE_UINT64: to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 
-		case TYPE_SPECIFIER_POINTER: value->value_uint64 = ConvertNumerical<u64>(value, from->kind); break;
+		case TYPE_SPECIFIER_POINTER: to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 
 		case TYPE_BASETYPE_FLOAT16: Assert();
-		case TYPE_BASETYPE_FLOAT32: value->value_float32 = ConvertNumerical<f64>(value, from->kind); break;
-		case TYPE_BASETYPE_FLOAT64: value->value_float64 = ConvertNumerical<f64>(value, from->kind); break;
+		case TYPE_BASETYPE_FLOAT32: to_value->value_float32 = ConvertNumerical<f64>(from_value, from_type->kind); break;
+		case TYPE_BASETYPE_FLOAT64: to_value->value_float64 = ConvertNumerical<f64>(from_value, from_type->kind); break;
+
+		case TYPE_BASETYPE_TUPLE:
+		{
+			Assert(from_type->kind == TYPE_BASETYPE_TUPLE);
+			Assert(from_type->tuple.count == to_type->tuple.count);
+
+			char* from_element = from_value->data;
+			char* to_element = to_value->data;
+
+			for (u32 i = 0; i < from_type->tuple.count; i++)
+			{
+				Convert(from_type->tuple[i], (Value*)from_element, to_type->tuple[i], (Value*)to_element);
+
+				from_element += from_type->tuple[i]->size;
+				to_element += to_type->tuple[i]->size;
+			}
+
+		} break;
 
 		default: Assert();
 	}
@@ -121,7 +136,6 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
 			char left[binary->left->type->size];
-			ZeroMemory(left,  sizeof left);
 			Interpret(binary->left,  left,  false, frame, interpreter);
 			bool l = ConvertNumerical<bool>((Value*)left,  binary->left->type->kind);
 
@@ -132,7 +146,6 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			}
 
 			char right[binary->right->type->size];
-			ZeroMemory(right, sizeof right);
 			Interpret(binary->right, right, false, frame, interpreter);
 			bool r = ConvertNumerical<bool>((Value*)right, binary->right->type->kind);
 
@@ -146,7 +159,6 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
 			char left[binary->left->type->size];
-			ZeroMemory(left,  sizeof left);
 			Interpret(binary->left,  left,  false, frame, interpreter);
 			bool l = ConvertNumerical<bool>((Value*)left,  binary->left->type->kind);
 
@@ -157,7 +169,6 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			}
 
 			char right[binary->right->type->size];
-			ZeroMemory(right, sizeof right);
 			Interpret(binary->right, right, false, frame, interpreter);
 			bool r = ConvertNumerical<bool>((Value*)right, binary->right->type->kind);
 
@@ -186,11 +197,8 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
-			char left[GetExpressionMinSize(binary->left)];
-			char right[GetExpressionMinSize(binary->right)];
-
-			ZeroMemory(left,  sizeof left);
-			ZeroMemory(right, sizeof right);
+			char left[binary->left->type->size];
+			char right[binary->right->type->size];
 
 			Interpret(binary->left,  left,  false, frame, interpreter);
 			Interpret(binary->right, right, false, frame, interpreter);
@@ -228,6 +236,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			{
 				f64 l = ConvertNumerical<f64>((Value*)left,  binary->left->type->kind);
 				f64 r = ConvertNumerical<f64>((Value*)right, binary->right->type->kind);
+				f64 f;
 
 				switch (binary->kind)
 				{
@@ -237,22 +246,27 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 					case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: *(bool*)output = l >= r; break;
 					case AST_EXPRESSION_BINARY_COMPARE_EQUAL:            *(bool*)output = l == r; break;
 					case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:        *(bool*)output = l != r; break;
-					case AST_EXPRESSION_BINARY_ADD:         *(f64*)output = l +  r; break;
-					case AST_EXPRESSION_BINARY_SUBTRACT:    *(f64*)output = l -  r; break;
-					case AST_EXPRESSION_BINARY_MULTIPLY:    *(f64*)output = l *  r; break;
-					case AST_EXPRESSION_BINARY_DIVIDE:      *(f64*)output = l /  r; break;
-					case AST_EXPRESSION_BINARY_EXPONENTIAL: *(f64*)output = Pow(l, r); break;
+					case AST_EXPRESSION_BINARY_ADD:         f = l +  r; break;
+					case AST_EXPRESSION_BINARY_SUBTRACT:    f = l -  r; break;
+					case AST_EXPRESSION_BINARY_MULTIPLY:    f = l *  r; break;
+					case AST_EXPRESSION_BINARY_DIVIDE:      f = l /  r; break;
+					case AST_EXPRESSION_BINARY_EXPONENTIAL: f = Pow(l, r); break;
 					default: Assert();
 				}
 
-				Print("% % % = ", l, binary->op, r);
 
-				if (binary->type == &type_bool) Print("%\n", *(bool*)output);
-				else Print("%\n", *(f64*)output);
+				if (binary->type == &type_bool)
+				{
+					Print("% % % = %\n", l, binary->op, r, *(bool*)output);
+				}
+				else
+				{
+					Print("% % % = %\n", l, binary->op, r, f);
+				}
 
 				if (binary->type != &type_bool)
 				{
-					Convert((Value*)output, &type_float64, binary->type);
+					Convert(&type_float64, (Value*)&f, binary->type, (Value*)output);
 				}
 			}
 			else if (IsIntegerLike(dominant))
@@ -285,12 +299,16 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 						default: Assert();
 					}
 
-					*(s64*)output = n;
-					Convert((Value*)output, &type_int64, binary->type);
+					Convert(&type_int64, (Value*)&n, binary->type, (Value*)output); // Not necessary?
 
-					Print("% % % = ", l, binary->op, r);
-					if (binary->type == &type_bool) Print("%\n", (bool)n);
-					else Print("%\n", n);
+					if (binary->type == &type_bool)
+					{
+						Print("% % % = %\n", l, binary->op, r, (bool)n);
+					}
+					else
+					{
+						Print("% % % = %\n", l, binary->op, r, n);
+					}
 				}
 				else
 				{
@@ -320,12 +338,16 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 						default: Assert();
 					}
 
-					*(u64*)output = n;
-					Convert((Value*)output, &type_uint64, binary->type);
+					Convert(&type_uint64, (Value*)&n, binary->type, (Value*)output); // Not necessary?
 
-					Print("% % % = ", l, binary->op, r);
-					if (binary->type == &type_bool) Print("%\n", (bool)n);
-					else Print("%\n", n);
+					if (binary->type == &type_bool)
+					{
+						Print("% % % = %\n", l, binary->op, r, (bool)n);
+					}
+					else
+					{
+						Print("% % % = %\n", l, binary->op, r, n);
+					}
 				}
 			}
 			else
@@ -352,7 +374,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			s64 n = 0;
 			Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
-			Convert((Value*)&n, unary->subexpression->type, unary->type);
+			// Convert((Value*)&n, unary->subexpression->type, unary->type);
 			n = ~n;
 			CopyMemory(output, (char*)&n, unary->type->size);
 			// @Todo: Not really sure which one to keep...
@@ -370,7 +392,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		case AST_EXPRESSION_UNARY_MINUS:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			char data[GetExpressionMinSize(unary->subexpression)];
+			char data[unary->subexpression->type->size];
 			Interpret(unary->subexpression, data, false, frame, interpreter);
 
 			switch (unary->subexpression->type->kind)
@@ -420,7 +442,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 		case AST_EXPRESSION_UNARY_PLUS:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			char data[GetExpressionMinSize(unary->subexpression)];
+			char data[unary->subexpression->type->size];
 			Interpret(unary->subexpression, data, false, frame, interpreter);
 
 			switch (unary->subexpression->type->kind)
@@ -521,12 +543,12 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
 			Ast_Function* function = ((Ast_Expression_Function*)call->function)->function;
 
-			char input[function->type->function.input->size];
-			Interpret(call->parameters, input, false, frame, interpreter);
+			char uncasted_arguments[call->parameters->type->size];
+			Interpret(call->parameters, uncasted_arguments, false, frame, interpreter);
 
-			char data[function->type->function.output->size];
-			Interpret(function, input, data, interpreter);
-			CopyMemory(output, data, expression->type->size);
+			char arguments[function->type->function.input->size];
+			Convert(call->parameters->type, (Value*)uncasted_arguments, function->type->function.input, (Value*)arguments);
+			Interpret(function, arguments, output, interpreter);
 		} break;
 
 		default:
@@ -548,7 +570,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 			{
 				Ast_Expression* expression = statement->expression;
 
-				char data[GetExpressionMinSize(expression)];
+				char data[expression->type->size];
 				Interpret(expression, data, true, frame, interpreter);
 			} break;
 
@@ -560,11 +582,9 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 
 				if (variable->assignment)
 				{
-					char data[GetExpressionMinSize(variable->assignment)];
-					ZeroMemory(data, sizeof data);
+					char data[variable->assignment->type->size];
 					Interpret(variable->assignment, data, false, frame, interpreter);
-					Convert((Value*)data, variable->assignment->type, variable->type);
-					CopyMemory(frame->GetData(variable), data, variable->type->size);
+					Convert(variable->assignment->type, (Value*)data, variable->type, (Value*)frame->GetData(variable));
 				}
 			} break;
 
@@ -573,11 +593,9 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				Ast_Assignment* assignment = &statement->assignment;
 				char* reference;
 				Interpret(assignment->left, (char*)&reference, true,  frame, interpreter);
-				char data[GetExpressionMinSize(assignment->right)];
-				ZeroMemory(data, sizeof data);
+				char data[assignment->right->type->size];
 				Interpret(assignment->right, data, false, frame, interpreter);
-				Convert((Value*)data, assignment->right->type, assignment->left->type);
-				CopyMemory(reference, data, assignment->left->type->size);
+				Convert(assignment->right->type, (Value*)data, assignment->left->type, (Value*)reference);
 			} break;
 
 			case AST_STATEMENT_ASSIGNMENT_ADD:
@@ -595,8 +613,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 					u64 left = 0;
 					CopyMemory((char*)&left, reference, assignment->left->type->size);
 
-					char right_data[GetExpressionMinSize(assignment->right)];
-					ZeroMemory(right_data, sizeof right_data);
+					char right_data[assignment->right->type->size];
 					Interpret(assignment->right, right_data, false, frame, interpreter);
 					u64 right = *(u64*)right_data;
 
@@ -626,8 +643,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 					{
 						bool is_if = branch->token->kind == TOKEN_IF;
 						u64 loop_count = 0;
-						char data[GetExpressionMinSize(branch->condition)];
-						ZeroMemory(data, sizeof data);
+						char data[branch->condition->type->size];
 
 						while (!frame->do_break && !frame->do_return)
 						{
@@ -680,10 +696,9 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 
 				if (expression)
 				{
-					char data[GetExpressionMinSize(expression)];
-					ZeroMemory(data, sizeof data);
+					char data[expression->type->size];
 					Interpret(expression, data, false, frame, interpreter);
-					CopyMemory(output, data, frame->function->return_type->size);
+					Convert(expression->type, (Value*)data, frame->function->return_type, (Value*)output);
 				}
 
 			} break;

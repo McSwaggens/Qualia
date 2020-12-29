@@ -1,5 +1,8 @@
+Add(a : int, b : int) -> int:
+	return a + b
+
 Test():
-	p0 : *int32 = 4
-	p1 := p0 + 1
-	p1+0
+	terms := (1.0, 2.0)
+	Add(terms)
+	Add(1.0, 2.0)
 

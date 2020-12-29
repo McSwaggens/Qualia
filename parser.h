@@ -607,16 +607,6 @@ extern Type type_float16;
 extern Type type_float32;
 extern Type type_float64;
 
-Parse_Info LexicalParse(String file_path);
-void ParseFile(String file_path);
-void SemanticParse(Parse_Info* info);
-void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter);
-void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter);
-void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter);
-StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
-u32 GetTypePrecedence(Type* type);
-Type* GetDominantType(Type* a, Type* b);
-
 static bool IsPrimitive(Type* type)
 {
 	switch (type->kind)
@@ -794,4 +784,15 @@ static bool AreTypesCompatible(Type* a, Type* b)
 	return a == b || (IsPrimitive(a) && IsPrimitive(b))
 		|| (IsPointer(a) && IsPointer(b)); // @TestMe: This might produce semantic bugs somewhere.
 }
+
+Parse_Info LexicalParse(String file_path);
+void ParseFile(String file_path);
+void SemanticParse(Parse_Info* info);
+void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter);
+void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter);
+void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter);
+StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
+u32 GetTypePrecedence(Type* type);
+Type* GetDominantType(Type* a, Type* b);
+void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value);
 

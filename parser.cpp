@@ -194,6 +194,22 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 			Write(buffer, ")");
 		} break;
 
+		case AST_EXPRESSION_FIXED_ARRAY:
+		{
+			Ast_Expression_Fixed_Array* fixed_array = (Ast_Expression_Fixed_Array*)expression;
+
+			Write(buffer, "{ ");
+
+			for (u32 i = 0; i < fixed_array->elements.count; i++)
+			{
+				if (!i) Write(buffer, ", ");
+
+				Write(buffer, fixed_array->elements[i]);
+			}
+
+			Write(buffer, " }");
+		} break;
+
 		case AST_EXPRESSION_TERMINAL_LITERAL:
 		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
 		case AST_EXPRESSION_TERMINAL:
@@ -409,7 +425,8 @@ static bool IsExpressionStarter(Token_Kind kind)
 {
 	return IsUnaryOperator(kind)
 		|| IsTerm(kind)
-		|| kind == TOKEN_OPEN_PAREN;
+		|| kind == TOKEN_OPEN_PAREN
+		|| kind == TOKEN_OPEN_BRACE;
 }
 
 static u32 GetTernaryPrecedence(Token_Kind kind)
@@ -659,7 +676,7 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 		}
 	}
 
-	structure.members = members.Lock(&info->stack);
+	structure.members = members.Lock();
 
 	return structure;
 }
@@ -730,7 +747,7 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 		}
 	}
 
-	enumeration.members = members.Lock(&info->stack);
+	enumeration.members = members.Lock();
 
 	return enumeration;
 }
@@ -827,7 +844,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 					Ast_Expression_Tuple* tuple = info->stack.Allocate<Ast_Expression_Tuple>();
 					tuple->kind  = AST_EXPRESSION_TUPLE;
 					tuple->span.begin = open;
-					tuple->elements = elements.Lock(&info->stack);
+					tuple->elements = elements.Lock();
 					left = tuple;
 				}
 				else left = element;
@@ -841,6 +858,46 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		CheckScope(token, indent, info);
 		token = closure+1;
 		left->span.end = token;
+	}
+	else if (token->kind == TOKEN_OPEN_BRACE)
+	{
+		Ast_Expression_Fixed_Array* fixed_array = info->stack.Allocate<Ast_Expression_Fixed_Array>();
+		ZeroMemory(fixed_array);
+		fixed_array->kind = AST_EXPRESSION_FIXED_ARRAY;
+		fixed_array->span = Span(token, token->GetClosure());
+
+		Token* closure = token->GetClosure();
+		Pooled_Array<Ast_Expression*> elements = NewPooledArray<Ast_Expression*>();
+
+		if (token+1 == closure)
+		{
+			Error(info, token->location, "Empty arrays literals aren't allowed.\n");
+		}
+
+		token++;
+
+		while (token < closure)
+		{
+			CheckScope(token, indent+1, info);
+			Ast_Expression* expression = ParseExpression(token, indent+1, info, false);
+			elements.Add(expression);
+			CheckScope(token, indent, info);
+
+			if (token->kind == TOKEN_COMMA)
+			{
+				token++;
+
+				if (token == closure)
+				{
+					Error(info, token->location, "Expected expression after ',', not: '%'\n", token);
+				}
+			}
+		}
+
+		fixed_array->elements = elements.Lock();
+
+		token = closure + 1;
+		left = fixed_array;
 	}
 	else
 	{
@@ -1010,7 +1067,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 		specifiers.Add(specifier);
 	}
 
-	type.specifiers = specifiers.Lock(&info->stack);
+	type.specifiers = specifiers.Lock();
 	type.basetype.token = token;
 
 	if (IsPrimitive(token->kind))
@@ -1174,7 +1231,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 		}
 	}
 
-	function->parameters = params.Lock(&info->stack);
+	function->parameters = params.Lock();
 }
 
 static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* info)
@@ -1527,10 +1584,10 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 		}
 	}
 
-	code.statements = statements.Lock(&info->stack);
-	code.scope.enums = enums.Lock(&info->stack);
-	code.scope.structs = structs.Lock(&info->stack);
-	code.scope.functions = functions.Lock(&info->stack);
+	code.statements = statements.Lock();
+	code.scope.enums = enums.Lock();
+	code.scope.structs = structs.Lock();
+	code.scope.functions = functions.Lock();
 
 	return code;
 }
@@ -1643,10 +1700,10 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 		}
 	}
 
-	root->imports = imports.Lock(&info->stack);
-	root->scope.functions = functions.Lock(&info->stack);
-	root->scope.structs = structs.Lock(&info->stack);
-	root->scope.enums = enums.Lock(&info->stack);
+	root->imports = imports.Lock();
+	root->scope.functions = functions.Lock();
+	root->scope.structs = structs.Lock();
+	root->scope.enums = enums.Lock();
 }
 
 void ParseFile(String file_path)

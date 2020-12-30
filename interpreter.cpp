@@ -59,6 +59,19 @@ void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value)
 		case TYPE_BASETYPE_FLOAT32: to_value->value_float32 = ConvertNumerical<f64>(from_value, from_type->kind); break;
 		case TYPE_BASETYPE_FLOAT64: to_value->value_float64 = ConvertNumerical<f64>(from_value, from_type->kind); break;
 
+		case TYPE_SPECIFIER_FIXED_ARRAY:
+		{
+			Assert(from_type->kind == TYPE_SPECIFIER_FIXED_ARRAY);
+			Assert(from_type->length == to_type->length);
+
+			for (u32 i = 0; i < to_type->length; i++)
+			{
+				Value* from = (Value*)(from_value->data + from_type->subtype->size * i);
+				Value* to = (Value*)(to_value->data + to_type->subtype->size * i);
+				Convert(from_type->subtype, from, to_type->subtype, to);
+			}
+		} break;
+
 		case TYPE_BASETYPE_TUPLE:
 		{
 			Assert(from_type->kind == TYPE_BASETYPE_TUPLE);
@@ -114,6 +127,87 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			else
 			{
 				CopyMemory(output, data + struct_member->member->offset, binary->right->type->size);
+			}
+		} break;
+
+		case AST_EXPRESSION_SUBSCRIPT:
+		{
+			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
+			u64 subsize = subscript->array->type->subtype->size;
+
+			if (subscript->array->type->kind == TYPE_SPECIFIER_POINTER)
+			{
+				char* p;
+				Interpret(subscript->array, (char*)&p, false, frame, interpreter);
+
+				char index_data[subscript->index->type->size];
+				Interpret(subscript->index, index_data, false, frame, interpreter);
+				u64 index = ConvertNumerical<u64>((Value*)index_data, subscript->index->type->kind);
+
+				p += index * subsize;
+
+				if (allow_referential)
+				{
+					*(char**)output = p;
+				}
+				else
+				{
+					CopyMemory(output, p, subsize);
+				}
+			}
+			else if (subscript->array->type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY)
+			{
+			}
+			else if (subscript->array->type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
+			{
+				if (subscript->array->is_referential_value)
+				{
+					char* p;
+					Interpret(subscript->array, (char*)&p, true, frame, interpreter);
+
+					char index_data[subscript->index->type->size];
+					Interpret(subscript->index, index_data, false, frame, interpreter);
+					u64 index = ConvertNumerical<u64>((Value*)index_data, subscript->index->type->kind);
+
+					p += index * subsize;
+
+					if (allow_referential)
+					{
+						*(char**)output = p;
+					}
+					else
+					{
+						CopyMemory(output, p, subsize);
+					}
+				}
+				else
+				{
+					Assert(!allow_referential);
+
+					char array[subscript->array->type->size];
+					Interpret(subscript->array, array, false, frame, interpreter);
+
+					char index_data[subscript->index->type->size];
+					Interpret(subscript->index, index_data, false, frame, interpreter);
+					u64 index = ConvertNumerical<u64>((Value*)index_data, subscript->index->type->kind);
+
+					CopyMemory(output, array + index * subsize, subsize);
+				}
+			}
+			else Assert();
+		} break;
+
+		case AST_EXPRESSION_FIXED_ARRAY:
+		{
+			Ast_Expression_Fixed_Array* fixed_array = (Ast_Expression_Fixed_Array*)expression;
+			Type* subtype = fixed_array->type->subtype;
+
+			for (u32 i = 0; i < fixed_array->elements.count; i++)
+			{
+				Ast_Expression* element = fixed_array->elements[i];
+				char element_data[element->type->size];
+				Interpret(element, element_data, false, frame, interpreter);
+				Convert(element->type, (Value*)element_data, subtype, (Value*)(output + subtype->size * i));
 			}
 		} break;
 
@@ -571,7 +665,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				Ast_Expression* expression = statement->expression;
 
 				char data[expression->type->size];
-				Interpret(expression, data, true, frame, interpreter);
+				Interpret(expression, data, false, frame, interpreter);
 			} break;
 
 			case AST_STATEMENT_VARIABLE_DECLARATION:
@@ -648,7 +742,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 						while (!frame->do_break && !frame->do_return)
 						{
 							Interpret(branch->condition, data, false, frame, interpreter);
-							bool passed = *(u64*)data;
+							bool passed = ConvertNumerical<bool>((Value*)data, branch->condition->type->kind);
 
 							if (passed)
 							{

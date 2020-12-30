@@ -44,7 +44,7 @@ struct Pooled_Array
 		return !count;
 	}
 
-	Array<T> Lock(Stack_Allocator* stack)
+	Array<T> Lock()
 	{
 		if (data)
 		{

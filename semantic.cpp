@@ -264,7 +264,9 @@ static Type* GetFixedArray(Type* type, u64 length, Parse_Info* info)
 	Type* new_type = info->stack.Allocate<Type>();
 	ZeroMemory(new_type);
 	new_type->kind = TYPE_SPECIFIER_FIXED_ARRAY;
+	new_type->subtype = type;
 	new_type->length = length;
+	new_type->size = type->size * length;
 	type->fixed_arrays.Add(new_type);
 
 	return new_type;
@@ -393,7 +395,11 @@ static bool IsConvertableTo(Type* from, Type* to)
 	if (from == to) return true;
 	if (IsNumerical(from) && IsNumerical(to)) return true;
 
-	if (from->kind == TYPE_BASETYPE_TUPLE && to->kind == TYPE_BASETYPE_TUPLE)
+	if (from->kind == TYPE_SPECIFIER_FIXED_ARRAY && to->kind == TYPE_SPECIFIER_FIXED_ARRAY)
+	{
+		return from->length == to->length && IsConvertableTo(from->subtype, to->subtype);
+	}
+	else if (from->kind == TYPE_BASETYPE_TUPLE && to->kind == TYPE_BASETYPE_TUPLE)
 	{
 		if (from->tuple.count != to->tuple.count) return false;
 
@@ -747,6 +753,44 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			}
 		} break;
 
+		case AST_EXPRESSION_FIXED_ARRAY:
+		{
+			Ast_Expression_Fixed_Array* fixed_array = (Ast_Expression_Fixed_Array*)expression;
+			fixed_array->is_pure = true;
+			fixed_array->can_constantly_evaluate = true;
+			fixed_array->is_referential_value = false;
+			Type* subtype;
+
+			for (u32 i = 0; i < fixed_array->elements.count; i++)
+			{
+				Ast_Expression* element = fixed_array->elements[i];
+				ScanExpression(element, scope, info);
+
+				if (!element->is_pure)
+				{
+					fixed_array->is_pure = false;
+				}
+
+				if (!element->can_constantly_evaluate)
+				{
+					fixed_array->can_constantly_evaluate = false;
+				}
+
+				if (i)
+				{
+					if (!IsConvertableTo(element->type, subtype))
+					{
+						Error(info, element->span, "Expected expression of type %, not: %\n", subtype, element->type); // @FixMe
+					}
+				}
+				else
+				{
+					subtype = element->type;
+					fixed_array->type = GetFixedArray(subtype, fixed_array->elements.count, info);
+				}
+			}
+		} break;
+
 		case AST_EXPRESSION_TERMINAL_LITERAL:
 		{
 			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
@@ -827,6 +871,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 					ZeroMemory(type);
 					type->kind = TYPE_SPECIFIER_FIXED_ARRAY;
 					type->length = length;
+					type->size = length;
 					type->subtype = &type_uint8;
 					type_uint8.fixed_arrays.Add(type);
 					literal->type = type;
@@ -1250,7 +1295,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			subscript->is_referential_value = true;
 		} break;
 
-		default: Unreachable();
+		default: Assert(); Unreachable();
 	}
 }
 

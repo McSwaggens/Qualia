@@ -154,6 +154,7 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_TERMINAL_PRIMITIVE,
 	AST_EXPRESSION_TERMINAL_STRUCT_MEMBER,
 	AST_EXPRESSION_TERMINAL_ENUM_MEMBER,
+	AST_EXPRESSION_FIXED_ARRAY,
 	AST_EXPRESSION_UNARY_BINARY_NOT,
 	AST_EXPRESSION_UNARY_NOT,
 	AST_EXPRESSION_UNARY_MINUS,
@@ -291,6 +292,11 @@ struct Ast_Expression_Call : Ast_Expression
 };
 
 struct Ast_Expression_Tuple : Ast_Expression
+{
+	Array<Ast_Expression*> elements;
+};
+
+struct Ast_Expression_Fixed_Array : Ast_Expression
 {
 	Array<Ast_Expression*> elements;
 };

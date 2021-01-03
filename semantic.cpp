@@ -1076,7 +1076,8 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!AreTypesCompatible(binary->left->type, binary->right->type) && !(IsNumerical(binary->left->type) && IsNumerical(binary->right->type)))
+			if (!IsConvertableTo(binary->right->type, binary->left->type) && // @FixMe
+				!(IsNumerical(binary->left->type) && IsNumerical(binary->right->type)))
 			{
 				Error(info, binary->span, "% and % are incompatible types.\n", binary->left->type, binary->right->type);
 			}
@@ -1131,6 +1132,22 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			}
 
 			binary->type = GetDominantType(binary->left->type, binary->right->type);
+
+			if (IsPointer(binary->left->type) && IsPointer(binary->right->type))
+			{
+				if (binary->left->type != binary->right->type)
+				{
+					Error(info, binary->span,
+						"Cannot perform binary operation '%' on two pointers of different types: '%' and '%'.\n",
+						binary->op, binary->left->type, binary->right->type);
+				}
+
+				if (binary->kind == AST_EXPRESSION_BINARY_SUBTRACT)
+				{
+					binary->type = &type_int64;
+				}
+			}
+
 		} break;
 
 		case AST_EXPRESSION_BINARY_BITWISE_OR:
@@ -1622,7 +1639,7 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, P
 						Error(info, statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
 					}
 
-					if (!AreTypesCompatible(statement->ret.expression->type, function->return_type))
+					if (!IsConvertableTo(function->return_type, statement->ret.expression->type))
 					{
 						Error(info, statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
 					}
@@ -1711,7 +1728,7 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, P
 					Error(info, statement->assignment.left->span, "Expression is not referential.\n");
 				}
 
-				if (!AreTypesCompatible(statement->assignment.left->type, statement->assignment.right->type))
+				if (!IsConvertableTo(statement->assignment.right->type, statement->assignment.left->type))
 				{
 					Error(info, statement->assignment.token->location, "Left and right types are incompatible.\n");
 				}

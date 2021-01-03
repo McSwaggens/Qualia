@@ -739,30 +739,6 @@ static bool IsNumerical(Type* type)
 	}
 }
 
-static bool IsIntegerLike(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_BOOL:
-		case TYPE_BASETYPE_UINT8:
-		case TYPE_BASETYPE_UINT16:
-		case TYPE_BASETYPE_UINT32:
-		case TYPE_BASETYPE_UINT64:
-		case TYPE_BASETYPE_INT8:
-		case TYPE_BASETYPE_INT16:
-		case TYPE_BASETYPE_INT32:
-		case TYPE_BASETYPE_INT64:
-		case TYPE_BASETYPE_FLOAT16:
-		case TYPE_BASETYPE_FLOAT32:
-		case TYPE_BASETYPE_FLOAT64:
-		case TYPE_SPECIFIER_POINTER:
-		case TYPE_BASETYPE_ENUM:
-			return true;
-		default:
-			return false;
-	}
-}
-
 static bool IsPointer(Type* type)
 {
 	switch (type->kind)
@@ -783,12 +759,6 @@ static bool IsOptional(Type* type)
 		default:
 			return false;
 	}
-}
-
-static bool AreTypesCompatible(Type* a, Type* b)
-{
-	return a == b || (IsPrimitive(a) && IsPrimitive(b))
-		|| (IsPointer(a) && IsPointer(b)); // @TestMe: This might produce semantic bugs somewhere.
 }
 
 Parse_Info LexicalParse(String file_path);

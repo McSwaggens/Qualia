@@ -230,8 +230,8 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
 			char left[binary->left->type->size];
-			Interpret(binary->left,  left,  false, frame, interpreter);
-			bool l = ConvertNumerical<bool>((Value*)left,  binary->left->type->kind);
+			Interpret(binary->left, left, false, frame, interpreter);
+			bool l = ConvertNumerical<bool>((Value*)left, binary->left->type->kind);
 
 			if (!l)
 			{
@@ -253,8 +253,8 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
 			char left[binary->left->type->size];
-			Interpret(binary->left,  left,  false, frame, interpreter);
-			bool l = ConvertNumerical<bool>((Value*)left,  binary->left->type->kind);
+			Interpret(binary->left, left, false, frame, interpreter);
+			bool l = ConvertNumerical<bool>((Value*)left, binary->left->type->kind);
 
 			if (l)
 			{
@@ -326,6 +326,16 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 				Print("% % % = %\n", l, binary->op, r, *(u64*)output);
 			}
+			else if (IsPointer(binary->left->type) && IsPointer(binary->right->type) && binary->kind == AST_EXPRESSION_BINARY_SUBTRACT)
+			{
+				u64 l = ConvertNumerical<u64>((Value*)left,  binary->left->type->kind);
+				u64 r = ConvertNumerical<u64>((Value*)right, binary->right->type->kind);
+				Assert(binary->left->type == binary->right->type);
+
+				*(s64*)output = (l - r) / binary->left->type->size;
+
+				Print("% % % = %\n", l, binary->op, r, *(s64*)output);
+			}
 			else if (IsFloat(dominant))
 			{
 				f64 l = ConvertNumerical<f64>((Value*)left,  binary->left->type->kind);
@@ -363,7 +373,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 					Convert(&type_float64, (Value*)&f, binary->type, (Value*)output);
 				}
 			}
-			else if (IsIntegerLike(dominant))
+			else if (IsInteger(dominant) || IsPointer(dominant))
 			{
 				bool is_signed = IsSignedInteger(dominant);
 
@@ -468,11 +478,8 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			s64 n = 0;
 			Interpret(unary->subexpression, (char*)&n, false, frame, interpreter);
-			// Convert((Value*)&n, unary->subexpression->type, unary->type);
 			n = ~n;
-			CopyMemory(output, (char*)&n, unary->type->size);
-			// @Todo: Not really sure which one to keep...
-			// *(s64*)output = n;
+			Convert(unary->subexpression->type, (Value*)&n, unary->type, (Value*)output);
 		} break;
 
 		case AST_EXPRESSION_UNARY_NOT:
@@ -686,7 +693,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 			{
 				Ast_Assignment* assignment = &statement->assignment;
 				char* reference;
-				Interpret(assignment->left, (char*)&reference, true,  frame, interpreter);
+				Interpret(assignment->left, (char*)&reference, true, frame, interpreter);
 				char data[assignment->right->type->size];
 				Interpret(assignment->right, data, false, frame, interpreter);
 				Convert(assignment->right->type, (Value*)data, assignment->left->type, (Value*)reference);
@@ -702,14 +709,13 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				char* reference;
 				Interpret(assignment->left, (char*)&reference, true, frame, interpreter);
 
-				if (IsIntegerLike(assignment->left->type))
+				if (IsSignedInteger(assignment->left->type))
 				{
-					u64 left = 0;
-					CopyMemory((char*)&left, reference, assignment->left->type->size);
+					s64 left = ConvertNumerical<s64>((Value*)reference, assignment->left->type->kind);
 
 					char right_data[assignment->right->type->size];
 					Interpret(assignment->right, right_data, false, frame, interpreter);
-					u64 right = *(u64*)right_data;
+					s64 right = ConvertNumerical<s64>((Value*)right_data, assignment->right->type->kind);
 
 					switch (statement->kind)
 					{
@@ -717,11 +723,56 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 						case AST_STATEMENT_ASSIGNMENT_SUBTRACT: left -= right; break;
 						case AST_STATEMENT_ASSIGNMENT_MULTIPLY: left *= right; break;
 						case AST_STATEMENT_ASSIGNMENT_DIVIDE:   left /= right; break;
-						case AST_STATEMENT_ASSIGNMENT_POWER:    left  = Pow(left, right) + 0.5; break; // @TestMe
+						case AST_STATEMENT_ASSIGNMENT_POWER:    left  = Pow(left, right) + 0.5; break;
 						default: Unreachable();
 					}
 
-					CopyMemory(reference, (char*)&left, assignment->left->type->size);
+					Convert(&type_int64, (Value*)&left, assignment->left->type, (Value*)reference);
+				}
+				else if (IsUnsignedInteger(assignment->left->type) || IsPointer(assignment->left->type))
+				{
+					u64 left = ConvertNumerical<u64>((Value*)reference, assignment->left->type->kind);
+
+					char right_data[assignment->right->type->size];
+					Interpret(assignment->right, right_data, false, frame, interpreter);
+					u64 right = ConvertNumerical<u64>((Value*)right_data, assignment->right->type->kind);
+
+					if (!IsPointer(assignment->right->type))
+					{
+						right *= assignment->left->type->size;
+					}
+
+					switch (statement->kind)
+					{
+						case AST_STATEMENT_ASSIGNMENT_ADD:      left += right; break;
+						case AST_STATEMENT_ASSIGNMENT_SUBTRACT: left -= right; break;
+						case AST_STATEMENT_ASSIGNMENT_MULTIPLY: left *= right; break;
+						case AST_STATEMENT_ASSIGNMENT_DIVIDE:   left /= right; break;
+						case AST_STATEMENT_ASSIGNMENT_POWER:    left  = Pow(left, right) + 0.5; break;
+						default: Unreachable();
+					}
+
+					Convert(&type_uint64, (Value*)&left, assignment->left->type, (Value*)reference);
+				}
+				else if (IsFloat(assignment->left->type))
+				{
+					f64 left = ConvertNumerical<f64>((Value*)reference, assignment->left->type->kind);
+
+					char right_data[assignment->right->type->size];
+					Interpret(assignment->right, right_data, false, frame, interpreter);
+					f64 right = ConvertNumerical<f64>((Value*)right_data, assignment->right->type->kind);
+
+					switch (statement->kind)
+					{
+						case AST_STATEMENT_ASSIGNMENT_ADD:      left += right; break;
+						case AST_STATEMENT_ASSIGNMENT_SUBTRACT: left -= right; break;
+						case AST_STATEMENT_ASSIGNMENT_MULTIPLY: left *= right; break;
+						case AST_STATEMENT_ASSIGNMENT_DIVIDE:   left /= right; break;
+						case AST_STATEMENT_ASSIGNMENT_POWER:    left  = Pow(left, right); break;
+						default: Unreachable();
+					}
+
+					Convert(&type_float64, (Value*)&left, assignment->left->type, (Value*)reference);
 				}
 				else Assert();
 			} break;
@@ -809,12 +860,11 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				Interpret(inc->expression, (char*)&ref, true, frame, interpreter);
 				Type* type = inc->expression->type;
 
-				if (type->kind == TYPE_SPECIFIER_POINTER)
+				switch (type->kind)
 				{
-					*(char**)ref += type->subtype->size;
-				}
-				else switch (type->kind)
-				{
+					case TYPE_SPECIFIER_POINTER:
+						*(char**)ref += type->subtype->size; break;
+
 					case TYPE_BASETYPE_INT8:
 					case TYPE_BASETYPE_UINT8:
 						++*(u8*)ref; break;
@@ -851,12 +901,11 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				Interpret(dec->expression, (char*)&ref, true, frame, interpreter);
 				Type* type = dec->expression->type;
 
-				if (type->kind == TYPE_SPECIFIER_POINTER)
+				switch (type->kind)
 				{
-					*(char**)ref -= type->subtype->size;
-				}
-				else switch (type->kind)
-				{
+					case TYPE_SPECIFIER_POINTER:
+						*(char**)ref -= type->subtype->size; break;
+
 					case TYPE_BASETYPE_INT8:
 					case TYPE_BASETYPE_UINT8:
 						--*(u8*)ref; break;

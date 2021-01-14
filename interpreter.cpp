@@ -98,35 +98,104 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 {
 	switch (expression->kind)
 	{
+		case AST_EXPRESSION_TERMINAL_ARRAY_DATA:   Assert();
+		case AST_EXPRESSION_TERMINAL_ARRAY_LENGTH: Assert();
+
 		case AST_EXPRESSION_BINARY_DOT:
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
-			Ast_Expression_Struct_Member* struct_member = (Ast_Expression_Struct_Member*)binary->right;
 
-			char data[binary->left->type->size];
-			Interpret(binary->left, data, true, frame, interpreter);
-
-			for (Type* t = binary->left->type; t->kind == TYPE_SPECIFIER_POINTER; t = t->subtype, *(char**)data = **(char***)data);
-
-			Assert(binary->right->kind == AST_EXPRESSION_TERMINAL_STRUCT_MEMBER);
-
-			if (binary->left->is_referential_value)
+			if (binary->right->kind == AST_EXPRESSION_TERMINAL_STRUCT_MEMBER)
 			{
-				char* reference = *(char**)data;
-				reference += struct_member->member->offset;
+				Ast_Expression_Struct_Member* struct_member = (Ast_Expression_Struct_Member*)binary->right;
 
-				if (allow_referential)
+				if (binary->left->is_referential_value || binary->left->type->kind == TYPE_SPECIFIER_POINTER)
 				{
-					*(char**)output = reference;
+					char* ref;
+					Interpret(binary->left, (char*)&ref, true, frame, interpreter);
+
+					Type* type = binary->left->type;
+
+					if (binary->left->is_referential_value && type->kind == TYPE_SPECIFIER_POINTER)
+					{
+						ref = *(char**)ref;
+					}
+
+					while (type->kind == TYPE_SPECIFIER_POINTER && type->subtype->kind == TYPE_SPECIFIER_POINTER)
+					{
+						type = type->subtype;
+						ref = *(char**)ref;
+					}
+
+					ref += struct_member->member->offset;
+
+					if (allow_referential)
+					{
+						*(char**)output = ref;
+					}
+					else
+					{
+						CopyMemory(output, ref, binary->right->type->size);
+					}
 				}
 				else
 				{
-					CopyMemory(output, reference, binary->type->size);
+					Assert(!allow_referential);
+
+					char data[binary->left->type->size];
+					Interpret(binary->left, data, false, frame, interpreter);
+
+					CopyMemory(output, data + struct_member->member->offset, binary->right->type->size);
+				}
+			}
+			else if (binary->right->kind == AST_EXPRESSION_TERMINAL_ARRAY_DATA)
+			{
+				Assert(binary->left->type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY);
+
+				if (allow_referential)
+				{
+					Assert(binary->is_referential_value);
+					Assert(binary->left->is_referential_value);
+					DynamicArray_Value* dynamic_array_ref;
+					Interpret(binary->left, (char*)&dynamic_array_ref, true, frame, interpreter);
+					*(char**)output = (char*)&dynamic_array_ref->pointer;
+				}
+				else
+				{
+					DynamicArray_Value dynamic_array;
+					Interpret(binary->left, (char*)&dynamic_array, false, frame, interpreter);
+					*(char**)output = dynamic_array.pointer;
+				}
+			}
+			else if (binary->right->kind == AST_EXPRESSION_TERMINAL_ARRAY_LENGTH)
+			{
+				if (binary->left->type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
+				{
+					*(u64*)output = binary->left->type->length;
+				}
+				else
+				{
+					Assert(binary->left->type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY);
+
+					if (allow_referential)
+					{
+						Assert(binary->is_referential_value);
+						Assert(binary->left->is_referential_value);
+						DynamicArray_Value* dynamic_array_ref;
+						Interpret(binary->left, (char*)&dynamic_array_ref, true, frame, interpreter);
+						*(char**)output = (char*)&dynamic_array_ref->length;
+					}
+					else
+					{
+						DynamicArray_Value dynamic_array;
+						Interpret(binary->left, (char*)&dynamic_array, false, frame, interpreter);
+						*(u64*)output = dynamic_array.length;
+					}
 				}
 			}
 			else
 			{
-				CopyMemory(output, data + struct_member->member->offset, binary->right->type->size);
+				Assert();
 			}
 		} break;
 
@@ -157,6 +226,27 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			}
 			else if (subscript->array->type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY)
 			{
+				DynamicArray_Value dynamic_array;
+				Interpret(subscript->array, (char*)&dynamic_array, false, frame, interpreter);
+
+				char index_data[subscript->index->type->size];
+				Interpret(subscript->index, index_data, false, frame, interpreter);
+				u64 index = ConvertNumerical<u64>((Value*)index_data, subscript->index->type->kind);
+
+				char* p = dynamic_array.pointer;
+
+				Assert(index < dynamic_array.length);
+
+				p += index * subsize;
+
+				if (allow_referential)
+				{
+					*(char**)output = p;
+				}
+				else
+				{
+					CopyMemory(output, p, subsize);
+				}
 			}
 			else if (subscript->array->type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
 			{
@@ -328,8 +418,8 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			}
 			else if (IsPointer(binary->left->type) && IsPointer(binary->right->type) && binary->kind == AST_EXPRESSION_BINARY_SUBTRACT)
 			{
-				u64 l = ConvertNumerical<u64>((Value*)left,  binary->left->type->kind);
-				u64 r = ConvertNumerical<u64>((Value*)right, binary->right->type->kind);
+				u64 l = *(u64*)left;
+				u64 r = *(u64*)right;
 				Assert(binary->left->type == binary->right->type);
 
 				*(s64*)output = (l - r) / binary->left->type->size;

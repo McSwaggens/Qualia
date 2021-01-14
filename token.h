@@ -191,15 +191,9 @@ struct SourceLocation
 	u32 offset;
 };
 
-struct DynamicArray32_Value
+struct DynamicArray_Value
 {
-	u32 pointer;
-	u32 length;
-};
-
-struct DynamicArray64_Value
-{
-	u64 pointer;
+	char* pointer;
 	u64 length;
 };
 
@@ -221,8 +215,7 @@ union Value
 	f32 value_float32;
 	f64 value_float64;
 
-	DynamicArray32_Value value_dynamic_array32;
-	DynamicArray64_Value value_dynamic_array64;
+	DynamicArray_Value dynamic_array;
 
 	Value* pointer;
 

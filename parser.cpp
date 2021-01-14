@@ -210,9 +210,11 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 			Write(buffer, " }");
 		} break;
 
+		case AST_EXPRESSION_TERMINAL:
 		case AST_EXPRESSION_TERMINAL_LITERAL:
 		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
-		case AST_EXPRESSION_TERMINAL:
+		case AST_EXPRESSION_TERMINAL_ARRAY_DATA:
+		case AST_EXPRESSION_TERMINAL_ARRAY_LENGTH:
 		{
 			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
 			Write(buffer, literal->token);
@@ -1381,6 +1383,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 
 			CheckScope(token, indent+1, info);
 			token++;
+			CheckScope(token, indent+1, info);
 
 			statement.assignment.left  = expression;
 			statement.assignment.token = token;

@@ -1006,7 +1006,6 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, info);
-			binary->is_referential_value = binary->left->is_referential_value || binary->left->type->kind == TYPE_SPECIFIER_POINTER;
 
 			// @Todo: Handle inferred function calls.
 
@@ -1023,9 +1022,17 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 						Error(info, binary->span, "Invalid dot expression on array.\n");
 					}
 
-					if (CompareStrings(terminal->token->info.string, "length"))
+					if (CompareStrings(terminal->token->info.string, "data") && type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY)
 					{
-						binary->type = GetPrimitiveTypeFromTokenKind(TOKEN_UINT);
+						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_DATA;
+						binary->type = GetPointer(binary->left->type->subtype, info);
+						binary->is_referential_value = binary->left->is_referential_value;
+					}
+					else if (CompareStrings(terminal->token->info.string, "length"))
+					{
+						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_LENGTH;
+						binary->type = &type_uint64;
+						binary->is_referential_value = binary->left->is_referential_value && binary->left->type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY;
 					}
 					else
 					{
@@ -1040,6 +1047,8 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			else
 			{
 				Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)binary->right;
+				binary->is_referential_value = binary->left->is_referential_value || binary->left->type->kind == TYPE_SPECIFIER_POINTER;
+
 				while (type->kind == TYPE_SPECIFIER_POINTER) type = type->subtype;
 
 				if (type->kind == TYPE_BASETYPE_STRUCT)
@@ -1288,6 +1297,10 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		} break;
 
 		case AST_EXPRESSION_LAMBDA:
+		{
+			Assert();
+		} break;
+
 		case AST_EXPRESSION_SUBSCRIPT:
 		{
 			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
@@ -1301,7 +1314,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 				Error(info, subscript->array->span, "Expression with type % is not a valid array.\n", subscript->array->span);
 			}
 
-			if (!IsInteger(subscript->index->type))
+			if (!IsConvertableTo(subscript->index->type, &type_int64))
 			{
 				Error(info, subscript->index->span, "Subscript index must be an integer, not: %\n", subscript->index->type);
 			}
@@ -1310,9 +1323,16 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			subscript->can_constantly_evaluate = subscript->array->can_constantly_evaluate && subscript->index->can_constantly_evaluate;
 			subscript->is_pure = subscript->array->is_pure && subscript->index->is_pure;
 			subscript->is_referential_value = true;
+
+			if (subscript->array->type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
+			{
+				subscript->is_referential_value = subscript->array->is_referential_value;
+			}
 		} break;
 
-		default: Assert(); Unreachable();
+		default:
+			Assert();
+			Unreachable();
 	}
 }
 

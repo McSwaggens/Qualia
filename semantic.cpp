@@ -737,10 +737,14 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 				if (type->kind == TYPE_BASETYPE_STRUCT)
 				{
 					expression->kind = AST_EXPRESSION_TERMINAL_STRUCT;
+					Ast_Expression_Struct* struct_terminal = (Ast_Expression_Struct*)expression;
+					struct_terminal->structure = type->structure;
 				}
 				else if (type->kind == TYPE_BASETYPE_ENUM)
 				{
 					expression->kind = AST_EXPRESSION_TERMINAL_ENUM;
+					Ast_Expression_Enum* enum_terminal = (Ast_Expression_Enum*)expression;
+					enum_terminal->enumeration = type->enumeration;
 				}
 				else if (IsPrimitive(type))
 				{
@@ -1011,7 +1015,42 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 
 			Type* type = binary->left->type;
 
-			if (type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY || type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
+			if (binary->left->kind == AST_EXPRESSION_TERMINAL_ENUM)
+			{
+				Ast_Enum* ast_enum = ((Ast_Expression_Enum*)binary->left)->enumeration;
+
+				if (binary->right->kind != AST_EXPRESSION_TERMINAL)
+				{
+					Error(info, binary->right->span, "Expected enum member name.\n");
+				}
+
+				binary->right->kind = AST_EXPRESSION_TERMINAL_ENUM_MEMBER;
+
+				Ast_Expression_Enum_Member* member_terminal = (Ast_Expression_Enum_Member*)binary->right;
+				String name = member_terminal->token->info.string;
+
+				Assert(member_terminal->token->kind == TOKEN_IDENTIFIER);
+
+				Ast_Enum_Member* member = FindEnumMember(ast_enum, name);
+
+				if (!member)
+				{
+					Error(info, binary->right->span, "Enum % does not contain a member called \"%\".", ast_enum->name, name);
+				}
+
+				member_terminal->member = member;
+
+				member_terminal->type = type;
+				member_terminal->can_constantly_evaluate = true;
+				member_terminal->is_pure = true;
+				member_terminal->is_referential_value = false;
+
+				binary->type = type;
+				binary->can_constantly_evaluate = true;
+				binary->is_pure = true;
+				binary->is_referential_value = false;
+			}
+			else if (type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY || type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
 			{
 				if (binary->right->kind == AST_EXPRESSION_TERMINAL)
 				{
@@ -1528,6 +1567,14 @@ static void ScanScope(Ast_Scope* scope, Parse_Info* info)
 		CheckForCircularDependencies(s, info);
 		CalculateStructSize(s);
 		// Print("Struct % has size = %\n", s->name, s->type.size);
+	}
+
+	for (Ast_Enum* e = scope->enums; e < scope->enums.End(); e++)
+	{
+		for (Ast_Enum_Member* member = e->members; member < e->members.End(); member++)
+		{
+			ScanExpression(member->expression, scope, info);
+		}
 	}
 
 	for (Ast_Function* f = scope->functions; f < scope->functions.End(); f++)

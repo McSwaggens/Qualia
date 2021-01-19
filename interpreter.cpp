@@ -51,6 +51,7 @@ void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value)
 		case TYPE_BASETYPE_UINT8:  to_value->value_uint8  = ConvertNumerical<u64>(from_value, from_type->kind); break;
 		case TYPE_BASETYPE_UINT16: to_value->value_uint16 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 		case TYPE_BASETYPE_UINT32: to_value->value_uint32 = ConvertNumerical<u64>(from_value, from_type->kind); break;
+		case TYPE_BASETYPE_ENUM:
 		case TYPE_BASETYPE_UINT64: to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 
 		case TYPE_SPECIFIER_POINTER: to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
@@ -147,6 +148,17 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 					CopyMemory(output, data + struct_member->member->offset, binary->right->type->size);
 				}
+			}
+			else if (binary->right->kind == AST_EXPRESSION_TERMINAL_ENUM_MEMBER)
+			{
+				Ast_Expression_Enum* enum_expression = (Ast_Expression_Enum*)binary->left;
+				Ast_Expression_Enum_Member* enum_member_expression = (Ast_Expression_Enum_Member*)binary->right;
+
+				// @Performance @FixMe: This should be pre-computed...
+				Ast_Expression* value_expression = enum_member_expression->member->expression;
+				char data[value_expression->type->size];
+				Interpret(value_expression, data, false, frame, interpreter);
+				Convert(value_expression->type, (Value*)data, binary->type, (Value*)output);
 			}
 			else if (binary->right->kind == AST_EXPRESSION_TERMINAL_ARRAY_DATA)
 			{

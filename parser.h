@@ -716,7 +716,8 @@ static bool IsOptional(Type* type)
 }
 
 extern Array<Intrinsic_Function> intrinsic_functions;
-Parse_Info LexicalParse(String file_path);
+
+void LexicalParse(String file_path, Parse_Info* info);
 void InitIntrinsicFunctions(Parse_Info* info);
 void ParseFile(String file_path);
 void SemanticParse(Parse_Info* info);

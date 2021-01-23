@@ -1719,8 +1719,10 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 
 void ParseFile(String file_path)
 {
-	Parse_Info info = LexicalParse(file_path);
+	Parse_Info info;
+	ZeroMemory(&info);
 	info.stack.Init();
+	LexicalParse(file_path, &info);
 	info.ast_root = info.stack.Allocate<Ast_Root>();
 	ZeroMemory(info.ast_root);
 	InitIntrinsicFunctions(&info);

@@ -900,7 +900,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			}
 			else if (literal->token->kind == TOKEN_STRING_LITERAL)
 			{
-				u64 length = literal->token->info.span.Length();
+				u64 length = literal->token->info.string.length;
 				bool found = false;
 
 				for (u32 i = 0; i < type_uint8.fixed_arrays.count; i++)

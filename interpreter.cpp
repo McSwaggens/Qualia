@@ -700,6 +700,12 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 			switch (literal->token->kind)
 			{
+				case TOKEN_STRING_LITERAL:
+				{
+					String string = literal->token->info.string;
+					CopyMemory(output, string.data, string.length);
+				} break;
+
 				case TOKEN_INTEGER_LITERAL:
 				{
 					CopyMemory(output, (char*)&literal->token->info.integer.value, literal->type->size);

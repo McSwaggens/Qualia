@@ -7,7 +7,7 @@
 #include "span.h"
 #include "string.h"
 
-Parse_Info LexicalParse(String file_path)
+void LexicalParse(String file_path, Parse_Info* info)
 {
 	Span<char> code = LoadFile(file_path, 16);
 	char* cursor = code;
@@ -335,11 +335,19 @@ Parse_Info LexicalParse(String file_path)
 		}
 		else if (*cursor == '"')
 		{
+			token.kind = TOKEN_STRING_LITERAL;
+
 			char* start = ++cursor;
+			u32 escapes = 0;
 
 			for (; cursor <= code.end && *cursor != '"'; cursor++)
 			{
-				if (*cursor == '\n')
+				if (*cursor == '\\')
+				{
+					escapes++;
+					cursor++;
+				}
+				else if (*cursor == '\n')
 				{
 					lines.Add(Span(line_start, cursor));
 					line++;
@@ -354,9 +362,53 @@ Parse_Info LexicalParse(String file_path)
 			}
 
 			char* end = cursor++;
-			u64 size = end - start;
-			token.kind = TOKEN_STRING_LITERAL;
-			token.info.span = Span(start, end);
+
+			if (escapes)
+			{
+				u32 length = end - start - escapes;
+				token.info.string = String(info->stack.Allocate<char>(length), length);
+
+				char* c = start;
+				char* s = token.info.string.data;
+
+				while (c < end)
+				{
+					if (*c == '\\')
+					{
+						c++;
+						switch (*c)
+						{
+							case '0':  *s = '\0'; break;
+							case 'a':  *s = '\a'; break;
+							case 'b':  *s = '\b'; break;
+							case 't':  *s = '\t'; break;
+							case 'n':  *s = '\n'; break;
+							case 'v':  *s = '\v'; break;
+							case 'f':  *s = '\f'; break;
+							case 'r':  *s = '\r'; break;
+							case '\\': *s = '\\'; break;
+							case '\"': *s = '\"'; break;
+
+							default:
+							{
+								Print("error: Invalid escape character: \\%\n", *c);
+								Fail();
+							}
+						}
+					}
+					else
+					{
+						*s = *c;
+					}
+
+					s++;
+					c++;
+				}
+			}
+			else
+			{
+				token.info.string = String(start, end - start);
+			}
 		}
 		else if (*cursor == '(')
 		{
@@ -513,11 +565,8 @@ Parse_Info LexicalParse(String file_path)
 		Fail();
 	}
 
-	Parse_Info info;
-	info.file_path = file_path;
-	info.tokens = tokens;
-	info.code = code;
-	info.lines = lines;
-
-	return info;
+	info->file_path = file_path;
+	info->tokens = tokens;
+	info->code = code;
+	info->lines = lines;
 }

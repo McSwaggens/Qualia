@@ -84,6 +84,16 @@ struct Type
 	List<Type*> function_extensions;
 };
 
+using Intrinsic_Function_Type = void (*)(void*, void*);
+
+struct Intrinsic_Function
+{
+	String name;
+	Type* input;
+	Type* output;
+	void (*function)(void* input, void* output);
+};
+
 struct Ast_Attribute
 {
 	Token* token;
@@ -147,6 +157,7 @@ enum Ast_Expression_Kind
 {
 	AST_EXPRESSION_TERMINAL,
 	AST_EXPRESSION_TERMINAL_FUNCTION,
+	AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION,
 	AST_EXPRESSION_TERMINAL_LITERAL,
 	AST_EXPRESSION_TERMINAL_VARIABLE,
 	AST_EXPRESSION_TERMINAL_STRUCT,
@@ -190,71 +201,6 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_AS,
 	AST_EXPRESSION_IF_ELSE,
 };
-
-static bool IsTerminalExpression(Ast_Expression_Kind kind)
-{
-	switch (kind)
-	{
-		case AST_EXPRESSION_TERMINAL:
-		case AST_EXPRESSION_TERMINAL_FUNCTION:
-		case AST_EXPRESSION_TERMINAL_LITERAL:
-		case AST_EXPRESSION_TERMINAL_VARIABLE:
-		case AST_EXPRESSION_TERMINAL_STRUCT:
-		case AST_EXPRESSION_TERMINAL_ENUM:
-		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
-		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER:
-		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsUnaryExpression(Ast_Expression_Kind kind)
-{
-	switch (kind)
-	{
-		case AST_EXPRESSION_UNARY_BINARY_NOT:
-		case AST_EXPRESSION_UNARY_NOT:
-		case AST_EXPRESSION_UNARY_MINUS:
-		case AST_EXPRESSION_UNARY_PLUS:
-		case AST_EXPRESSION_UNARY_VALUE_OF:
-		case AST_EXPRESSION_UNARY_ADDRESS_OF:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsBinaryExpression(Ast_Expression_Kind kind)
-{
-	switch (kind)
-	{
-		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_LESS:
-		case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_GREATER:
-		case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
-		case AST_EXPRESSION_BINARY_DOT:
-		case AST_EXPRESSION_BINARY_ADD:
-		case AST_EXPRESSION_BINARY_SUBTRACT:
-		case AST_EXPRESSION_BINARY_MULTIPLY:
-		case AST_EXPRESSION_BINARY_DIVIDE:
-		case AST_EXPRESSION_BINARY_MODULO:
-		case AST_EXPRESSION_BINARY_EXPONENTIAL:
-		case AST_EXPRESSION_BINARY_BITWISE_OR:
-		case AST_EXPRESSION_BINARY_BITWISE_XOR:
-		case AST_EXPRESSION_BINARY_BITWISE_AND:
-		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
-		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
-		case AST_EXPRESSION_BINARY_AND:
-		case AST_EXPRESSION_BINARY_OR:
-			return true;
-		default:
-			return false;
-	}
-}
 
 struct Ast_Expression
 {
@@ -330,6 +276,12 @@ struct Ast_Expression_Function : Ast_Expression
 {
 	Token* token;
 	Ast_Function* function;
+};
+
+struct Ast_Expression_Intrinsic_Function : Ast_Expression
+{
+	Token* token;
+	Intrinsic_Function* intrinsic_function;
 };
 
 struct Ast_Expression_Struct : Ast_Expression
@@ -763,7 +715,9 @@ static bool IsOptional(Type* type)
 	}
 }
 
+extern Array<Intrinsic_Function> intrinsic_functions;
 Parse_Info LexicalParse(String file_path);
+void InitIntrinsicFunctions(Parse_Info* info);
 void ParseFile(String file_path);
 void SemanticParse(Parse_Info* info);
 void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter);

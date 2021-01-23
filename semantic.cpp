@@ -610,13 +610,57 @@ static Ast_VariableDeclaration* GetVariable(Token* token, Ast_Scope* scope)
 	return null;
 }
 
-static Ast_Function* GetFunction(Token* token, Type* input_type, Ast_Scope* scope)
+Type* GetTupleFromTypeArray(Array<Type*> types, Parse_Info* info);
+
+Intrinsic_Function intrinsic_functions_array[1];
+Array<Intrinsic_Function> intrinsic_functions = Array<Intrinsic_Function>(intrinsic_functions_array, 1);
+
+void Intrinsic_SystemCall(u64* input, u64* output)
+{
+	*output = SystemCall(input[0], input[1], input[2], input[3], input[4], input[5], input[6]);
+}
+
+void InitIntrinsicFunctions(Parse_Info* info)
+{
+	intrinsic_functions[0] = {
+		"SystemCall",
+
+		GetTupleFromTypeArray({
+			&type_uint64, // rax
+			&type_uint64, // rdi
+			&type_uint64, // rsi
+			&type_uint64, // rdx
+			&type_uint64, // r10
+			&type_uint64, // r8
+			&type_uint64, // r9
+		}, info),
+
+		&type_uint64,
+
+		(Intrinsic_Function_Type)&Intrinsic_SystemCall
+	};
+}
+
+static Intrinsic_Function* GetIntrinsicFunction(String name, Type* input_type)
+{
+	for (Intrinsic_Function* intrinsic = intrinsic_functions; intrinsic < intrinsic_functions.End(); intrinsic++)
+	{
+		if (CompareStrings(name, intrinsic->name) && IsConvertableTo(input_type, intrinsic->input))
+		{
+			return intrinsic;
+		}
+	}
+
+	return null;
+}
+
+static Ast_Function* GetFunction(String name, Type* input_type, Ast_Scope* scope)
 {
 	while (scope)
 	{
 		for (Ast_Function* function = scope->functions; function < scope->functions.End(); function++)
 		{
-			if (CompareStrings(token->info.string, function->name->info.string) && IsConvertableTo(input_type, function->type->function.input))
+			if (CompareStrings(name, function->name->info.string) && IsConvertableTo(input_type, function->type->function.input))
 			{
 				return function;
 			}
@@ -1300,13 +1344,19 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			{
 				// @Note: call->function could still be a variable and not a function!
 
-				if (Ast_Function* function = GetFunction(terminal->token, call->parameters->type, scope); function)
+				if (Ast_Function* function = GetFunction(terminal->token->info.string, call->parameters->type, scope); function)
 				{
 					Ast_Expression_Function* function_expression = (Ast_Expression_Function*)call->function;
 					call->function->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
 					function_expression->function = function;
 					call->type = function->return_type;
-					if (!call->type) call->type = &empty_tuple;
+				}
+				else if (Intrinsic_Function* intrinsic_function = GetIntrinsicFunction(terminal->token->info.string, call->parameters->type); intrinsic_function)
+				{
+					Ast_Expression_Intrinsic_Function* intrinsic_function_expression = (Ast_Expression_Intrinsic_Function*)call->function;
+					call->function->kind = AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION;
+					intrinsic_function_expression->intrinsic_function = intrinsic_function;
+					call->type = intrinsic_function->output;
 				}
 				else if (Ast_VariableDeclaration* variable = GetVariable(terminal->token, scope); variable)
 				{
@@ -1867,6 +1917,58 @@ static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Parse_Info
 	tuple->tuple = Array(tuple_members, params.count);
 	first->tuple_extensions.Add(tuple);
 	return tuple;
+}
+
+Type* GetTupleFromTypeArray(Array<Type*> types, Parse_Info* info)
+{
+	if (types.count == 0)
+	{
+		return &empty_tuple;
+	}
+
+	if (types.count == 1)
+	{
+		return types[0];
+	}
+
+	Type* first = types[0];
+
+	for (u32 i = 0; i < first->tuple_extensions.count; i++)
+	{
+		Type* type = first->tuple_extensions[i];
+		bool fail = false;
+
+		if (type->tuple.count != types.count) continue;
+
+		for (u32 j = 0; j < type->tuple.count; j++)
+		{
+			if (type->tuple[j] != types[j])
+			{
+				fail = true;
+				break;
+			}
+		}
+
+		if (!fail)
+		{
+			return type;
+		}
+	}
+
+	Type* type = info->stack.Allocate<Type>();
+	Type** tuple_members = info->stack.Allocate<Type*>(types.count);
+	ZeroMemory(type);
+	type->kind = TYPE_BASETYPE_TUPLE;
+
+	for (u32 i = 0; i < types.count; i++)
+	{
+		tuple_members[i] = types[i];
+		type->size += types[i]->size;
+	}
+
+	type->tuple = Array(tuple_members, types.count);
+	first->tuple_extensions.Add(type);
+	return type;
 }
 
 static Type* GetTypeFromTupleExpression(Ast_Expression_Tuple* tuple, Parse_Info* info)

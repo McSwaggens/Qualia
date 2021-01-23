@@ -9,7 +9,7 @@
 
 static constexpr u64 PageSize = 4096;
 
-void* AllocateVirtualPage(u64 size);
+void* AllocateVirtualPage(u64 size, bool write = true, bool execute = false);
 void DeAllocateVirtualPage(void* page, u64 size);
 
 template<typename T>

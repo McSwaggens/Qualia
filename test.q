@@ -1,13 +1,13 @@
 
-enum SystemCall:
-	Read  = 0
-	Write = 1
-	Open  = 2
-	Close = 3
+enum Unix:
+	Read   = 0
+	Write  = 1
+	Open   = 2
+	Close  = 3
+	Mmap   = 9
+	Munmap = 11
 
 Test():
-	SystemCall.Read
-	SystemCall.Write
-	SystemCall.Open
-	SystemCall.Close
+	str := { 0x48u8, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64, 0x0A }
+	SystemCall(Unix.Write, 1, &str[0], str.length, 0, 0, 0)
 

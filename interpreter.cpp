@@ -21,6 +21,7 @@ static T ConvertNumerical(Value* value, Type_Kind type)
 		case TYPE_BASETYPE_UINT32: return value->value_uint32;
 		case TYPE_BASETYPE_UINT64: return value->value_uint64;
 
+		case TYPE_BASETYPE_ENUM:     return value->value_uint64;
 		case TYPE_SPECIFIER_POINTER: return value->value_uint64;
 
 		case TYPE_BASETYPE_FLOAT16: Assert();
@@ -51,9 +52,9 @@ void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value)
 		case TYPE_BASETYPE_UINT8:  to_value->value_uint8  = ConvertNumerical<u64>(from_value, from_type->kind); break;
 		case TYPE_BASETYPE_UINT16: to_value->value_uint16 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 		case TYPE_BASETYPE_UINT32: to_value->value_uint32 = ConvertNumerical<u64>(from_value, from_type->kind); break;
-		case TYPE_BASETYPE_ENUM:
 		case TYPE_BASETYPE_UINT64: to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 
+		case TYPE_BASETYPE_ENUM:     to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 		case TYPE_SPECIFIER_POINTER: to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 
 		case TYPE_BASETYPE_FLOAT16: Assert();
@@ -744,14 +745,33 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			// @Todo @Bug: Make this work for "external" functions, or function pointers.
 			//        ...  Maybe make them not work in compile time?
 			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
-			Ast_Function* function = ((Ast_Expression_Function*)call->function)->function;
 
-			char uncasted_arguments[call->parameters->type->size];
-			Interpret(call->parameters, uncasted_arguments, false, frame, interpreter);
+			if (call->function->kind == AST_EXPRESSION_TERMINAL_FUNCTION)
+			{
+				Ast_Expression_Function* function_expression = (Ast_Expression_Function*)call->function;
+				Ast_Function* function = function_expression->function;
 
-			char arguments[function->type->function.input->size];
-			Convert(call->parameters->type, (Value*)uncasted_arguments, function->type->function.input, (Value*)arguments);
-			Interpret(function, arguments, output, interpreter);
+				char uncasted_arguments[call->parameters->type->size];
+				Interpret(call->parameters, uncasted_arguments, false, frame, interpreter);
+
+				char arguments[function->type->function.input->size];
+				Convert(call->parameters->type, (Value*)uncasted_arguments, function->type->function.input, (Value*)arguments);
+				Interpret(function, arguments, output, interpreter);
+			}
+			else
+			{
+				Assert(call->function->kind == AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION);
+
+				Ast_Expression_Intrinsic_Function* intrinsic_function_expression = (Ast_Expression_Intrinsic_Function*)call->function;
+				Intrinsic_Function* intrinsic = intrinsic_function_expression->intrinsic_function;
+
+				char uncasted_arguments[call->parameters->type->size];
+				Interpret(call->parameters, uncasted_arguments, false, frame, interpreter);
+
+				char arguments[intrinsic->input->size];
+				Convert(call->parameters->type, (Value*)uncasted_arguments, intrinsic->input, (Value*)arguments);
+				intrinsic->function(arguments, output);
+			}
 		} break;
 
 		default:

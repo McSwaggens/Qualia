@@ -224,3 +224,5 @@ void ExitProcess(bool failure);
 [[noreturn]]
 void Fail();
 
+u64 SystemCall(u64 rax, u64 rdi = 0, u64 rsi = 0, u64 rdx = 0, u64 r10 = 0, u64 r8 = 0, u64 r9 = 0);
+

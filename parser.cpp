@@ -162,6 +162,14 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 			Write(buffer, ")");
 		} break;
 
+		case AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION:
+		{
+			Ast_Expression_Intrinsic_Function* function = (Ast_Expression_Intrinsic_Function*)expression;
+			Write(buffer, "(Intrinsic Function: ");
+			Write(buffer, function->token);
+			Write(buffer, ")");
+		} break;
+
 		case AST_EXPRESSION_TERMINAL_STRUCT:
 		{
 			Ast_Expression_Struct* structure = (Ast_Expression_Struct*)expression;
@@ -1715,6 +1723,7 @@ void ParseFile(String file_path)
 	info.stack.Init();
 	info.ast_root = info.stack.Allocate<Ast_Root>();
 	ZeroMemory(info.ast_root);
+	InitIntrinsicFunctions(&info);
 	ParseGlobalScope(info.ast_root, info.tokens, &info);
 	SemanticParse(&info);
 }

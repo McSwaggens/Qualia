@@ -11,7 +11,7 @@ struct Array
 
 	constexpr Array() = default;
 	constexpr Array(T* data, u32 count) : data(data), count(count) { }
-	constexpr Array(InitList<T> initlist) : data(initlist.begin()), count(initlist.size()) { }
+	constexpr Array(InitList<T> initlist) : data(const_cast<T*>(initlist.begin())), count(initlist.size()) { }
 	constexpr Array(Null) : data(null), count(0) { }
 	constexpr operator T*() { return data; }
 	constexpr operator const T*() const { return data; }

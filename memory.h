@@ -3,14 +3,42 @@
 #include "int.h"
 #include "util.h"
 #include "array.h"
-#include <stdlib.h>
 
-#define ATTRIBUTE_ALLOCATOR __attribute__((malloc))
+#define ALLOCATOR __attribute__((malloc))
+#define ALLIGNED(n) __attribute__((assume_aligned((n))))
 
 static constexpr u64 PageSize = 4096;
 
-void* AllocateVirtualPage(u64 size, bool write = true, bool execute = false);
+ALLIGNED(PageSize)
+void* AllocateVirtualPage(u64 size, bool write = true, bool execute = false, bool prefault = false);
 void DeAllocateVirtualPage(void* page, u64 size);
+
+void InitGlobalArena();
+
+ALLIGNED(8)
+void* Allocate(u64 size);
+ALLIGNED(8)
+void* ReAllocate(void* p, u64 old_size, u64 new_size);
+void DeAllocate(void* p, u64 size);
+
+template<typename T>
+[[nodiscard]]
+static inline T* Allocate(u64 count = 1)
+{
+	return static_cast<T*>(Allocate(sizeof(T) * count));
+}
+
+template<typename T>
+static inline void ReAllocate(T*& p, u32 old_count, u64 new_count)
+{
+	p = static_cast<T*>(ReAllocate((void*)p, sizeof(T) * old_count, sizeof(T) * new_count));
+}
+
+template<typename T>
+static inline void DeAllocate(T* p, u64 count = 1)
+{
+	DeAllocate((void*)p, count*sizeof(T));
+}
 
 template<typename T>
 static constexpr void CopyMemory(T* dest, const T* src, u64 count = 1)
@@ -50,12 +78,6 @@ static constexpr bool Compare(const T* a, const T* b, u64 count = 1)
 	return true;
 }
 
-// template<typename T>
-// static constexpr bool Compare(T a, T b)
-// {
-// 	return CompareMemory(&a, &b);
-// }
-
 template<typename T>
 static constexpr void ZeroMemory(T* begin, T* end)
 {
@@ -64,7 +86,6 @@ static constexpr void ZeroMemory(T* begin, T* end)
 		char* p = reinterpret_cast<char*>(begin);
 		char* e = reinterpret_cast<char*>(end);
 		for (; p < e; p++) *p = 0;
-		// @FixMe @Performance
 	}
 	else __builtin_memset(begin, 0, sizeof(T) * (end - begin));
 }
@@ -76,28 +97,8 @@ static constexpr void ZeroMemory(T* p, u64 count = 1)
 	{
 		char* bytes = reinterpret_cast<char*>(p);
 		for (u64 i = 0; i < count * sizeof(T); i++) bytes[i] = 0;
-		// @FixMe @Performance
 	}
 	else __builtin_memset(p, 0, sizeof(T) * count);
-}
-
-template<typename T>
-[[nodiscard]]
-static inline T* Allocate(u64 count = 1)
-{
-	return static_cast<T*>(malloc(sizeof(T) * count));
-}
-
-template<typename T>
-static inline void ReAllocate(T*& p, u64 count)
-{
-	p = static_cast<T*>(realloc(p, sizeof(T) * count));
-}
-
-template<typename T>
-static inline void Free(T* p)
-{
-	free(p);
 }
 
 struct Stack_Allocator_Block
@@ -112,14 +113,6 @@ struct Stack_Allocator
 	char* head;
 	u64 block_size;
 
-	void Init(u64 size = 4096 * 1024 * 16)
-	{
-		block = Cast(AllocateVirtualPage(size), Stack_Allocator_Block*);
-		block->previous = null;
-		block_size = size;
-		head = block->data;
-	}
-
 	void Free()
 	{
 		while (block)
@@ -131,28 +124,28 @@ struct Stack_Allocator
 	}
 
 	template<typename T>
-	T* Allocate(u32 count = 1) ATTRIBUTE_ALLOCATOR
+	T* Allocate(u32 count = 1) ALLOCATOR
 	{
 		u64 size = sizeof(T) * count;
 
-		// @Todo @Bug: Check if allocation is larger than block_size.
 		if (head + size >= block->data + block_size - sizeof(Stack_Allocator_Block))
 		{
-			block_size *= 2;
-			Stack_Allocator_Block* new_block = Cast(AllocateVirtualPage(block_size), Stack_Allocator_Block*);
+			block_size <<= 1;
+			block_size = block_size | (size & -block_size);
+			Stack_Allocator_Block* new_block = (Stack_Allocator_Block*)AllocateVirtualPage(block_size);
 			new_block->previous = block;
 			head = new_block->data;
 			block = new_block;
 		}
 
-		T* p = Cast(head, T*);
+		T* p = (T*)head;
 		head += size;
 
 		return p;
 	}
 
 	template<typename T>
-	Array<T> CreateArray(u32 count)
+	Array<T> AllocateArray(u32 count)
 	{
 		Array<T> array;
 		array.count = count;
@@ -161,4 +154,5 @@ struct Stack_Allocator
 	}
 };
 
+Stack_Allocator NewStackAllocator(u64 size = 1<<21);
 

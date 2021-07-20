@@ -1,10 +1,13 @@
 #pragma once
 
 #include "int.h"
+#include "util.h"
 #include "string.h"
 #include "file.h"
 #include "span.h"
 #include "list.h"
+
+#define DebugPrint(s, ...) { if (IsDebug()) Print("[DEBUG] " s, ##__VA_ARGS__); }
 
 void Write(OutputBuffer* buffer, u8  n);
 void Write(OutputBuffer* buffer, u16 n);

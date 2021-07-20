@@ -6,22 +6,7 @@
 
 template<typename ...Args>
 [[noreturn]]
-static void Error(Parse_Info* info, SourceLocation where, String format, Args&&... message_args)
-{
-	u32 margin = 2;
-	u32 start = where.line;
-	u32 number_of_lines = 1 + margin;
-
-	Print("%:%:%: error: ", info->file_path, (where.line+1), (where.offset+1));
-	Print(format, message_args...);
-
-	for (u32 line = start; line < start + number_of_lines && line < info->lines.count; line++)
-	{
-		Print("%\n", String(info->lines[line], info->lines[line].Length()));
-	}
-
-	Fail();
-}
+static void Error(Parse_Info* info, SourceLocation where, String format, Args&&... message_args);
 
 template<typename ...Args>
 [[noreturn]]
@@ -46,14 +31,10 @@ static void Error(Parse_Info* info, Span<Token> where, String format, Args&&... 
 	Fail();
 }
 
-static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info);
-static void ScanScope(Ast_Scope* scope, Parse_Info* info);
-static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info);
-static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info);
 static Type* GetTypeFromTupleExpression(Ast_Expression_Tuple* tuple, Parse_Info* info);
 static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info);
 
-static MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev = null)
+MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev)
 {
 	u64 size = 0x1000;
 	u64 header_size = sizeof(MemoryBlock);
@@ -68,7 +49,7 @@ static MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev = null)
 		size = NextPow2(min_size + header_size);
 	}
 
-	MemoryBlock* block = Cast(AllocateVirtualPage(size), MemoryBlock*);
+	MemoryBlock* block = (MemoryBlock*)AllocateVirtualPage(size);
 	block->size = size - header_size;
 	block->head = block->data;
 	block->prev = prev;
@@ -85,17 +66,14 @@ static MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev = null)
 	return block;
 }
 
-static u64 CalculateStackFrameSize(Ast_Function* function);
-static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset);
-
-static u64 CalculateStackFrameSize(Ast_Function* function)
+u64 CalculateStackFrameSize(Ast_Function* function)
 {
 	return CalculateStackFrameSize(&function->code, 0);
 }
 
 // @Note: This doesn't calculate the minimum memory needed to represent the stackframe which would be ideal for producing optimized binaries.
 //        Another function needs to created for that.
-static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset)
+u64 CalculateStackFrameSize(Ast_Code* code, u64 offset)
 {
 	u64 initial_offset = offset;
 
@@ -127,294 +105,6 @@ static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset)
 	code->frame_size = offset - initial_offset;
 
 	return offset;
-}
-
-static u64 GetFreeSpace(MemoryBlock* block)
-{
-	return block->data + block->size - block->head;
-}
-
-static u64 GetUsedSpace(MemoryBlock* block)
-{
-	return block->head - block->data;
-}
-
-static Value* Push(Type* type, Interpreter* interpreter)
-{
-	u64 size = type->size;
-
-	if (GetFreeSpace(interpreter->block) < size)
-	{
-		if (interpreter->block->next && interpreter->block->next->size > size)
-		{
-			interpreter->block = interpreter->block->next;
-		}
-		else
-		{
-			interpreter->block = CreateMemoryBlock(size, interpreter->block);
-		}
-	}
-
-	void* result = interpreter->block->head;
-	interpreter->block->head += size;
-
-	return Cast(result, Value*);
-}
-
-static void Pop(Type* type, Interpreter* interpreter)
-{
-	u64 size = type->size;
-
-	Assert(GetFreeSpace(interpreter->block) >= size);
-
-	interpreter->block->head -= size;
-
-	if (interpreter->block->head == interpreter->block->data && interpreter->block->prev)
-	{
-		interpreter->block = interpreter->block->prev;
-	}
-}
-
-StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter)
-{
-	StackFrame frame;
-	ZeroMemory(&frame);
-
-	u64 size = CalculateStackFrameSize(function);
-
-	if (!interpreter->block || size > GetFreeSpace(interpreter->block))
-	{
-		interpreter->block = CreateMemoryBlock(size, interpreter->block);
-	}
-
-	frame.data = interpreter->block->head;
-	frame.function = function;
-	interpreter->block->head += size;
-
-	ZeroMemory(frame.data, size);
-	return frame;
-}
-
-static Interpreter* CreateInterpreter(Parse_Info* info)
-{
-	Interpreter* interpreter = info->stack.Allocate<Interpreter>();
-	ZeroMemory(interpreter);
-	interpreter->block = CreateMemoryBlock(0x10000);
-	return interpreter;
-}
-
-static void InitSpecifiers(Type* type, Parse_Info* info)
-{
-	type->specifiers = info->stack.Allocate<Type>(3);
-	ZeroMemory(type->specifiers, 3);
-
-	type->specifiers[0].kind = TYPE_SPECIFIER_POINTER;
-	type->specifiers[0].subtype = type;
-	type->specifiers[0].size = 8; // @FixMe
-
-	type->specifiers[1].kind = TYPE_SPECIFIER_OPTIONAL;
-	type->specifiers[1].subtype = type;
-	type->specifiers[1].size = type->size + 1;
-
-	type->specifiers[2].kind = TYPE_SPECIFIER_DYNAMIC_ARRAY;
-	type->specifiers[2].subtype = type;
-	type->specifiers[2].size = 16; // @FixMe
-}
-
-static Type* GetPointer(Type* type, Parse_Info* info)
-{
-	if (!type->specifiers)
-	{
-		InitSpecifiers(type, info);
-	}
-
-	return type->specifiers + 0;
-}
-
-static Type* GetOptional(Type* type, Parse_Info* info)
-{
-	if (!type->specifiers)
-	{
-		InitSpecifiers(type, info);
-	}
-
-	return type->specifiers + 1;
-}
-
-static Type* GetDynamicArray(Type* type, Parse_Info* info)
-{
-	if (!type->specifiers)
-	{
-		InitSpecifiers(type, info);
-	}
-
-	return type->specifiers + 2;
-}
-
-static Type* GetFixedArray(Type* type, u64 length, Parse_Info* info)
-{
-	for (u32 i = 0; i < type->fixed_arrays.count; i++)
-	{
-		if (type->fixed_arrays[i]->length == length)
-		{
-			return type->fixed_arrays[i];
-		}
-	}
-
-	Type* new_type = info->stack.Allocate<Type>();
-	ZeroMemory(new_type);
-	new_type->kind = TYPE_SPECIFIER_FIXED_ARRAY;
-	new_type->subtype = type;
-	new_type->length = length;
-	new_type->size = type->size * length;
-	type->fixed_arrays.Add(new_type);
-
-	return new_type;
-}
-
-static consteval Type NewPrimitiveType(Type_Kind kind, u64 size)
-{
-	Type type;
-	type.kind = kind;
-	type.size = size;
-	type.length = 0;
-	type.specifiers = null;
-	type.fixed_arrays = null;
-	type.tuple_extensions = null;
-	type.function_extensions = null;
-	return type;
-}
-
-static consteval Type NewEmptyTupleType()
-{
-	Type type;
-	type.kind = TYPE_BASETYPE_TUPLE;
-	type.size = 0;
-	type.length = 0;
-	type.specifiers = null;
-	type.fixed_arrays = null;
-	type.tuple_extensions = null;
-	type.function_extensions = null;
-	return type;
-}
-
-Type empty_tuple  = NewEmptyTupleType();
-Type type_bool    = NewPrimitiveType(TYPE_BASETYPE_BOOL,    1);
-Type type_int8    = NewPrimitiveType(TYPE_BASETYPE_INT8,    1);
-Type type_int16   = NewPrimitiveType(TYPE_BASETYPE_INT16,   2);
-Type type_int32   = NewPrimitiveType(TYPE_BASETYPE_INT32,   4);
-Type type_int64   = NewPrimitiveType(TYPE_BASETYPE_INT64,   8);
-Type type_uint8   = NewPrimitiveType(TYPE_BASETYPE_UINT8,   1);
-Type type_uint16  = NewPrimitiveType(TYPE_BASETYPE_UINT16,  2);
-Type type_uint32  = NewPrimitiveType(TYPE_BASETYPE_UINT32,  4);
-Type type_uint64  = NewPrimitiveType(TYPE_BASETYPE_UINT64,  8);
-Type type_float16 = NewPrimitiveType(TYPE_BASETYPE_FLOAT16, 2);
-Type type_float32 = NewPrimitiveType(TYPE_BASETYPE_FLOAT32, 4);
-Type type_float64 = NewPrimitiveType(TYPE_BASETYPE_FLOAT64, 8);
-
-static constexpr Type* GetPrimitiveTypeFromTokenKind(Token_Kind kind)
-{
-	switch (kind)
-	{
-		case TOKEN_BOOL:    return &type_bool;
-		case TOKEN_INT:     return &type_int64;
-		case TOKEN_INT8:    return &type_int8;
-		case TOKEN_INT16:   return &type_int16;
-		case TOKEN_INT32:   return &type_int32;
-		case TOKEN_INT64:   return &type_int64;
-		case TOKEN_UINT:    return &type_uint64;
-		case TOKEN_UINT8:   return &type_uint8;
-		case TOKEN_UINT16:  return &type_uint16;
-		case TOKEN_UINT32:  return &type_uint32;
-		case TOKEN_UINT64:  return &type_uint64;
-		case TOKEN_FLOAT16: return &type_float16;
-		case TOKEN_FLOAT32: return &type_float32;
-		case TOKEN_FLOAT64: return &type_float64;
-
-		default:
-			Assert();
-			Unreachable();
-	}
-}
-
-static constexpr Type* GetPrimitiveTypeFromKind(Type_Kind kind)
-{
-	switch (kind)
-	{
-		case TYPE_BASETYPE_BOOL:    return &type_bool;
-		case TYPE_BASETYPE_UINT8:   return &type_uint8;
-		case TYPE_BASETYPE_UINT16:  return &type_uint16;
-		case TYPE_BASETYPE_UINT32:  return &type_uint32;
-		case TYPE_BASETYPE_UINT64:  return &type_uint64;
-		case TYPE_BASETYPE_INT8:    return &type_int8;
-		case TYPE_BASETYPE_INT16:   return &type_int16;
-		case TYPE_BASETYPE_INT32:   return &type_int32;
-		case TYPE_BASETYPE_INT64:   return &type_int64;
-		case TYPE_BASETYPE_FLOAT16: return &type_float16;
-		case TYPE_BASETYPE_FLOAT32: return &type_float32;
-		case TYPE_BASETYPE_FLOAT64: return &type_float64;
-
-		default:
-			Assert();
-			Unreachable();
-	}
-}
-
-static constexpr Type_Kind GetUnsignedVersionOf(Type_Kind kind)
-{
-	switch (kind)
-	{
-		case TYPE_BASETYPE_INT8:  return TYPE_BASETYPE_UINT8;
-		case TYPE_BASETYPE_INT16: return TYPE_BASETYPE_UINT16;
-		case TYPE_BASETYPE_INT32: return TYPE_BASETYPE_UINT32;
-		case TYPE_BASETYPE_INT64: return TYPE_BASETYPE_UINT64;
-
-		default:
-			Assert();
-			Unreachable();
-	}
-}
-
-static constexpr Type_Kind GetSignedVersionOf(Type_Kind kind)
-{
-	switch (kind)
-	{
-		case TYPE_BASETYPE_UINT8:  return TYPE_BASETYPE_INT8;
-		case TYPE_BASETYPE_UINT16: return TYPE_BASETYPE_INT16;
-		case TYPE_BASETYPE_UINT32: return TYPE_BASETYPE_INT32;
-		case TYPE_BASETYPE_UINT64: return TYPE_BASETYPE_INT64;
-
-		default:
-			Assert();
-			Unreachable();
-	}
-}
-
-static bool IsConvertableTo(Type* from, Type* to)
-{
-	if (from == to) return true;
-	if (IsNumerical(from) && IsNumerical(to)) return true;
-
-	if (from->kind == TYPE_SPECIFIER_FIXED_ARRAY && to->kind == TYPE_SPECIFIER_FIXED_ARRAY)
-	{
-		return from->length == to->length && IsConvertableTo(from->subtype, to->subtype);
-	}
-	else if (from->kind == TYPE_BASETYPE_TUPLE && to->kind == TYPE_BASETYPE_TUPLE)
-	{
-		if (from->tuple.count != to->tuple.count) return false;
-
-		for (u32 i = 0; i < from->tuple.count; i++)
-		{
-			if (!IsConvertableTo(from->tuple[i], to->tuple[i]))
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	return false;
 }
 
 static Type* GetBaseType(Token* token, Ast_Scope* scope)
@@ -564,17 +254,17 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info)
 		{
 			if (specifier->kind == AST_SPECIFIER_POINTER)
 			{
-				type = GetPointer(type, info);
+				type = GetPointer(type, &info->stack);
 			}
 			else if (specifier->kind == AST_SPECIFIER_OPTIONAL)
 			{
-				type = GetOptional(type, info);
+				type = GetOptional(type, &info->stack);
 			}
 			else if (specifier->kind == AST_SPECIFIER_ARRAY)
 			{
 				if (specifier->size_expression == null)
 				{
-					type = GetDynamicArray(type, info);
+					type = GetDynamicArray(type, &info->stack);
 				}
 				else
 				{
@@ -582,13 +272,40 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info)
 					Assert(specifier->size_expression->kind == AST_EXPRESSION_TERMINAL_LITERAL); // @RemoveMe @Todo: Need to be removed.
 					Ast_Expression_Literal* literal = (Ast_Expression_Literal*)specifier->size_expression;
 					u64 length = literal->token->info.integer.value;
-					type = GetFixedArray(type, length, info);
+					type = GetFixedArray(type, length, &info->stack);
 				}
 			}
 		}
 	}
 
 	return type;
+}
+
+bool IsConvertableTo(Type* from, Type* to)
+{
+	if (from == to) return true;
+	if (IsNumerical(from) && IsNumerical(to)) return true;
+
+	if (from->kind == TYPE_SPECIFIER_FIXED_ARRAY && to->kind == TYPE_SPECIFIER_FIXED_ARRAY)
+	{
+		return from->length == to->length && IsConvertableTo(from->subtype, to->subtype);
+	}
+	else if (from->kind == TYPE_BASETYPE_TUPLE && to->kind == TYPE_BASETYPE_TUPLE)
+	{
+		if (from->tuple.count != to->tuple.count) return false;
+
+		for (u32 i = 0; i < from->tuple.count; i++)
+		{
+			if (!IsConvertableTo(from->tuple[i], to->tuple[i]))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	return false;
 }
 
 static Ast_VariableDeclaration* GetVariable(Token* token, Ast_Scope* scope)
@@ -713,51 +430,7 @@ static Type* FindBaseType(Type* type)
 	return type;
 }
 
-u32 GetTypePrecedence(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_TUPLE:
-		case TYPE_BASETYPE_FUNCTION:
-		case TYPE_BASETYPE_STRUCT:
-		case TYPE_SPECIFIER_OPTIONAL:
-		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
-		case TYPE_SPECIFIER_FIXED_ARRAY:
-			return 0;
-
-		case TYPE_BASETYPE_BOOL:    return 1;
-
-		case TYPE_BASETYPE_UINT8:   return 2;
-		case TYPE_BASETYPE_UINT16:  return 3;
-		case TYPE_BASETYPE_UINT32:  return 4;
-		case TYPE_BASETYPE_UINT64:  return 5;
-
-		case TYPE_BASETYPE_INT8:    return 6;
-		case TYPE_BASETYPE_INT16:   return 7;
-		case TYPE_BASETYPE_INT32:   return 8;
-		case TYPE_BASETYPE_INT64:   return 9;
-
-		case TYPE_BASETYPE_FLOAT16: return 10;
-		case TYPE_BASETYPE_FLOAT32: return 11;
-		case TYPE_BASETYPE_FLOAT64: return 12;
-
-		case TYPE_BASETYPE_ENUM:
-		case TYPE_SPECIFIER_POINTER:
-			return 13;
-
-		default:
-			Assert();
-	}
-
-	Unreachable();
-}
-
-Type* GetDominantType(Type* a, Type* b)
-{
-	return GetTypePrecedence(a) >= GetTypePrecedence(b) ? a : b;
-}
-
-static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info)
+void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info)
 {
 	switch (expression->kind)
 	{
@@ -834,7 +507,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 				else
 				{
 					subtype = element->type;
-					fixed_array->type = GetFixedArray(subtype, fixed_array->elements.count, info);
+					fixed_array->type = GetFixedArray(subtype, fixed_array->elements.count, &info->stack);
 				}
 			}
 		} break;
@@ -869,34 +542,41 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 						default: Unreachable();
 					}
 				}
+
+				literal->value_uint64 = literal->token->info.integer.value;
 			}
 			else if (literal->token->kind == TOKEN_FLOAT_LITERAL)
 			{
 				if (literal->token->info.floating_point.explicit_bytes == 0)
 				{
 					literal->type = &type_float32; // @Fixme?
+					literal->value_float32 = literal->token->info.floating_point.value;
 				}
 				else if (literal->token->info.floating_point.explicit_bytes == 2)
 				{
 					literal->type = &type_float16;
+					Assert();
 				}
 				else if (literal->token->info.floating_point.explicit_bytes == 4)
 				{
 					literal->type = &type_float32;
+					literal->value_float32 = literal->token->info.floating_point.value;
 				}
 				else if (literal->token->info.floating_point.explicit_bytes == 8)
 				{
 					literal->type = &type_float64;
+					literal->value_float64 = literal->token->info.floating_point.value;
 				}
 				else Unreachable();
 			}
 			else if (literal->token->kind == TOKEN_TRUE || literal->token->kind == TOKEN_FALSE)
 			{
 				literal->type = &type_bool;
+				literal->value_bool = literal->token->kind == TOKEN_TRUE;
 			}
 			else if (literal->token->kind == TOKEN_NULL)
 			{
-				literal->type = GetPointer(&empty_tuple, info);
+				literal->type = GetPointer(&empty_tuple, &info->stack);
 			}
 			else if (literal->token->kind == TOKEN_STRING_LITERAL)
 			{
@@ -962,7 +642,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
-			unary->type = GetPointer(unary->subexpression->type, info);
+			unary->type = GetPointer(unary->subexpression->type, &info->stack);
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
 			unary->is_referential_value = false;
@@ -989,7 +669,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 			unary->type = unary->subexpression->type->subtype;
 		} break;
 
-		case AST_EXPRESSION_UNARY_BINARY_NOT:
+		case AST_EXPRESSION_UNARY_BITWISE_NOT:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
@@ -1108,7 +788,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 					if (CompareStrings(terminal->token->info.string, "data") && type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY)
 					{
 						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_DATA;
-						binary->type = GetPointer(binary->left->type->subtype, info);
+						binary->type = GetPointer(binary->left->type->subtype, &info->stack);
 						binary->is_referential_value = binary->left->is_referential_value;
 					}
 					else if (CompareStrings(terminal->token->info.string, "length"))
@@ -1365,7 +1045,6 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_I
 					variable_expression->variable = variable;
 					call->type = variable->type->function.output;
 					if (!call->type) call->type = &empty_tuple;
-					call->is_referential_value = true;
 					call->is_pure = variable->is_pure;
 					call->can_constantly_evaluate = variable->can_constantly_evaluate;
 
@@ -1529,7 +1208,7 @@ static void CalculateStructSize(Ast_Struct* s)
 	s->type.size = size;
 }
 
-static void ScanScope(Ast_Scope* scope, Parse_Info* info)
+void ScanScope(Ast_Scope* scope, Parse_Info* info)
 {
 	for (Ast_Struct* s = scope->structs; s < scope->structs.End(); s++)
 	{
@@ -1647,7 +1326,7 @@ static void ScanScope(Ast_Scope* scope, Parse_Info* info)
 
 }
 
-static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info)
+void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info)
 {
 	code->scope.parent = scope;
 	ScanScope(&code->scope, info);
@@ -1701,12 +1380,8 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, P
 				ScanExpression(statement->claim.expression, &code->scope, info);
 			} break;
 
-			case AST_STATEMENT_ALIAS:
-			{
-				Assert();
-			} break;
-
 			case AST_STATEMENT_INCREMENT:
+			case AST_STATEMENT_DECREMENT:
 			{
 				Ast_Increment* inc = &statement->increment;
 				ScanExpression(inc->expression, &code->scope, info);
@@ -1719,22 +1394,6 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, P
 				if (!IsInteger(inc->expression->type) && !IsFloat(inc->expression->type) && inc->expression->type->kind != TYPE_SPECIFIER_POINTER)
 				{
 					Error(info, inc->expression->span, "Expression is an integer, float or pointer.\n");
-				}
-			} break;
-
-			case AST_STATEMENT_DECREMENT:
-			{
-				Ast_Decrement* dec = &statement->decrement;
-				ScanExpression(dec->expression, &code->scope, info);
-
-				if (!dec->expression->is_referential_value)
-				{
-					Error(info, dec->expression->span, "Expression is not a referential value.\n");
-				}
-
-				if (!IsInteger(dec->expression->type) && !IsFloat(dec->expression->type) && dec->expression->type->kind != TYPE_SPECIFIER_POINTER)
-				{
-					Error(info, dec->expression->span, "Expression is an integer, float or pointer.\n");
 				}
 			} break;
 
@@ -1761,7 +1420,7 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, P
 						Error(info, statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
 					}
 				}
-				else if (function->does_return)
+				else if (function->does_have_return_type_appendage)
 				{
 					Error(info, statement->ret.token->location, "Expected return value with type: %\n", function->return_type);
 				}
@@ -2023,7 +1682,7 @@ static Type* GetTypeFromTupleExpression(Ast_Expression_Tuple* tuple, Parse_Info*
 	return type;
 }
 
-static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info)
+void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info)
 {
 	for (Ast_VariableDeclaration* param = function->parameters; param < function->parameters.End(); param++)
 	{

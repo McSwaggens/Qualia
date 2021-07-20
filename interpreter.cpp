@@ -348,7 +348,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 			*(bool*)output = r;
 
-			Print("% % % = %\n", l, binary->op, r, *(bool*)output);
+			DebugPrint("% % % = %\n", l, binary->op, r, *(bool*)output);
 		} break;
 
 		case AST_EXPRESSION_BINARY_OR:
@@ -371,7 +371,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 			*(bool*)output = r;
 
-			Print("% % % = %\n", l, binary->op, r, *(bool*)output);
+			DebugPrint("% % % = %\n", l, binary->op, r, *(bool*)output);
 		} break;
 
 		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
@@ -427,7 +427,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 						Unreachable();
 				}
 
-				Print("% % % = %\n", l, binary->op, r, *(u64*)output);
+				DebugPrint("% % % = %\n", l, binary->op, r, *(u64*)output);
 			}
 			else if (IsPointer(binary->left->type) && IsPointer(binary->right->type) && binary->kind == AST_EXPRESSION_BINARY_SUBTRACT)
 			{
@@ -437,7 +437,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 				*(s64*)output = (l - r) / binary->left->type->size;
 
-				Print("% % % = %\n", l, binary->op, r, *(s64*)output);
+				DebugPrint("% % % = %\n", l, binary->op, r, *(s64*)output);
 			}
 			else if (IsFloat(dominant))
 			{
@@ -464,11 +464,11 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 				if (binary->type == &type_bool)
 				{
-					Print("% % % = %\n", l, binary->op, r, *(bool*)output);
+					DebugPrint("% % % = %\n", l, binary->op, r, *(bool*)output);
 				}
 				else
 				{
-					Print("% % % = %\n", l, binary->op, r, f);
+					DebugPrint("% % % = %\n", l, binary->op, r, f);
 				}
 
 				if (binary->type != &type_bool)
@@ -510,11 +510,11 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 					if (binary->type == &type_bool)
 					{
-						Print("% % % = %\n", l, binary->op, r, (bool)n);
+						DebugPrint("% % % = %\n", l, binary->op, r, (bool)n);
 					}
 					else
 					{
-						Print("% % % = %\n", l, binary->op, r, n);
+						DebugPrint("% % % = %\n", l, binary->op, r, n);
 					}
 				}
 				else
@@ -549,11 +549,11 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 					if (binary->type == &type_bool)
 					{
-						Print("% % % = %\n", l, binary->op, r, (bool)n);
+						DebugPrint("% % % = %\n", l, binary->op, r, (bool)n);
 					}
 					else
 					{
-						Print("% % % = %\n", l, binary->op, r, n);
+						DebugPrint("% % % = %\n", l, binary->op, r, n);
 					}
 				}
 			}
@@ -572,11 +572,11 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 
 				*(bool*)output = b;
 
-				Print("% % % = %\n", binary->left, binary->op, binary->right, b);
+				DebugPrint("% % % = %\n", binary->left, binary->op, binary->right, b);
 			}
 		} break;
 
-		case AST_EXPRESSION_UNARY_BINARY_NOT:
+		case AST_EXPRESSION_UNARY_BITWISE_NOT:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			s64 n = 0;
@@ -953,7 +953,6 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 
 			} break;
 
-			case AST_STATEMENT_ALIAS:
 			case AST_STATEMENT_CLAIM:
 				continue;
 
@@ -1024,7 +1023,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 
 			case AST_STATEMENT_DECREMENT:
 			{
-				Ast_Decrement* dec = &statement->decrement;
+				Ast_Increment* dec = &statement->increment;
 				char* ref;
 				Interpret(dec->expression, (char*)&ref, true, frame, interpreter);
 				Type* type = dec->expression->type;
@@ -1082,7 +1081,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 
 void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter)
 {
-	Print("Interpreting function: %\n", function->name);
+	DebugPrint("Interpreting function: %\n", function->name);
 	StackFrame frame = CreateStackFrame(function, interpreter);
 
 	if (function->parameters.count)
@@ -1094,11 +1093,49 @@ void Interpret(Ast_Function* function, char* input, char* output, Interpreter* i
 
 	for (Ast_VariableDeclaration** variable = function->code.scope.variables; variable < function->code.scope.variables.End(); variable++)
 	{
-		Print("&% = %\n", (*variable)->name, (u64)frame.GetData(*variable));
+		DebugPrint("&% = %\n", (*variable)->name, (u64)frame.GetData(*variable));
 	}
 
 	standard_output_buffer.Flush();
 
 	Interpret(&function->code, output, &frame, interpreter);
+}
+
+static u64 GetFreeSpace(MemoryBlock* block)
+{
+	return block->data + block->size - block->head;
+}
+
+static u64 GetUsedSpace(MemoryBlock* block)
+{
+	return block->head - block->data;
+}
+
+StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter)
+{
+	StackFrame frame;
+	ZeroMemory(&frame);
+
+	u64 size = CalculateStackFrameSize(function);
+
+	if (!interpreter->block || size > GetFreeSpace(interpreter->block))
+	{
+		interpreter->block = CreateMemoryBlock(size, interpreter->block);
+	}
+
+	frame.data = interpreter->block->head;
+	frame.function = function;
+	interpreter->block->head += size;
+
+	ZeroMemory(frame.data, size);
+	return frame;
+}
+
+Interpreter* CreateInterpreter(Parse_Info* info)
+{
+	Interpreter* interpreter = info->stack.Allocate<Interpreter>();
+	ZeroMemory(interpreter);
+	interpreter->block = CreateMemoryBlock(0x10000);
+	return interpreter;
 }
 

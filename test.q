@@ -1,13 +1,29 @@
 
-enum Unix:
-	Read   = 0
-	Write  = 1
-	Open   = 2
-	Close  = 3
-	Mmap   = 9
-	Munmap = 11
 
-Test():
-	str := "Testing testing, one... two... three!\nHello World!\n"
-	SystemCall(Unix.Write, 1, &str[0], str.length, 0, 0, 0)
+enum Color:
+	Red   = 0 + 0
+	Green = 1 << 0
+	Blue  = 2^1
 
+struct Foo:
+	a : int
+	b : int
+	c : int
+	d : int
+
+Fib(n : int) -> int:
+	a := 0
+	b := 1
+
+	while n:
+		dec n
+		c := a + b
+		a = b
+		b = c
+
+	return b
+
+
+
+ProgramStart():
+	while true:

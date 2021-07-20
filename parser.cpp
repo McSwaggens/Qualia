@@ -5,336 +5,6 @@
 #include "assert.h"
 #include "pooled_array.h"
 
-void Write(OutputBuffer* buffer, Type* type)
-{
-	if (!type)
-	{
-		Write(buffer, "null");
-		return;
-	}
-
-	switch (type->kind)
-	{
-		case TYPE_SPECIFIER_POINTER:
-			Write(buffer, "*");
-			Write(buffer, type->subtype);
-			break;
-
-		case TYPE_SPECIFIER_OPTIONAL:
-			Write(buffer, "?");
-			Write(buffer, type->subtype);
-			break;
-
-		case TYPE_SPECIFIER_FIXED_ARRAY:
-			Write(buffer, '[');
-			Write(buffer, type->length);
-			Write(buffer, ']');
-			Write(buffer, type->subtype);
-			break;
-
-		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
-			Write(buffer, "[]");
-			Write(buffer, type->subtype);
-			break;
-
-		case TYPE_BASETYPE_BOOL:    Write(buffer, TOKEN_BOOL);    break; 
-		case TYPE_BASETYPE_INT8:    Write(buffer, TOKEN_INT8);    break; 
-		case TYPE_BASETYPE_INT16:   Write(buffer, TOKEN_INT16);   break; 
-		case TYPE_BASETYPE_INT32:   Write(buffer, TOKEN_INT32);   break; 
-		case TYPE_BASETYPE_INT64:   Write(buffer, TOKEN_INT64);   break; 
-		case TYPE_BASETYPE_UINT8:   Write(buffer, TOKEN_UINT8);   break; 
-		case TYPE_BASETYPE_UINT16:  Write(buffer, TOKEN_UINT16);  break; 
-		case TYPE_BASETYPE_UINT32:  Write(buffer, TOKEN_UINT32);  break; 
-		case TYPE_BASETYPE_UINT64:  Write(buffer, TOKEN_UINT64);  break; 
-		case TYPE_BASETYPE_FLOAT16: Write(buffer, TOKEN_FLOAT16); break; 
-		case TYPE_BASETYPE_FLOAT32: Write(buffer, TOKEN_FLOAT32); break; 
-		case TYPE_BASETYPE_FLOAT64: Write(buffer, TOKEN_FLOAT64); break; 
-
-		case TYPE_BASETYPE_FUNCTION:
-			Write(buffer, type->function.input);
-			Write(buffer, " -> ");
-			Write(buffer, type->function.output);
-			break;
-
-		case TYPE_BASETYPE_TUPLE:
-			Write(buffer, '(');
-			for (u32 i = 0; i < type->tuple.count; i++)
-			{
-				if (i) Write(buffer, ", ");
-				Write(buffer, type->tuple[i]);
-			}
-			Write(buffer, ')');
-			break;
-
-		case TYPE_BASETYPE_STRUCT:
-			Write(buffer, type->structure->name);
-			break;
-
-		case TYPE_BASETYPE_ENUM:
-			Write(buffer, type->enumeration->name);
-			break;
-
-	}
-}
-
-void Write(OutputBuffer* buffer, Ast_Type* type)
-{
-	if (!type)
-	{
-		Write(buffer, "null");
-		return;
-	}
-
-	Write(buffer, *type);
-}
-
-void Write(OutputBuffer* buffer, Ast_Type type)
-{
-	for (Ast_Specifier* specifier = type.specifiers; specifier < type.specifiers.End(); specifier++)
-	{
-		switch (specifier->kind)
-		{
-			case AST_SPECIFIER_POINTER:  Write(buffer, "*"); break;
-			case AST_SPECIFIER_OPTIONAL: Write(buffer, "?"); break;
-			case AST_SPECIFIER_ARRAY:
-			{
-				Write(buffer, "[");
-				Write(buffer, specifier->size_expression);
-				Write(buffer, "]");
-			} break;
-		}
-	}
-
-	switch (type.basetype.kind)
-	{
-		case AST_BASETYPE_PRIMITIVE: Write(buffer, type.basetype.token); break;
-		case AST_BASETYPE_USERTYPE:  Write(buffer, type.basetype.token); break;
-		case AST_BASETYPE_ENUM:      Write(buffer, type.basetype.enumeration->name); break;
-		case AST_BASETYPE_STRUCT:    Write(buffer, type.basetype.structure->name); break;
-
-		case AST_BASETYPE_TUPLE:
-		{
-			Write(buffer, "(");
-
-			for (Ast_Type* t = type.basetype.tuple; t < type.basetype.tuple.End(); t++)
-			{
-				if (t != type.basetype.tuple) Write(buffer, ", ");
-				Write(buffer, t);
-			}
-
-			Write(buffer, ")");
-		} break;
-
-		case AST_BASETYPE_FUNCTION:
-		{
-			Write(buffer, "(");
-			Write(buffer, type.basetype.function.input);
-			Write(buffer, ") -> (");
-			Write(buffer, type.basetype.function.output);
-			Write(buffer, ")");
-		} break;
-	}
-}
-
-void Write(OutputBuffer* buffer, Ast_Expression* expression)
-{
-	if (!expression)
-	{
-		Write(buffer, "null");
-		return;
-	}
-
-	switch (expression->kind)
-	{
-		case AST_EXPRESSION_TERMINAL_VARIABLE:
-		{
-			Ast_Expression_Variable* variable = (Ast_Expression_Variable*)expression;
-			Write(buffer, "(Variable: ");
-			Write(buffer, variable->token);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_TERMINAL_FUNCTION:
-		{
-			Ast_Expression_Function* function = (Ast_Expression_Function*)expression;
-			Write(buffer, "(Function: ");
-			Write(buffer, function->token);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION:
-		{
-			Ast_Expression_Intrinsic_Function* function = (Ast_Expression_Intrinsic_Function*)expression;
-			Write(buffer, "(Intrinsic Function: ");
-			Write(buffer, function->token);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_TERMINAL_STRUCT:
-		{
-			Ast_Expression_Struct* structure = (Ast_Expression_Struct*)expression;
-			Write(buffer, "(Struct: ");
-			Write(buffer, structure->token);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_TERMINAL_ENUM:
-		{
-			Ast_Expression_Enum* enumeration = (Ast_Expression_Enum*)expression;
-			Write(buffer, "(Enum: ");
-			Write(buffer, enumeration->token);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER:
-		{
-			Ast_Expression_Struct_Member* member = (Ast_Expression_Struct_Member*)expression;
-			Write(buffer, "(Struct_Member: ");
-			Write(buffer, member->token);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER:
-		{
-			Ast_Expression_Enum_Member* member = (Ast_Expression_Enum_Member*)expression;
-			Write(buffer, "(Enum_Member: ");
-			Write(buffer, member->token);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_FIXED_ARRAY:
-		{
-			Ast_Expression_Fixed_Array* fixed_array = (Ast_Expression_Fixed_Array*)expression;
-
-			Write(buffer, "{ ");
-
-			for (u32 i = 0; i < fixed_array->elements.count; i++)
-			{
-				if (!i) Write(buffer, ", ");
-
-				Write(buffer, fixed_array->elements[i]);
-			}
-
-			Write(buffer, " }");
-		} break;
-
-		case AST_EXPRESSION_TERMINAL:
-		case AST_EXPRESSION_TERMINAL_LITERAL:
-		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
-		case AST_EXPRESSION_TERMINAL_ARRAY_DATA:
-		case AST_EXPRESSION_TERMINAL_ARRAY_LENGTH:
-		{
-			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
-			Write(buffer, literal->token);
-		} break;
-
-		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_LESS:
-		case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_GREATER:
-		case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
-		case AST_EXPRESSION_BINARY_DOT:
-		case AST_EXPRESSION_BINARY_ADD:
-		case AST_EXPRESSION_BINARY_SUBTRACT:
-		case AST_EXPRESSION_BINARY_MULTIPLY:
-		case AST_EXPRESSION_BINARY_DIVIDE:
-		case AST_EXPRESSION_BINARY_MODULO:
-		case AST_EXPRESSION_BINARY_EXPONENTIAL:
-		case AST_EXPRESSION_BINARY_BITWISE_OR:
-		case AST_EXPRESSION_BINARY_BITWISE_XOR:
-		case AST_EXPRESSION_BINARY_BITWISE_AND:
-		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
-		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
-		case AST_EXPRESSION_BINARY_AND:
-		case AST_EXPRESSION_BINARY_OR:
-		{
-			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
-			Write(buffer, "(");
-			Write(buffer, binary->left);
-			Write(buffer, " ");
-			Write(buffer, binary->op);
-			Write(buffer, " ");
-			Write(buffer, binary->right);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_UNARY_VALUE_OF:
-		case AST_EXPRESSION_UNARY_ADDRESS_OF:
-		case AST_EXPRESSION_UNARY_MINUS:
-		case AST_EXPRESSION_UNARY_PLUS:
-		case AST_EXPRESSION_UNARY_BINARY_NOT:
-		case AST_EXPRESSION_UNARY_NOT:
-		{
-			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			Write(buffer, "(");
-			Write(buffer, unary->op);
-			Write(buffer, " ");
-			Write(buffer, unary->subexpression);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_SUBSCRIPT:
-		{
-			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
-			Write(buffer, subscript->array);
-			Write(buffer, "[");
-			Write(buffer, subscript->index);
-			Write(buffer, "]");
-		} break;
-
-		case AST_EXPRESSION_CALL:
-		{
-			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
-			Write(buffer, call->function);
-			if (call->parameters->kind != AST_EXPRESSION_TUPLE)
-			{
-				Write(buffer, "(");
-				Write(buffer, call->parameters);
-				Write(buffer, ")");
-			}
-			else
-			{
-				Write(buffer, call->parameters);
-			}
-		} break;
-
-		case AST_EXPRESSION_TUPLE:
-		{
-			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
-			Write(buffer, "(");
-			for (u32 i = 0; i < tuple->elements.count; i++)
-			{
-				if (i) Write(buffer, ", ");
-				Write(buffer, tuple->elements[i]);
-			}
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_IF_ELSE:
-		{
-			Ast_Expression_Ternary* ternary = (Ast_Expression_Ternary*)expression;
-			Write(buffer, "(");
-			Write(buffer, ternary->left);
-			Write(buffer, " if ");
-			Write(buffer, ternary->middle);
-			Write(buffer, " else ");
-			Write(buffer, ternary->right);
-			Write(buffer, ")");
-		} break;
-
-		case AST_EXPRESSION_AS:
-		{
-			Write(buffer, "(AS)");
-		} break;
-
-		case AST_EXPRESSION_LAMBDA:
-		{
-			Write(buffer, "(LAMBDA)");
-		} break;
-	}
-}
-
 static bool IsSpecifier(Token_Kind kind)
 {
 	return kind == TOKEN_ASTERISK
@@ -567,16 +237,8 @@ template<typename ...Args>
 static void Error(Parse_Info* info, SourceLocation where, String format, Args&&... message_args)
 {
 	u32 margin = 2;
-	u32 start = 0;
+	u32 start = where.line;
 	u32 number_of_lines = 1 + margin;
-
-	// u32 number_of_lines = 1 + margin * 2;
-	// if (margin < where.line)
-	// {
-	// 	start = where.line - margin;
-	// }
-
-	start = where.line;
 
 	Print("%:%:%: error: ", info->file_path, (where.line+1), (where.offset+1));
 	Print(format, message_args...);
@@ -651,6 +313,7 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 		{
 			Ast_Struct_Member member;
 			member.name = token;
+			member.index = members.count;
 			token++;
 
 			if (token->kind != TOKEN_COLON)
@@ -721,6 +384,7 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 		{
 			Ast_Enum_Member member;
 			member.name = token;
+			member.index = members.count;
 			token++;
 
 			if (token->kind != TOKEN_EQUAL)
@@ -774,7 +438,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		{
 			case TOKEN_ASTERISK:         unary->kind = AST_EXPRESSION_UNARY_VALUE_OF;   break;
 			case TOKEN_AMPERSAND:        unary->kind = AST_EXPRESSION_UNARY_ADDRESS_OF; break;
-			case TOKEN_BITWISE_NOT:      unary->kind = AST_EXPRESSION_UNARY_BINARY_NOT; break;
+			case TOKEN_BITWISE_NOT:      unary->kind = AST_EXPRESSION_UNARY_BITWISE_NOT; break;
 			case TOKEN_NOT:              unary->kind = AST_EXPRESSION_UNARY_NOT;        break;
 			case TOKEN_MINUS:            unary->kind = AST_EXPRESSION_UNARY_MINUS;      break;
 			case TOKEN_PLUS:             unary->kind = AST_EXPRESSION_UNARY_PLUS;       break;
@@ -1199,6 +863,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 	while (token < closure)
 	{
 		Ast_VariableDeclaration param;
+		ZeroMemory(&param);
 		param.type = null;
 		param.explicit_type = null;
 		param.is_parameter = true;
@@ -1244,9 +909,21 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 	function->parameters = params.Lock();
 }
 
+// static Ast_Branch_Loop_Kind GetBranchLoopKind(Token_Kind* kind)
+// {
+// 	switch (kind)
+// 	{
+// 		case TOKEN_IF:    return AST_BRANCH_LOOP_IF;
+// 		case TOKEN_WHILE: return AST_BRANCH_LOOP_WHILE;
+// 		case TOKEN_FOR:   return AST_BRANCH_LOOP_FOR;
+// 		default: Assert(); Unreachable();
+// 	}
+// }
+
 static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* info)
 {
 	Ast_BranchBlock branch_block;
+	ZeroMemory(&branch_block);
 	branch_block.branches = null;
 
 	Ast_Branch branch;
@@ -1321,12 +998,13 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 	Ast_Branch* else_branch = null;
 	Ast_Branch* then_branch = null;
 
-	for (s32 i = branch_block.branches.count-1; i >= 0; i--)
+	for (Ast_Branch* branch = branch_block.branches.End()-1; branch >= branch_block.branches.Begin(); branch--)
 	{
-		Ast_Branch* branch = &branch_block.branches[i];
-
-		branch->else_branch = else_branch;
-		branch->then_branch = then_branch;
+		if (branch->condition)
+		{
+			branch->else_branch = else_branch;
+			branch->then_branch = then_branch;
+		}
 
 		if (branch->kind == AST_BRANCH_ELSE)
 		{
@@ -1344,6 +1022,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 {
 	Ast_Statement statement;
+	ZeroMemory(&statement);
 
 	if (token[0].kind == TOKEN_IDENTIFIER && token[1].kind == TOKEN_COLON)
 	{
@@ -1418,31 +1097,17 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 		statement.branch_block = branch_block;
 		return statement;
 	}
-	else if (token->kind == TOKEN_INC)
+	else if (token->kind == TOKEN_INC || token->kind == TOKEN_DEC)
 	{
-		statement.kind = AST_STATEMENT_INCREMENT;
+		statement.kind = token->kind == TOKEN_INC ? AST_STATEMENT_INCREMENT : AST_STATEMENT_DECREMENT;
 		statement.increment.token = token++;
 
 		if (!IsOnCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
 		{
-			Error(info, statement.increment.token->location, "Expected expression after inc keyword\n");
+			Error(info, statement.increment.token->location, "Expected expression after % keyword\n", statement.increment.token);
 		}
 
 		statement.increment.expression = ParseExpression(token, indent+1, info);
-
-		return statement;
-	}
-	else if (token->kind == TOKEN_DEC)
-	{
-		statement.kind = AST_STATEMENT_DECREMENT;
-		statement.decrement.token = token++;
-
-		if (!IsOnCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
-		{
-			Error(info, statement.decrement.token->location, "Expected expression after dec keyword\n");
-		}
-
-		statement.decrement.expression = ParseExpression(token, indent+1, info);
 
 		return statement;
 	}
@@ -1494,13 +1159,6 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 			statement.claim.expression = ParseExpression(token, indent+1, info, false);
 		}
 
-		return statement;
-	}
-	else if (token->kind == TOKEN_ALIAS)
-	{
-		// @Todo
-		statement.kind = AST_STATEMENT_ALIAS;
-		statement.alias.token = token++;
 		return statement;
 	}
 	else if (token->kind == TOKEN_SEMICOLON)
@@ -1620,7 +1278,7 @@ static Ast_Function ParseFunction(Token*& token, u32 indent, Parse_Info* info)
 	{
 		CheckScope(token, indent+1, info);
 		token++;
-		function.does_return = true;
+		function.does_have_return_type_appendage = true;
 		function.ast_return_type = info->stack.Allocate<Ast_Type>();
 		*function.ast_return_type = ParseType(token, indent, info);
 	}
@@ -1717,16 +1375,17 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 	root->scope.enums = enums.Lock();
 }
 
-void ParseFile(String file_path)
+Parse_Info ParseFile(String file_path)
 {
 	Parse_Info info;
 	ZeroMemory(&info);
-	info.stack.Init();
+	info.stack = NewStackAllocator();
 	LexicalParse(file_path, &info);
 	info.ast_root = info.stack.Allocate<Ast_Root>();
 	ZeroMemory(info.ast_root);
 	InitIntrinsicFunctions(&info);
 	ParseGlobalScope(info.ast_root, info.tokens, &info);
 	SemanticParse(&info);
+	return info;
 }
 

@@ -45,8 +45,9 @@ struct String
 	{
 		if (length + other.length >= capacity)
 		{
+			u32 old_capacity = capacity;
 			capacity = capacity * 2 + other.length;
-			ReAllocate(data, capacity);
+			ReAllocate(data, old_capacity, capacity);
 		}
 
 		CopyMemory(data + length, other.data, other.length);
@@ -57,8 +58,9 @@ struct String
 	{
 		if (length + 1 >= capacity)
 		{
+			u32 old_capacity = capacity;
 			capacity += length + 1;
-			ReAllocate(data, capacity);
+			ReAllocate(data, old_capacity, capacity);
 		}
 
 		data[length++] = c;

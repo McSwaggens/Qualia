@@ -5,10 +5,11 @@
 #include "list.h"
 #include "token.h"
 #include "span.h"
+#include "type.h"
+#include "ir.h"
 
 struct Ast_Expression;
 struct Ast_VariableDeclaration;
-struct Ast_Alias;
 struct Ast_Import;
 struct Ast_Struct_Member;
 struct Ast_Enum_Member;
@@ -23,66 +24,12 @@ struct Ast_Enum;
 struct Ast_Code;
 struct Ast_Scope;
 struct Ast_Attribute;
-struct Type;
 struct StackFrame;
 
 void Write(OutputBuffer* buffer, Ast_Expression* expression);
 void Write(OutputBuffer* buffer, Ast_Type* type);
 void Write(OutputBuffer* buffer, Ast_Type type);
 void Write(OutputBuffer* buffer, Type* type);
-
-enum Type_Kind
-{
-	TYPE_BASETYPE_BOOL,
-	TYPE_BASETYPE_UINT8,
-	TYPE_BASETYPE_UINT16,
-	TYPE_BASETYPE_UINT32,
-	TYPE_BASETYPE_UINT64,
-	TYPE_BASETYPE_INT8,
-	TYPE_BASETYPE_INT16,
-	TYPE_BASETYPE_INT32,
-	TYPE_BASETYPE_INT64,
-	TYPE_BASETYPE_FLOAT16,
-	TYPE_BASETYPE_FLOAT32,
-	TYPE_BASETYPE_FLOAT64,
-	TYPE_BASETYPE_STRUCT,
-	TYPE_BASETYPE_ENUM,
-	TYPE_BASETYPE_TUPLE,
-	TYPE_BASETYPE_FUNCTION,
-	TYPE_SPECIFIER_POINTER,
-	TYPE_SPECIFIER_OPTIONAL,
-	TYPE_SPECIFIER_DYNAMIC_ARRAY,
-	TYPE_SPECIFIER_FIXED_ARRAY
-};
-
-struct Type
-{
-	Type_Kind kind;
-
-	union
-	{
-		Ast_Struct* structure;
-		Ast_Enum*   enumeration;
-
-		struct
-		{
-			Type* input;
-			Type* output;
-		} function;
-
-		Array<Type*> tuple;
-		Type* subtype;
-	};
-
-	Type* specifiers;
-	u64 length; // Fixed array size
-	u64 size;   // Size of the type in bytes
-
-	// @Optimization: Combine these into single List?
-	List<Type*> fixed_arrays;
-	List<Type*> tuple_extensions;
-	List<Type*> function_extensions;
-};
 
 using Intrinsic_Function_Type = void (*)(void*, void*);
 
@@ -116,7 +63,6 @@ struct Ast_Specifier
 
 enum Ast_BaseType_Kind
 {
-	// @Todo: Add `AST_BASETYPE_ALIAS`?
 	AST_BASETYPE_USERTYPE,
 	AST_BASETYPE_STRUCT,
 	AST_BASETYPE_ENUM,
@@ -168,7 +114,7 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_TERMINAL_ARRAY_LENGTH,
 	AST_EXPRESSION_TERMINAL_ARRAY_DATA,
 	AST_EXPRESSION_FIXED_ARRAY,
-	AST_EXPRESSION_UNARY_BINARY_NOT,
+	AST_EXPRESSION_UNARY_BITWISE_NOT,
 	AST_EXPRESSION_UNARY_NOT,
 	AST_EXPRESSION_UNARY_MINUS,
 	AST_EXPRESSION_UNARY_PLUS,
@@ -206,8 +152,8 @@ struct Ast_Expression
 {
 	Ast_Expression_Kind kind;
 	bool is_pure;
-	bool is_referential_value;
 	bool can_constantly_evaluate;
+	bool is_referential_value;
 	Type* type;
 	Span<Token> span;
 };
@@ -252,6 +198,24 @@ struct Ast_Expression_Fixed_Array : Ast_Expression
 struct Ast_Expression_Literal : Ast_Expression
 {
 	Token* token;
+
+	union
+	{
+		bool value_bool;
+
+		s8  value_int8;
+		s16 value_int16;
+		s32 value_int32;
+		s64 value_int64;
+
+		u8  value_uint8;
+		u16 value_uint16;
+		u32 value_uint32;
+		u64 value_uint64;
+
+		f32 value_float32;
+		f64 value_float64;
+	};
 };
 
 struct Ast_Expression_Subscript : Ast_Expression
@@ -311,7 +275,6 @@ struct Ast_Expression_Enum_Member : Ast_Expression
 struct Ast_Scope
 {
 	Ast_Scope* parent;
-	// Aliases?
 	Array<Ast_Function> functions;
 	Array<Ast_Struct> structs;
 	Array<Ast_Enum> enums;
@@ -326,6 +289,7 @@ struct Ast_Code
 	Ast_Scope scope;
 	u64 frame_size;
 	bool does_return;
+	bool has_return_statement;
 	bool is_inside_loop;
 	bool has_deferrer_that_returns;
 };
@@ -335,7 +299,6 @@ enum Ast_Statement_Kind
 	AST_STATEMENT_BRANCH_BLOCK,
 	AST_STATEMENT_DEFER,
 	AST_STATEMENT_CLAIM,
-	AST_STATEMENT_ALIAS,
 	AST_STATEMENT_RETURN,
 	AST_STATEMENT_BREAK,
 	AST_STATEMENT_INCREMENT,
@@ -366,7 +329,9 @@ struct Ast_Branch
 	Ast_Expression* condition;
 	Ast_Branch* else_branch;
 	Ast_Branch* then_branch;
+	IrBlock* initial_condition_block;
 	Ast_Code code;
+	bool used;
 };
 
 struct Ast_BranchBlock
@@ -378,13 +343,6 @@ struct Ast_Defer
 {
 	Token* token;
 	Ast_Code code;
-};
-
-struct Ast_Alias
-{
-	Token* token;
-	Ast_Expression* expression; // ????
-	// Token for identifier here?
 };
 
 struct Ast_Return
@@ -399,13 +357,7 @@ struct Ast_Claim
 	Ast_Expression* expression;
 };
 
-struct Ast_Increment
-{
-	Token* token;
-	Ast_Expression* expression;
-};
-
-struct Ast_Decrement
+struct Ast_Increment // Nudge?
 {
 	Token* token;
 	Ast_Expression* expression;
@@ -414,15 +366,17 @@ struct Ast_Decrement
 struct Ast_VariableDeclaration
 {
 	Token* name;
-	bool is_parameter;
-	bool can_constantly_evaluate;
-	bool is_pure;
-	bool is_global;
-	u64  offset;
+	u64 offset;
+	IrValue address;
+	IrValue current_value;
 	Ast_Type* explicit_type;
 	Type* type;
 	Ast_Expression* assignment;
 	Ast_Attribute attribute;
+	bool is_parameter;
+	bool can_constantly_evaluate;
+	bool is_pure;
+	bool is_global;
 };
 
 struct StackFrame
@@ -456,18 +410,15 @@ struct Ast_Statement
 
 	union
 	{
-		Token*                  token;
 		Ast_Assignment          assignment;
 		Ast_BranchBlock         branch_block;
 		Ast_Defer               defer;
 		Ast_Claim               claim;
-		Ast_Alias               alias;
 		Ast_Break               brk;
 		Ast_Return              ret;
-		Ast_VariableDeclaration variable_declaration;
-		Ast_Expression*         expression;
+		Ast_VariableDeclaration variable_declaration; // @FixMe @Optimization: Change to pointer, Ast_VariableDeclaration is yuuuge!
 		Ast_Increment           increment;
-		Ast_Decrement           decrement;
+		Ast_Expression*         expression;
 	};
 };
 
@@ -480,8 +431,11 @@ struct Ast_Function
 	Type* return_type;
 	Ast_Code code;
 	Ast_Attribute attribute;
+	List<IrBlock*> blocks;
+	u32 block_id_counter;
+	u32 register_id_counter;
 	bool is_pure;
-	bool does_return;
+	bool does_have_return_type_appendage;
 	bool is_global;
 };
 
@@ -496,6 +450,7 @@ struct Ast_Struct_Member
 	Token* name;
 	Ast_Type type;
 	u64 offset;
+	u32 index;
 	Ast_Attribute attribute;
 };
 
@@ -503,6 +458,7 @@ struct Ast_Enum_Member
 {
 	Token* name;
 	Ast_Expression* expression;
+	u32 index;
 	Ast_Attribute attribute;
 };
 
@@ -553,173 +509,11 @@ struct Interpreter
 	MemoryBlock* block;
 };
 
-extern Type empty_tuple;
-extern Type type_bool;
-extern Type type_int8;
-extern Type type_int16;
-extern Type type_int32;
-extern Type type_int64;
-extern Type type_uint8;
-extern Type type_uint16;
-extern Type type_uint32;
-extern Type type_uint64;
-extern Type type_float16;
-extern Type type_float32;
-extern Type type_float64;
-
-static bool IsPrimitive(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_BOOL:
-		case TYPE_BASETYPE_UINT8:
-		case TYPE_BASETYPE_UINT16:
-		case TYPE_BASETYPE_UINT32:
-		case TYPE_BASETYPE_UINT64:
-		case TYPE_BASETYPE_INT8:
-		case TYPE_BASETYPE_INT16:
-		case TYPE_BASETYPE_INT32:
-		case TYPE_BASETYPE_INT64:
-		case TYPE_BASETYPE_FLOAT16:
-		case TYPE_BASETYPE_FLOAT32:
-		case TYPE_BASETYPE_FLOAT64:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsConvertableToBool(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_BOOL:
-		case TYPE_BASETYPE_UINT8:
-		case TYPE_BASETYPE_UINT16:
-		case TYPE_BASETYPE_UINT32:
-		case TYPE_BASETYPE_UINT64:
-		case TYPE_BASETYPE_INT8:
-		case TYPE_BASETYPE_INT16:
-		case TYPE_BASETYPE_INT32:
-		case TYPE_BASETYPE_INT64:
-		case TYPE_SPECIFIER_POINTER:
-		case TYPE_SPECIFIER_OPTIONAL:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsInteger(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_UINT8:
-		case TYPE_BASETYPE_UINT16:
-		case TYPE_BASETYPE_UINT32:
-		case TYPE_BASETYPE_UINT64:
-		case TYPE_BASETYPE_INT8:
-		case TYPE_BASETYPE_INT16:
-		case TYPE_BASETYPE_INT32:
-		case TYPE_BASETYPE_INT64:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsSignedInteger(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_INT8:
-		case TYPE_BASETYPE_INT16:
-		case TYPE_BASETYPE_INT32:
-		case TYPE_BASETYPE_INT64:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsUnsignedInteger(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_UINT8:
-		case TYPE_BASETYPE_UINT16:
-		case TYPE_BASETYPE_UINT32:
-		case TYPE_BASETYPE_UINT64:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsFloat(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_FLOAT16:
-		case TYPE_BASETYPE_FLOAT32:
-		case TYPE_BASETYPE_FLOAT64:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsNumerical(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_BOOL:
-		case TYPE_BASETYPE_UINT8:
-		case TYPE_BASETYPE_UINT16:
-		case TYPE_BASETYPE_UINT32:
-		case TYPE_BASETYPE_UINT64:
-		case TYPE_BASETYPE_INT8:
-		case TYPE_BASETYPE_INT16:
-		case TYPE_BASETYPE_INT32:
-		case TYPE_BASETYPE_INT64:
-		case TYPE_BASETYPE_FLOAT16:
-		case TYPE_BASETYPE_FLOAT32:
-		case TYPE_BASETYPE_FLOAT64:
-		case TYPE_SPECIFIER_POINTER:
-		case TYPE_BASETYPE_ENUM:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsPointer(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_SPECIFIER_POINTER:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsOptional(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_SPECIFIER_OPTIONAL:
-			return true;
-		default:
-			return false;
-	}
-}
-
 extern Array<Intrinsic_Function> intrinsic_functions;
 
 void LexicalParse(String file_path, Parse_Info* info);
 void InitIntrinsicFunctions(Parse_Info* info);
-void ParseFile(String file_path);
+Parse_Info ParseFile(String file_path);
 void SemanticParse(Parse_Info* info);
 void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter);
 void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter);
@@ -728,4 +522,11 @@ StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
 u32 GetTypePrecedence(Type* type);
 Type* GetDominantType(Type* a, Type* b);
 void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value);
-
+u64 CalculateStackFrameSize(Ast_Function* function);
+u64 CalculateStackFrameSize(Ast_Code* code, u64 offset);
+MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev = null);
+Interpreter* CreateInterpreter(Parse_Info* info);
+void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info);
+void ScanScope(Ast_Scope* scope, Parse_Info* info);
+void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info);
+void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info);

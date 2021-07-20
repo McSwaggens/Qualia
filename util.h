@@ -2,11 +2,9 @@
 
 #include "int.h"
 
-#define Cast(E, T) ((T)E)
-
 static consteval bool IsDebug()
 {
-#if !defined(NDEBUG)
+#if defined(DEBUG)
 	return true;
 #else
 	return false;
@@ -129,7 +127,7 @@ static constexpr u32 DigitToInt(char c, DigitBase base = Base10)
 	switch (base)
 	{
 		case Base16:
-			if (c >= 'A' && c <= 'F' || c >= 'a' && c <= 'f') return (c & 0xDF) - ('A' - 10);
+			if ((c & 0xDF) - 'A' < 6) return (c & 0xDF) - ('A' - 10);
 
 		case Base10:
 		case Base8:
@@ -152,6 +150,8 @@ static constexpr bool IsPow2(u64 n)
 {
 	return n != 0 && (n & n-1) == 0;
 }
+
+// @Note: NextPow2(2^n) = 2^n
 
 static constexpr u64 NextPow2(u8 n)
 {
@@ -209,6 +209,26 @@ static constexpr u64 CountBits(u64 n)
 	return __builtin_popcountll(n);
 }
 
+static constexpr u64 CountLeadingZeroes(u32 n)
+{
+	return __builtin_clz(n);
+}
+
+static constexpr u64 CountLeadingZeroes(u64 n)
+{
+	return __builtin_clzll(n);
+}
+
+static constexpr u64 CountTrailingZeroes(u32 n)
+{
+	return __builtin_ctz(n);
+}
+
+static constexpr u64 CountTrailingZeroes(u64 n)
+{
+	return __builtin_ctzll(n);
+}
+
 template<typename T>
 static constexpr void Reverse(T* items, u64 count)
 {
@@ -224,5 +244,6 @@ void ExitProcess(bool failure);
 [[noreturn]]
 void Fail();
 
-u64 SystemCall(u64 rax, u64 rdi = 0, u64 rsi = 0, u64 rdx = 0, u64 r10 = 0, u64 r8 = 0, u64 r9 = 0);
+extern "C" u64 SystemCall(u64 rax, u64 rdi = 0, u64 rsi = 0, u64 rdx = 0, u64 r10 = 0, u64 r8 = 0, u64 r9 = 0);
+
 

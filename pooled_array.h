@@ -53,6 +53,16 @@ struct Pooled_Array
 
 		return Array(data, count);
 	}
+
+	void Release()
+	{
+		ReleaseArray((char*)data, size);
+	}
+
+	void Reset()
+	{
+		count = 0;
+	}
 };
 
 template<typename T>

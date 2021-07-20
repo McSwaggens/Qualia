@@ -25,13 +25,16 @@ struct List
 	constexpr T* Begin() { return data; }
 	constexpr T* End() { return data + count; }
 
+	constexpr T& Last() { return data[count-1]; }
+
 	void Add(T item)
 	{
 		u32 amount = 1;
 		if (count + amount >= capacity)
 		{
+			u32 old_capacity = capacity;
 			capacity = (count + amount) * 2;
-			ReAllocate(data, capacity);
+			ReAllocate(data, old_capacity, capacity);
 		}
 
 		FillMemory(data + count, amount, item);
@@ -56,12 +59,33 @@ struct List
 	{
 		if (count + amount >= capacity)
 		{
+			u32 old_capacity = capacity;
 			capacity = (count + amount) * 2;
-			ReAllocate(data, capacity);
+			ReAllocate(data, old_capacity, capacity);
 		}
 
 		FillMemory(data + count, amount, item);
 		count += amount;
+	}
+
+	void Pop()
+	{
+		count--;
+	}
+
+	void Remove(T item)
+	{
+		T* p = Begin();
+		while (p < End() && *p != item) p++;
+		if (p != End())
+		{
+			while (p+1 != End())
+			{
+				*p = *++p;
+			}
+
+			count--;
+		}
 	}
 
 	bool Contains(T value)
@@ -81,8 +105,9 @@ struct List
 	{
 		if (count + amount >= capacity)
 		{
+			u32 old_capacity = capacity;
 			capacity = count + amount;
-			ReAllocate(data, capacity);
+			ReAllocate(data, old_capacity, capacity);
 		}
 	}
 
@@ -90,8 +115,9 @@ struct List
 	{
 		if (count + amount >= capacity)
 		{
+			u32 old_capacity = capacity;
 			capacity = count + amount;
-			ReAllocate(data, capacity);
+			ReAllocate(data, old_capacity, capacity);
 		}
 
 		FillMemory(data + count, amount, value);
@@ -143,7 +169,7 @@ static inline List<T> CopyList(List<T> src, u32 padding = 0)
 template<typename T>
 static inline void AppendList(List<T>& target, const List<T> other)
 {
-	if (target.count + other.count >= target.capacity) // [[unlikely]]
+	if (target.count + other.count >= target.capacity)
 	{
 		target.capacity += other.count;
 		ReAllocate(target.data, target.capacity);
@@ -153,22 +179,10 @@ static inline void AppendList(List<T>& target, const List<T> other)
 	target.count += other.count;
 }
 
-// template<typename T>
-// static inline void AppendList(List<T>& list, T item, u32 count = 1)
-// {
-// 	if (list.count + count >= list.capacity)
-// 	{
-// 		list.capacity = (list.count + count) * 2;
-// 		ReAllocate(list.data, list.capacity);
-// 	}
-// 	FillMemory(list.data + list.count, item, count);
-// 	list.count += count;
-// }
-
 template<typename T>
 static inline void Free(List<T> list)
 {
-	Free(list.data);
+	DeAllocate(list.data, list.capacity);
 }
 
 template<typename T>

@@ -1,14 +1,19 @@
 bin/qualia: *.cpp *.h
 	mkdir -p bin
-	clang -o bin/qualia -lm -g3 -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions *.cpp
+	nasm -felf64 util.asm -o bin/util.o
+	clang -o bin/qualia -march=znver3 -lm -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions qualia.cpp bin/util.o \
+		-Og -ggdb -g3 -fno-omit-frame-pointer -DDEBUG
+		# -O3 -DDEBUG
 
 run: bin/qualia
 	./bin/qualia
+
+time: bin/qualia
+	fish -c "time ./bin/qualia"
 
 clean:
 	rm bin/qualia
 
 tags: *.cpp *.h
 	ctags -R --language-force=c++ --fields=+S *.h
-	# ctags *.h -R --language-force=c++ --c++-kinds=+p --fields=+S --extras=+q
 

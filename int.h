@@ -51,6 +51,7 @@ static constexpr u64 s64_min = 0x8000000000000000;
 
 // -------------------------------------------- //
 
+using f16 = __fp16;
 using f32 = float;
 using f64 = double;
 static_assert(sizeof(f32) == 4);

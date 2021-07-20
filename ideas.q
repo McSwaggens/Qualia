@@ -1,3 +1,5 @@
+// Struct member visability based on scope
+// difficulty: no idea
 struct Number:
 	signed: bool
 
@@ -41,3 +43,54 @@ Print(string: String):
 		for c in string.chars where c.IsAlphaNumeric():
 			Print(c)
 
+// once keyword:
+// difficulty: trivial
+PrintNumbers(numbers : []int):
+	for n in numbers:
+		once: Print("{ ", n);
+		else: Print(", ", n)
+	Print(" }");
+
+
+
+// Range:
+Fib(n : int) -> int:
+	a := 0
+	b := 1
+	for i in [0..n]:
+		c := a * b
+		a = b
+		b = c
+	return b
+
+// Tuple assignment:
+Fib(n : int) -> int:
+	a, b := (0, 1)
+	for i in [0..n]:
+		(a, b) = (b, a * b)
+	return b
+
+// 'where' keyword:
+PrintOdds(nums : []int):
+	for n in nums where n & 1:
+		Print(n)
+
+// Generics:
+Add(array : *[]T, value : T):
+	if BitCount(array.count+1) = 1:
+		array.data = ReAllocate(array.data, SizeOf(T) * array.count)
+	array[array.count] = value
+	inc array.count
+
+// Iterator functions:
+MyIteratorFunction(string : String) -> uint8:
+	if string.count <= 8:
+		for c in string.chars:
+			yield c
+	else:
+		for c in string.chars_ptr:
+			yield c
+
+Print(string : String):
+	for c in string:
+		Print(c)

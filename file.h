@@ -30,6 +30,12 @@ struct OutputBuffer
 	void Flush();
 	void Write(char c);
 	void Write(const char* src, u64 size);
+
+	template<u64 N>
+	void Write(const char (&s)[N])
+	{
+		Write(s, N-1);
+	}
 };
 
 
@@ -47,6 +53,7 @@ enum FileMode
 	FILE_MODE_APPEND,   // Open an existing file and go to the end.
 	FILE_MODE_TRUNCATE, // Open and truncate an existing file.
 	FILE_MODE_CREATE,   // Create a file that doesn't already exist.
+						// ProTip: Believe it or not; there is an 'E' at the end of 'create'!
 
 	FILE_MODE_CREATE_OR_OPEN,     // Open or create a file.
 	FILE_MODE_CREATE_OR_APPEND,   // Create file if it doesn't already exist, otherwise go the end.

@@ -3,121 +3,116 @@
 #include "print.h"
 #include "assert.h"
 
-IrValue MakeConstU8(u8 n)   { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_uint8;   v.value_uint8   = n; return v; }
-IrValue MakeConstU16(u16 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_uint16;  v.value_uint16  = n; return v; }
-IrValue MakeConstU32(u32 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_uint32;  v.value_uint32  = n; return v; }
-IrValue MakeConstU64(u64 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_uint64;  v.value_uint64  = n; return v; }
-IrValue MakeConstS8(s8 n)   { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_int8;    v.value_int8    = n; return v; }
-IrValue MakeConstS16(s16 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_int16;   v.value_int16   = n; return v; }
-IrValue MakeConstS32(s32 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_int32;   v.value_int32   = n; return v; }
-IrValue MakeConstS64(s64 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_int64;   v.value_int64   = n; return v; }
-IrValue MakeConstF32(f32 f) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_float32; v.value_float32 = f; return v; }
-IrValue MakeConstF64(f64 f) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_float64; v.value_float64 = f; return v; }
-IrValue MakeConstBool(bool b) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_INLINED_CONSTANT; v.type = &type_bool;  v.value_bool    = b; return v; }
-IrValue NoValue() { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_UNUSED; return v; }
+IrValue MakeConstU8(u8 n)   { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_uint8;   v.value_uint8   = n; return v; }
+IrValue MakeConstU16(u16 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_uint16;  v.value_uint16  = n; return v; }
+IrValue MakeConstU32(u32 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_uint32;  v.value_uint32  = n; return v; }
+IrValue MakeConstU64(u64 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_uint64;  v.value_uint64  = n; return v; }
+IrValue MakeConstS8(s8 n)   { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_int8;    v.value_int8    = n; return v; }
+IrValue MakeConstS16(s16 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_int16;   v.value_int16   = n; return v; }
+IrValue MakeConstS32(s32 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_int32;   v.value_int32   = n; return v; }
+IrValue MakeConstS64(s64 n) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_int64;   v.value_int64   = n; return v; }
+IrValue MakeConstF32(f32 f) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_float32; v.value_float32 = f; return v; }
+IrValue MakeConstF64(f64 f) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_float64; v.value_float64 = f; return v; }
+IrValue MakeConstBool(bool b) { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_CONSTANT; v.type = &type_bool;  v.value_bool    = b; return v; }
+IrValue NoValue() { IrValue v; ZeroMemory(&v); v.kind = IR_VALUE_NONE; return v; }
 
-IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block, IrContext* context);
+IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block);
 
-IrValue Dependency(IrValue dependency, IrOperation* user)
+IrValue Dependency(IrValue dependency, IrInstruction* user)
 {
 	switch (dependency.kind)
 	{
-		case IR_VALUE_REGISTER: dependency.reg->users.Add(user);      break;
-		case IR_VALUE_BLOCK:    dependency.block->users.Add(user);    break;
-		case IR_VALUE_ARGUMENT: dependency.argument->users.Add(user); break;
-
-		case IR_VALUE_CONSTANT:
-			Assert();
-
-		case IR_VALUE_UNUSED:
-		case IR_VALUE_INLINED_CONSTANT:
-			break;
+		case IR_VALUE_NONE: break;
+		case IR_VALUE_INSTRUCTION: dependency.instruction->users.Add(user); break;
+		case IR_VALUE_CONSTANT: break;
+		case IR_VALUE_LARGE_CONSTANT: break;
+		case IR_VALUE_GLOBAL: Assert();
 	}
 
 	return dependency;
 }
 
-void RemoveDependency(IrValue dependency, IrOperation* user)
+void RemoveDependency(IrValue dependency, IrInstruction* user)
 {
 	switch (dependency.kind)
 	{
-		case IR_VALUE_CONSTANT:
-			Assert();
-
-		case IR_VALUE_REGISTER: dependency.reg->users.Remove(user);      break;
-		case IR_VALUE_BLOCK:    dependency.block->users.Remove(user);    break;
-		case IR_VALUE_ARGUMENT: dependency.argument->users.Remove(user); break;
-
-		case IR_VALUE_UNUSED:
-		case IR_VALUE_INLINED_CONSTANT:
-			break;
+		case IR_VALUE_NONE: break;
+		case IR_VALUE_INSTRUCTION: dependency.instruction->users.Remove(user); break;
+		case IR_VALUE_CONSTANT: break;
+		case IR_VALUE_LARGE_CONSTANT: break;
+		case IR_VALUE_GLOBAL: Assert();
 	}
 }
 
-IrOperation* PushOperation(IrOperation_Kind kind, Type* type, IrBlock* block, IrContext* context)
+IrInstruction* AllocateIrInstruction(IrBlock* block)
 {
-	IrOperation* op = Allocate<IrOperation>();
-	ZeroMemory(op);
-	op->kind = kind;
-	op->type = type;
-	op->id = type ? context->function->register_id_counter++ : -1;
-	block->operations.Add(op);
-	return op;
+	if (block->bucket_head)
+	{
+		IrInstruction* result = block->bucket_head;
+		block->bucket_head = block->bucket_head->next;
+		return result;
+	}
+
+	IrInstruction_Bucket* bucket = Allocate<IrInstruction_Bucket>();
+	ZeroMemory(bucket);
+	bucket->next = block->bucket;
+
+	for (u32 i = 1; i < IR_INSTRUCTION_BUCKET_COUNT-1; i++)
+	{
+		IrInstruction* instruction = bucket->instructions + i;
+		instruction->next = instruction + 1;
+	}
+
+	bucket->instructions[IR_INSTRUCTION_BUCKET_COUNT-1].next = null;
+	block->bucket = bucket;
+	block->bucket_head = bucket->instructions + 1;
+
+	return bucket->instructions;
 }
 
-IrOperation* PushOperation(IrOperation_Kind kind, Type* type, IrValue a, IrBlock* block, IrContext* context)
+IrInstruction* PushInstruction(IrInstruction_Kind kind, Type* type, IrBlock* block)
 {
-	IrOperation* op = PushOperation(kind, type, block, context);
-	op->a = Dependency(a, op);
-	return op;
+	IrInstruction* instruction = AllocateIrInstruction(block);
+	ZeroMemory(instruction);
+	instruction->kind = kind;
+	instruction->type = type;
+	instruction->id = type ? block->function->register_id_counter++ : -1;
+	instruction->block_id = block->id;
+	return instruction;
 }
 
-IrOperation* PushOperation(IrOperation_Kind kind, Type* type, IrValue a, IrValue b, IrBlock* block, IrContext* context)
+IrInstruction* PushInstruction(IrInstruction_Kind kind, Type* type, IrValue a, IrBlock* block)
 {
-	IrOperation* op = PushOperation(kind, type, a, block, context);
-	op->b = Dependency(b, op);
-	return op;
+	IrInstruction* instruction = PushInstruction(kind, type, block);
+	instruction->a = Dependency(a, instruction);
+	return instruction;
 }
 
-IrOperation* PushOperation(IrOperation_Kind kind, Type* type, IrValue a, IrValue b, IrValue c, IrBlock* block, IrContext* context)
+IrInstruction* PushInstruction(IrInstruction_Kind kind, Type* type, IrValue a, IrValue b, IrBlock* block)
 {
-	IrOperation* op = PushOperation(kind, type, a, b, block, context);
-	op->c = Dependency(c, op);
-	return op;
+	IrInstruction* instruction = PushInstruction(kind, type, a, block);
+	instruction->b = Dependency(b, instruction);
+	return instruction;
 }
 
-IrValue GetValue(IrOperation* op)
+IrInstruction* PushInstruction(IrInstruction_Kind kind, Type* type, IrValue a, IrValue b, IrValue c, IrBlock* block)
+{
+	IrInstruction* instruction = PushInstruction(kind, type, a, b, block);
+	instruction->c = Dependency(c, instruction);
+	return instruction;
+}
+
+IrValue GetValue(IrInstruction* instruction)
 {
 	IrValue v;
 	ZeroMemory(&v);
-	v.kind = IR_VALUE_REGISTER;
-	v.reg = op;
-	v.type = op->type;
+	v.kind = IR_VALUE_INSTRUCTION;
+	v.instruction = instruction;
+	v.type = instruction->type;
 	return v;
 }
 
-IrArgument* PushArgument(Type* type, IrBlock* block)
-{
-	IrArgument* argument = Allocate<IrArgument>();
-	ZeroMemory(argument);
-	argument->id = block->function->register_id_counter++;
-	argument->block = block;
-	argument->type = type;
-	block->arguments.Add(argument);
-	return argument;
-}
-
-IrValue GetValue(IrArgument* argument)
-{
-	IrValue value;
-	ZeroMemory(&value);
-	value.kind = IR_VALUE_ARGUMENT;
-	value.argument = argument;
-	value.type = argument->type;
-	return value;
-}
-
-IrBlock* NewBlock(Ast_Function* function, IrContext* context)
+IrBlock* NewBlock(IrFunction* function)
 {
 	IrBlock* block = Allocate<IrBlock>();
 	ZeroMemory(block);
@@ -127,29 +122,21 @@ IrBlock* NewBlock(Ast_Function* function, IrContext* context)
 	return block;
 }
 
-IrValue GetValue(IrBlock* block)
-{
-	IrValue value;
-	ZeroMemory(&value);
-	value.kind = IR_VALUE_BLOCK;
-	value.block = block;
-	return value;
-}
-
-IrValue LoadOp(IrValue address, IrBlock* block, IrContext* context)
+IrValue PushLoad(IrValue address, IrBlock* block)
 {
 	Assert(address.type->kind == TYPE_SPECIFIER_POINTER);
-	return GetValue(PushOperation(OPERATION_LOAD, address.type->subtype, address, block, context));
+	Assert(address.type->size <= 8);
+	return GetValue(PushInstruction(IR_INSTRUCTION_LOAD, address.type->subtype, address, block));
 }
 
-IrValue CastValue(IrValue v, Type* to, IrBlock* block, IrContext* context)
+IrValue CastValue(IrValue v, Type* to, IrBlock* block)
 {
 	Type* from = v.type;
 	if (from == to) return v;
 
 	if (IsSignedInteger(from) && IsSignedInteger(to) && from->size < to->size)
 	{
-		return GetValue(PushOperation(OPERATION_SIGN_EXTEND, to, v, block, context));
+		return GetValue(PushInstruction(IR_INSTRUCTION_SIGN_EXTEND, to, v, block));
 	}
 
 	if (IsInteger(from) && IsInteger(to) ||
@@ -165,9 +152,9 @@ IrValue CastValue(IrValue v, Type* to, IrBlock* block, IrContext* context)
 	return v;
 }
 
-void StoreOp(IrValue address, IrValue value, IrBlock* block, IrContext* context)
+void PushStore(IrValue address, IrValue value, IrBlock* block)
 {
-	value = CastValue(value, address.type->subtype, block, context);
+	value = CastValue(value, address.type->subtype, block);
 
 	// Print("address.type->subtype = %\n", address.type->subtype);
 	// Print("value.type = %\n", value.type);
@@ -176,45 +163,80 @@ void StoreOp(IrValue address, IrValue value, IrBlock* block, IrContext* context)
 	Assert(value.type);
 	Assert(address.type->subtype == value.type);
 
-	PushOperation(OPERATION_STORE, null, address, value, block, context);
+	PushInstruction(IR_INSTRUCTION_STORE, null, address, value, block);
 }
 
-IrValue LoadConvertToIR(Ast_Expression* expression, IrBlock* block, IrContext* context)
+void PushCopy(IrValue destination, IrValue source, IrBlock* block)
 {
-	IrValue v = ConvertToIR(expression, block, context);
+	Assert(destination.type->kind == TYPE_SPECIFIER_POINTER);
+	Assert(destination.type == source.type);
+
+	PushInstruction(IR_INSTRUCTION_COPY, null, destination, source, block);
+}
+
+IrValue LoadConvertToIR(Ast_Expression* expression, IrBlock* block)
+{
+	IrValue v = ConvertToIR(expression, block);
 
 	if (expression->is_referential_value)
 	{
-		return LoadOp(v, block, context);
+		return PushLoad(v, block);
 	}
 
 	return v;
 }
 
-void PushJumpOp(IrBlock* from, IrBlock* to, IrContext* context)
+void DeclareUser(IrBlock* user, IrBlock* block)
 {
-	PushOperation(OPERATION_JUMP, null, GetValue(to), from, context);
+	block->users.Add(user);
 }
 
-IrValue PushTestOp(IrValue v, IrBlock* block, IrContext* context)
+void PushJump(IrBlock* from, IrBlock* to)
 {
-	return GetValue(PushOperation(OPERATION_COMPARE_NOT_EQUAL, &type_bool, v, MakeConstBool(false), block, context));
+	Assert(!from->control);
+	IrInstruction* instruction = PushInstruction(IR_INSTRUCTION_JUMP, null, from);
+	instruction->branch_a = to;
+	DeclareUser(from, to);
+	from->control = instruction;
 }
 
-IrValue TrimPointers(IrValue v, IrBlock* block, IrContext* context)
+void PushBranch(IrBlock* from, IrValue condition, IrBlock* block_true, IrBlock* block_false)
+{
+	Assert(!from->control);
+	IrInstruction* instruction = PushInstruction(IR_INSTRUCTION_BRANCH, null, condition, from);
+	instruction->branch_a = block_true;
+	instruction->branch_b = block_false;
+	DeclareUser(from, block_true);
+	DeclareUser(from, block_false);
+	from->control = instruction;
+}
+
+void PushReturn(IrBlock* from)
+{
+	PushInstruction(IR_INSTRUCTION_RETURN, null, from);
+}
+
+IrValue PushTest(IrValue v, IrBlock* block)
+{
+	IrValue zero = MakeConstU64(0);
+	zero.type = v.type;
+	return GetValue(PushInstruction(IR_INSTRUCTION_COMPARE_NOT_EQUAL, &type_bool, v, zero, block));
+}
+
+IrValue TrimPointers(IrValue v, IrBlock* block)
 {
 	Assert(v.type);
 	Assert(v.type->kind == TYPE_SPECIFIER_POINTER);
 
 	while (v.type->subtype->kind == TYPE_SPECIFIER_POINTER)
 	{
-		v = LoadOp(v, block, context);
+		v = PushLoad(v, block);
 	}
 
 	return v;
 }
 
-IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block, IrContext* context)
+IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block)
 {
 	switch (expression->kind)
 	{
@@ -229,7 +251,7 @@ IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block, IrContext* conte
 
 			IrValue v;
 			ZeroMemory(&v);
-			v.kind = IR_VALUE_INLINED_CONSTANT;
+			v.kind = IR_VALUE_CONSTANT;
 			v.type = literal->type;
 
 			switch (literal->type->kind)
@@ -276,26 +298,26 @@ IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block, IrContext* conte
 		case AST_EXPRESSION_UNARY_PLUS:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			IrValue subval = LoadConvertToIR(unary->subexpression, block, context);
+			IrValue subval = LoadConvertToIR(unary->subexpression, block);
 
-			IrOperation_Kind kind;
+			IrInstruction_Kind kind;
 			switch (expression->kind)
 			{
-				case AST_EXPRESSION_UNARY_BITWISE_NOT: kind = OPERATION_BITWISE_NOT; break;
-				case AST_EXPRESSION_UNARY_NOT:         kind = OPERATION_NOT;         break;
-				case AST_EXPRESSION_UNARY_MINUS:       kind = OPERATION_FLIP_SIGN;   break;
-				case AST_EXPRESSION_UNARY_PLUS:        kind = OPERATION_POSITIVE;    break;
+				case AST_EXPRESSION_UNARY_BITWISE_NOT: kind = IR_INSTRUCTION_BITWISE_NOT; break;
+				case AST_EXPRESSION_UNARY_NOT:         kind = IR_INSTRUCTION_NOT;         break;
+				case AST_EXPRESSION_UNARY_MINUS:       kind = IR_INSTRUCTION_FLIP_SIGN;   break;
+				case AST_EXPRESSION_UNARY_PLUS:        kind = IR_INSTRUCTION_POSITIVE;    break;
 				default: Unreachable();
 			}
 
-			return GetValue(PushOperation(kind, expression->type, subval, block, context));
+			return GetValue(PushInstruction(kind, expression->type, subval, block));
 		}
 
 		case AST_EXPRESSION_UNARY_VALUE_OF:
 		case AST_EXPRESSION_UNARY_ADDRESS_OF:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			return ConvertToIR(unary->subexpression, block, context);
+			return ConvertToIR(unary->subexpression, block);
 		};
 
 		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
@@ -317,41 +339,41 @@ IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block, IrContext* conte
 		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
-			IrValue left = LoadConvertToIR(binary->left, block, context);
-			IrValue right = LoadConvertToIR(binary->right, block, context);
+			IrValue left = LoadConvertToIR(binary->left, block);
+			IrValue right = LoadConvertToIR(binary->right, block);
 
-			IrOperation_Kind kind;
+			IrInstruction_Kind kind;
 
 			switch (expression->kind)
 			{
-				case AST_EXPRESSION_BINARY_COMPARE_EQUAL:            kind = OPERATION_COMPARE_EQUAL;            break;
-				case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:        kind = OPERATION_COMPARE_NOT_EQUAL;        break;
-				case AST_EXPRESSION_BINARY_COMPARE_LESS:             kind = OPERATION_COMPARE_LESS;             break;
-				case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    kind = OPERATION_COMPARE_LESS_OR_EQUAL;    break;
-				case AST_EXPRESSION_BINARY_COMPARE_GREATER:          kind = OPERATION_COMPARE_GREATER;          break;
-				case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: kind = OPERATION_COMPARE_GREATER_OR_EQUAL; break;
-				case AST_EXPRESSION_BINARY_ADD:                      kind = OPERATION_ADD;                      break;
-				case AST_EXPRESSION_BINARY_SUBTRACT:                 kind = OPERATION_SUBTRACT;                 break;
-				case AST_EXPRESSION_BINARY_MULTIPLY:                 kind = OPERATION_MULTIPLY;                 break;
-				case AST_EXPRESSION_BINARY_DIVIDE:                   kind = OPERATION_DIVIDE;                   break;
-				case AST_EXPRESSION_BINARY_MODULO:                   kind = OPERATION_MODULO;                   break;
-				case AST_EXPRESSION_BINARY_EXPONENTIAL:              kind = OPERATION_EXPONENTIAL;              break;
-				case AST_EXPRESSION_BINARY_BITWISE_OR:               kind = OPERATION_BITWISE_OR;               break;
-				case AST_EXPRESSION_BINARY_BITWISE_XOR:              kind = OPERATION_BITWISE_XOR;              break;
-				case AST_EXPRESSION_BINARY_BITWISE_AND:              kind = OPERATION_BITWISE_AND;              break;
-				case AST_EXPRESSION_BINARY_LEFT_SHIFT:               kind = OPERATION_BITWISE_LEFT_SHIFT;       break;
-				case AST_EXPRESSION_BINARY_RIGHT_SHIFT:              kind = OPERATION_BITWISE_RIGHT_SHIFT;      break;
+				case AST_EXPRESSION_BINARY_COMPARE_EQUAL:            kind = IR_INSTRUCTION_COMPARE_EQUAL;            break;
+				case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:        kind = IR_INSTRUCTION_COMPARE_NOT_EQUAL;        break;
+				case AST_EXPRESSION_BINARY_COMPARE_LESS:             kind = IR_INSTRUCTION_COMPARE_LESS;             break;
+				case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    kind = IR_INSTRUCTION_COMPARE_LESS_OR_EQUAL;    break;
+				case AST_EXPRESSION_BINARY_COMPARE_GREATER:          kind = IR_INSTRUCTION_COMPARE_GREATER;          break;
+				case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: kind = IR_INSTRUCTION_COMPARE_GREATER_OR_EQUAL; break;
+				case AST_EXPRESSION_BINARY_ADD:                      kind = IR_INSTRUCTION_ADD;                      break;
+				case AST_EXPRESSION_BINARY_SUBTRACT:                 kind = IR_INSTRUCTION_SUBTRACT;                 break;
+				case AST_EXPRESSION_BINARY_MULTIPLY:                 kind = IR_INSTRUCTION_MULTIPLY;                 break;
+				case AST_EXPRESSION_BINARY_DIVIDE:                   kind = IR_INSTRUCTION_DIVIDE;                   break;
+				case AST_EXPRESSION_BINARY_MODULO:                   kind = IR_INSTRUCTION_MODULO;                   break;
+				case AST_EXPRESSION_BINARY_EXPONENTIAL:              kind = IR_INSTRUCTION_EXPONENTIAL;              break;
+				case AST_EXPRESSION_BINARY_BITWISE_OR:               kind = IR_INSTRUCTION_BITWISE_OR;               break;
+				case AST_EXPRESSION_BINARY_BITWISE_XOR:              kind = IR_INSTRUCTION_BITWISE_XOR;              break;
+				case AST_EXPRESSION_BINARY_BITWISE_AND:              kind = IR_INSTRUCTION_BITWISE_AND;              break;
+				case AST_EXPRESSION_BINARY_LEFT_SHIFT:               kind = IR_INSTRUCTION_BITWISE_LEFT_SHIFT;       break;
+				case AST_EXPRESSION_BINARY_RIGHT_SHIFT:              kind = IR_INSTRUCTION_BITWISE_RIGHT_SHIFT;      break;
 				default: Unreachable();
 			}
 
-			return GetValue(PushOperation(kind, expression->type, left, right, block, context));
+			return GetValue(PushInstruction(kind, expression->type, left, right, block));
 		} break;
 
 		case AST_EXPRESSION_BINARY_AND:
 		case AST_EXPRESSION_BINARY_OR:
 		{
-			// case AST_EXPRESSION_BINARY_AND: kind = OPERATION_AND; break;
-			// case AST_EXPRESSION_BINARY_OR:  kind = OPERATION_OR;  break;
+			// case AST_EXPRESSION_BINARY_AND: kind = IR_INSTRUCTION_AND; break;
+			// case AST_EXPRESSION_BINARY_OR:  kind = IR_INSTRUCTION_OR;  break;
 			Assert();
 		} break;
 
@@ -363,13 +385,13 @@ IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block, IrContext* conte
 			{
 				Ast_Enum_Member* member = ((Ast_Expression_Enum_Member*)binary->right)->member;
 				Assert(member->expression->type);
-				return ConvertToIR(member->expression, block, context); // @Todo @FixMe: This should be constantly evaluated before IR.
+				return ConvertToIR(member->expression, block); // @Todo @FixMe: This should be constantly evaluated before IR.
 			}
 
-			IrValue left = TrimPointers(ConvertToIR(binary->left, block, context), block, context);
+			IrValue left = TrimPointers(ConvertToIR(binary->left, block), block);
 			Ast_Struct_Member* member = ((Ast_Expression_Struct_Member*)binary->right)->member;
 
-			return GetValue(PushOperation(OPERATION_MEMBER, GetPointer(member->type.type, &context->stack), left, MakeConstU64(member->index), block, context));
+			return GetValue(PushInstruction(IR_INSTRUCTION_MEMBER, GetPointer(member->type.type), left, MakeConstU64(member->index), block));
 		};
 
 		case AST_EXPRESSION_CALL:
@@ -380,10 +402,10 @@ IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block, IrContext* conte
 		case AST_EXPRESSION_SUBSCRIPT:
 		{
 			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
-			IrValue array = LoadConvertToIR(subscript->array, block, context);
-			IrValue index = LoadConvertToIR(subscript->index, block, context);
+			IrValue array = LoadConvertToIR(subscript->array, block);
+			IrValue index = LoadConvertToIR(subscript->index, block);
 
-			return GetValue(PushOperation(OPERATION_ELEMENT, GetPointer(subscript->type, &context->stack), array, index, block, context));
+			return GetValue(PushInstruction(IR_INSTRUCTION_ELEMENT, GetPointer(subscript->type), array, index, block));
 		} break;
 
 		case AST_EXPRESSION_IF_ELSE:
@@ -401,11 +423,11 @@ IrValue ConvertToIR(Ast_Expression* expression, IrBlock* block, IrContext* conte
 	Unreachable();
 }
 
-IrValue ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock* break_block, Ast_Function* function, IrContext* context)
+IrBlock* ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock* break_block, IrFunction* function)
 {
 	if (!block)
 	{
-		block = NewBlock(function, context);
+		block = NewBlock(function);
 	}
 
 	IrBlock* initial_block = block;
@@ -420,13 +442,12 @@ IrValue ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock
 
 				for (Ast_Branch* branch = branch_block->branches; branch < branch_block->branches.End(); branch++)
 				{
-					branch->initial_condition_block = NewBlock(function, context);
+					branch->initial_condition_block = NewBlock(function);
 				}
 
-				PushJumpOp(block, branch_block->branches[0].initial_condition_block, context);
+				PushJump(block, branch_block->branches[0].initial_condition_block);
 
-				IrBlock* exit_block = NewBlock(function, context);
-				IrValue  exit_block_value = GetValue(exit_block);
+				IrBlock* exit_block = NewBlock(function);
 
 				for (Ast_Branch* branch = branch_block->branches; branch < branch_block->branches.End(); branch++)
 				{
@@ -448,37 +469,37 @@ IrValue ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock
 
 						if (branch->token->kind == TOKEN_WHILE)
 						{
-							IrBlock* loop_block = NewBlock(function, context);
-							IrValue inner_block = ConvertToIR(&branch->code, null, loop_block, then_branch, function, context);
+							IrBlock* loop_block = NewBlock(function);
+							IrBlock* inner_block = ConvertToIR(&branch->code, null, loop_block, then_branch, function);
 
 							{
-								IrValue condition = LoadConvertToIR(branch->condition, branch->initial_condition_block, context);
-								IrValue test = PushTestOp(condition, branch->initial_condition_block, context);
+								IrValue condition = LoadConvertToIR(branch->condition, branch->initial_condition_block);
+								IrValue test = PushTest(condition, branch->initial_condition_block);
 
-								PushOperation(OPERATION_BRANCH, null, test, inner_block, GetValue(else_branch), branch->initial_condition_block, context);
+								PushBranch(branch->initial_condition_block, test, inner_block, else_branch);
 							}
 
 							{
-								IrValue condition = LoadConvertToIR(branch->condition, loop_block, context);
-								IrValue test = PushTestOp(condition, loop_block, context);
+								IrValue condition = LoadConvertToIR(branch->condition, loop_block);
+								IrValue test = PushTest(condition, loop_block);
 
-								PushOperation(OPERATION_BRANCH, null, test, inner_block, GetValue(then_branch), loop_block, context);
+								PushBranch(loop_block, test, inner_block, then_branch);
 							}
 						}
 						else
 						{
 							Assert(branch->token->kind == TOKEN_IF);
 
-							IrValue inner_block = ConvertToIR(&branch->code, null, then_branch, break_block, function, context);
-							IrValue condition = LoadConvertToIR(branch->condition, branch->initial_condition_block, context);
-							IrValue test = PushTestOp(condition, branch->initial_condition_block, context);
+							IrBlock* inner_block = ConvertToIR(&branch->code, null, then_branch, break_block, function);
+							IrValue condition = LoadConvertToIR(branch->condition, branch->initial_condition_block);
+							IrValue test = PushTest(condition, branch->initial_condition_block);
 
-							PushOperation(OPERATION_BRANCH, null, test, GetValue(else_branch), inner_block, branch->initial_condition_block, context);
+							PushBranch(branch->initial_condition_block, test, else_branch, inner_block);
 						}
 					}
 					else
 					{
-						ConvertToIR(&branch->code, branch->initial_condition_block, exit_block, break_block, function, context);
+						ConvertToIR(&branch->code, branch->initial_condition_block, exit_block, break_block, function);
 					}
 				}
 
@@ -487,7 +508,8 @@ IrValue ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock
 
 			case AST_STATEMENT_DEFER:
 			{
-				ConvertToIR(&statement->defer.code, null, exit_block, break_block, function, context);
+				Assert();
+				ConvertToIR(&statement->defer.code, null, exit_block, break_block, function);
 			} break;
 
 			case AST_STATEMENT_CLAIM:
@@ -499,23 +521,17 @@ IrValue ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock
 			{
 				Ast_Return* ret = &statement->ret;
 
-				if (ret->expression)
-				{
-					IrValue v = ConvertToIR(ret->expression, block, context);
-					PushOperation(OPERATION_RETURN, null, v, block, context);
-				}
-				else
-				{
-					PushOperation(OPERATION_RETURN, null, block, context);
-				}
-				return GetValue(initial_block);
+				IrValue v = ConvertToIR(ret->expression, block);
+				// @Todo: PushStore return value or something...
+				PushReturn(block);
+				return initial_block;
 			} break;
 
 			case AST_STATEMENT_BREAK:
 			{
 				Assert(break_block);
-				PushJumpOp(block, break_block, context);
-				return GetValue(initial_block);
+				PushJump(block, break_block);
+				return initial_block;
 			} break;
 
 			case AST_STATEMENT_INCREMENT:
@@ -524,14 +540,14 @@ IrValue ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock
 				Ast_Increment* inc = &statement->increment;
 				bool direction = statement->kind == AST_STATEMENT_INCREMENT;
 
-				IrValue address = ConvertToIR(inc->expression, block, context);
-				IrValue value = LoadOp(address, block, context);
+				IrValue address = ConvertToIR(inc->expression, block);
+				IrValue value = PushLoad(address, block);
 
 				IrValue one;
 
 				switch (inc->expression->type->kind)
 				{
-					case TYPE_SPECIFIER_POINTER: one = MakeConstU64(1); break; // @FixMe: OPERATION_ELEMENT
+					case TYPE_SPECIFIER_POINTER: one = MakeConstU64(1); break; // @FixMe: IR_INSTRUCTION_ELEMENT
 					case TYPE_BASETYPE_UINT8:    one = MakeConstU8(1);  break;
 					case TYPE_BASETYPE_UINT16:   one = MakeConstU16(1); break;
 					case TYPE_BASETYPE_UINT32:   one = MakeConstU32(1); break;
@@ -546,26 +562,26 @@ IrValue ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock
 					default: Assert(); Unreachable();
 				}
 
-				value = GetValue(PushOperation(direction ? OPERATION_ADD : OPERATION_SUBTRACT, inc->expression->type, value, one, block, context));
-				StoreOp(address, value, block, context);
+				value = GetValue(PushInstruction(direction ? IR_INSTRUCTION_ADD : IR_INSTRUCTION_SUBTRACT, inc->expression->type, value, one, block));
+				PushStore(address, value, block);
 			} break;
 
 			case AST_STATEMENT_EXPRESSION:
 			{
-				ConvertToIR(statement->expression, block, context);
+				ConvertToIR(statement->expression, block);
 			} break;
 
 			case AST_STATEMENT_VARIABLE_DECLARATION:
 			{
 				Ast_VariableDeclaration* var = &statement->variable_declaration;
 
-				IrValue address = GetValue(PushOperation(OPERATION_STACK_ALLOCATE, GetPointer(var->type, &context->stack), MakeConstU64(var->type->size), block, context));
+				IrValue address = GetValue(PushInstruction(IR_INSTRUCTION_STACK_ALLOCATE, GetPointer(var->type), MakeConstU64(var->type->size), block));
 				var->address = address;
 
 				if (var->assignment)
 				{
-					IrValue v = LoadConvertToIR(var->assignment, block, context);
-					StoreOp(address, v, block, context);
+					IrValue v = LoadConvertToIR(var->assignment, block);
+					PushStore(address, v, block);
 				}
 			} break;
 
@@ -573,10 +589,10 @@ IrValue ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock
 			{
 				Ast_Assignment* assignment = &statement->assignment;
 
-				IrValue left = ConvertToIR(assignment->left, block, context);
-				IrValue right = LoadConvertToIR(assignment->right, block, context);
+				IrValue left = ConvertToIR(assignment->left, block);
+				IrValue right = LoadConvertToIR(assignment->right, block);
 
-				StoreOp(left, right, block, context);
+				PushStore(left, right, block);
 			} break;
 
 			case AST_STATEMENT_ASSIGNMENT_ADD:
@@ -592,46 +608,50 @@ IrValue ConvertToIR(Ast_Code* code, IrBlock* block, IrBlock* exit_block, IrBlock
 
 	if (exit_block)
 	{
-		PushJumpOp(block, exit_block, context);
+		PushJump(block, exit_block);
 	}
-	else if (!block->operations.count)
+	else
 	{
-		PushOperation(OPERATION_RETURN, null, block, context);
+		PushReturn(block);
 	}
 
-	return GetValue(initial_block);
+	return initial_block;
 }
 
-void ConvertToIR(Ast_Function* function, IrContext* context)
+void ConvertToIR(Ast_Function* function)
 {
-	Ast_Function* previous_function = context->function;
-	context->function = function;
+	IrFunction ir_function;
+	ZeroMemory(&ir_function);
+	ir_function.function = function;
 
-	IrBlock* entry_block = NewBlock(function, context);
+	IrBlock* entry_block = NewBlock(&ir_function);
 
 	for (u32 i = 0; i < function->parameters.count; i++)
 	{
 		Ast_VariableDeclaration* param = &function->parameters[i];
-		IrArgument* argument = PushArgument(GetPointer(param->type, &context->stack), entry_block);
-		param->address = GetValue(argument);
+		if (param->type->size <= 8)
+		{
+			param->address = GetValue(PushInstruction(IR_INSTRUCTION_STACK_ALLOCATE, GetPointer(param->type), MakeConstU64(param->type->size), entry_block));
+			IrValue v = GetValue(PushInstruction(IR_INSTRUCTION_PARAMETER, param->type, MakeConstU64(i), entry_block));
+			PushStore(param->address, v, entry_block);
+		}
+		else
+		{
+			param->address = GetValue(PushInstruction(IR_INSTRUCTION_PARAMETER, GetPointer(param->type), MakeConstU64(i), entry_block));
+		}
 	}
 
-	ConvertToIR(&function->code, entry_block, null, null, function, context);
+	ConvertToIR(&function->code, entry_block, null, null, &ir_function);
 
-	Print("% {\n%}\n", function->name, function->blocks);
+	Print("%\n", &ir_function);
 
-	context->function = previous_function;
 }
 
 void ConvertToIR(Ast_Root* root)
 {
-	IrContext context;
-	ZeroMemory(&context);
-	context.stack = NewStackAllocator();
-
 	for (Ast_Function* function = root->scope.functions; function < root->scope.functions.End(); function++)
 	{
-		ConvertToIR(function, &context);
+		ConvertToIR(function);
 	}
 }
 

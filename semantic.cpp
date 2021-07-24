@@ -254,17 +254,17 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info)
 		{
 			if (specifier->kind == AST_SPECIFIER_POINTER)
 			{
-				type = GetPointer(type, &info->stack);
+				type = GetPointer(type);
 			}
 			else if (specifier->kind == AST_SPECIFIER_OPTIONAL)
 			{
-				type = GetOptional(type, &info->stack);
+				type = GetOptional(type);
 			}
 			else if (specifier->kind == AST_SPECIFIER_ARRAY)
 			{
 				if (specifier->size_expression == null)
 				{
-					type = GetDynamicArray(type, &info->stack);
+					type = GetDynamicArray(type);
 				}
 				else
 				{
@@ -272,7 +272,7 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info)
 					Assert(specifier->size_expression->kind == AST_EXPRESSION_TERMINAL_LITERAL); // @RemoveMe @Todo: Need to be removed.
 					Ast_Expression_Literal* literal = (Ast_Expression_Literal*)specifier->size_expression;
 					u64 length = literal->token->info.integer.value;
-					type = GetFixedArray(type, length, &info->stack);
+					type = GetFixedArray(type, length);
 				}
 			}
 		}
@@ -507,7 +507,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 				else
 				{
 					subtype = element->type;
-					fixed_array->type = GetFixedArray(subtype, fixed_array->elements.count, &info->stack);
+					fixed_array->type = GetFixedArray(subtype, fixed_array->elements.count);
 				}
 			}
 		} break;
@@ -576,7 +576,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			}
 			else if (literal->token->kind == TOKEN_NULL)
 			{
-				literal->type = GetPointer(&empty_tuple, &info->stack);
+				literal->type = GetPointer(&empty_tuple);
 			}
 			else if (literal->token->kind == TOKEN_STRING_LITERAL)
 			{
@@ -642,7 +642,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
-			unary->type = GetPointer(unary->subexpression->type, &info->stack);
+			unary->type = GetPointer(unary->subexpression->type);
 			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
 			unary->is_pure = unary->subexpression->is_pure;
 			unary->is_referential_value = false;
@@ -788,7 +788,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 					if (CompareStrings(terminal->token->info.string, "data") && type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY)
 					{
 						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_DATA;
-						binary->type = GetPointer(binary->left->type->subtype, &info->stack);
+						binary->type = GetPointer(binary->left->type->subtype);
 						binary->is_referential_value = binary->left->is_referential_value;
 					}
 					else if (CompareStrings(terminal->token->info.string, "length"))

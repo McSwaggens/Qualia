@@ -75,6 +75,18 @@ PrintOdds(nums : []int):
 	for n in nums where n & 1:
 		Print(n)
 
+// Any type:
+Print(format : []uint8, arguments : []Qualia.Any):
+	n := 0
+	for c in format:
+		if c = "%" and n < arguments.count:
+			Write(arguments[n])
+			inc n
+		else:
+			Write(c)
+			
+			
+
 // Generics:
 Add(array : *[]T, value : T):
 	if BitCount(array.count+1) = 1:
@@ -82,8 +94,33 @@ Add(array : *[]T, value : T):
 	array[array.count] = value
 	inc array.count
 
+// Expression functions:
+IsNegative(n : int) -> bool => n < 0
+
+// Implied return type:
+IsPositive(n : int) => !n.IsNegative()
+
+Sort(a : float32, b : float32) => (a, b) if a <= b else (b, a)
+
+// Aliasing:
+alias uint32 as DWORD
+
+// Operator overloading
+// Forced to be inline
+// Must be pure
+// Must return a value
+// Comparison operators must return bool
+
+[Qualia.Operator(=)]
+IsEqual(a : float32, b : float32) => a - b < 0.01
+
+(a : [4]float32 + b : [4]float32) -> [4]float32 => { a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3] }
+
+
+
 // Iterator functions:
-MyIteratorFunction(string : String) -> uint8:
+[Qualia.DefaultIterator]
+IterateString(string : String) -> [..]uint8:
 	if string.count <= 8:
 		for c in string.chars:
 			yield c

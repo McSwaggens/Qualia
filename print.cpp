@@ -454,82 +454,73 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 	}
 }
 
-void Write(OutputBuffer* buffer, IrOperation_Kind kind)
+void Write(OutputBuffer* buffer, IrInstruction_Kind kind)
 {
 	switch (kind)
 	{
-		case OPERATION_NOP:                 buffer->Write("nop");     break;
+		case IR_INSTRUCTION_NOP:                 buffer->Write("nop");     break;
 
-		case OPERATION_PHI:                 buffer->Write("phi");     break;
-		case OPERATION_STACK_ALLOCATE:      buffer->Write("stack");   break;
-		case OPERATION_MEMBER:              buffer->Write("member");  break;
-		case OPERATION_ELEMENT:             buffer->Write("element"); break;
+		case IR_INSTRUCTION_PHI:                 buffer->Write("phi");     break;
+		case IR_INSTRUCTION_STACK_ALLOCATE:      buffer->Write("stack");   break;
+		case IR_INSTRUCTION_PARAMETER:           buffer->Write("param");   break;
+		case IR_INSTRUCTION_MEMBER:              buffer->Write("member");  break;
+		case IR_INSTRUCTION_ELEMENT:             buffer->Write("element"); break;
+		case IR_INSTRUCTION_SELECT:              buffer->Write("select");  break;
 
-		case OPERATION_LOAD:                buffer->Write("load");     break;
-		case OPERATION_STORE:               buffer->Write("store");    break;
-		case OPERATION_COPY:                buffer->Write("copy");     break;
+		case IR_INSTRUCTION_LOAD:                buffer->Write("load");     break;
+		case IR_INSTRUCTION_STORE:               buffer->Write("store");    break;
+		case IR_INSTRUCTION_COPY:                buffer->Write("copy");     break;
+		case IR_INSTRUCTION_CALL:                buffer->Write("call");     break;
 
-		case OPERATION_BRANCH:              buffer->Write("branch");   break;
-		case OPERATION_JUMP:                buffer->Write("jump");     break;
-		case OPERATION_CALL:                buffer->Write("call");     break;
+		case IR_INSTRUCTION_BRANCH:              buffer->Write("branch");   break;
+		case IR_INSTRUCTION_JUMP:                buffer->Write("jump");     break;
+		case IR_INSTRUCTION_RETURN:              buffer->Write("return");   break;
 
-		case OPERATION_ADD:                 buffer->Write("add");      break;
-		case OPERATION_SUBTRACT:            buffer->Write("subtract"); break;
-		case OPERATION_MULTIPLY:            buffer->Write("multiply"); break;
-		case OPERATION_DIVIDE:              buffer->Write("divide");   break;
-		case OPERATION_MODULO:              buffer->Write("modulo");   break;
-		case OPERATION_EXPONENTIAL:         buffer->Write("exponential"); break;
+		case IR_INSTRUCTION_ADD:                 buffer->Write("add");      break;
+		case IR_INSTRUCTION_SUBTRACT:            buffer->Write("subtract"); break;
+		case IR_INSTRUCTION_MULTIPLY:            buffer->Write("multiply"); break;
+		case IR_INSTRUCTION_DIVIDE:              buffer->Write("divide");   break;
+		case IR_INSTRUCTION_MODULO:              buffer->Write("modulo");   break;
+		case IR_INSTRUCTION_EXPONENTIAL:         buffer->Write("exponential"); break;
 
-		case OPERATION_NOT:                 buffer->Write("not");  break;
-		case OPERATION_FLIP_SIGN:           buffer->Write("flip"); break;
-		case OPERATION_POSITIVE:            buffer->Write("pos");  break;
-		case OPERATION_SIGN_EXTEND:         buffer->Write("sign_extend"); break;
+		case IR_INSTRUCTION_NOT:                 buffer->Write("not");  break;
+		case IR_INSTRUCTION_FLIP_SIGN:           buffer->Write("flip"); break;
+		case IR_INSTRUCTION_POSITIVE:            buffer->Write("pos");  break;
+		case IR_INSTRUCTION_SIGN_EXTEND:         buffer->Write("sign_extend"); break;
 
-		case OPERATION_BITWISE_NOT:         buffer->Write("NOT"); break;
-		case OPERATION_BITWISE_OR:          buffer->Write("OR");  break;
-		case OPERATION_BITWISE_AND:         buffer->Write("AND"); break;
-		case OPERATION_BITWISE_XOR:         buffer->Write("XOR"); break;
+		case IR_INSTRUCTION_BITWISE_NOT:         buffer->Write("NOT"); break;
+		case IR_INSTRUCTION_BITWISE_OR:          buffer->Write("OR");  break;
+		case IR_INSTRUCTION_BITWISE_AND:         buffer->Write("AND"); break;
+		case IR_INSTRUCTION_BITWISE_XOR:         buffer->Write("XOR"); break;
 
-		case OPERATION_BITWISE_LEFT_SHIFT:  buffer->Write("left_shift");  break;
-		case OPERATION_BITWISE_RIGHT_SHIFT: buffer->Write("right_shift"); break;
+		case IR_INSTRUCTION_BITWISE_LEFT_SHIFT:  buffer->Write("left_shift");  break;
+		case IR_INSTRUCTION_BITWISE_RIGHT_SHIFT: buffer->Write("right_shift"); break;
 
-		case OPERATION_COMPARE_EQUAL:            buffer->Write("compare_equal");            break;
-		case OPERATION_COMPARE_NOT_EQUAL:        buffer->Write("compare_not_equal");        break;
-		case OPERATION_COMPARE_LESS:             buffer->Write("compare_less");             break;
-		case OPERATION_COMPARE_LESS_OR_EQUAL:    buffer->Write("compare_less_or_equal");    break;
-		case OPERATION_COMPARE_GREATER:          buffer->Write("compare_greater");          break;
-		case OPERATION_COMPARE_GREATER_OR_EQUAL: buffer->Write("compare_greater_or_equal"); break;
-		case OPERATION_RETURN:                   buffer->Write("return"); break;
+		case IR_INSTRUCTION_COMPARE_EQUAL:            buffer->Write("compare_equal");            break;
+		case IR_INSTRUCTION_COMPARE_NOT_EQUAL:        buffer->Write("compare_not_equal");        break;
+		case IR_INSTRUCTION_COMPARE_LESS:             buffer->Write("compare_less");             break;
+		case IR_INSTRUCTION_COMPARE_LESS_OR_EQUAL:    buffer->Write("compare_less_or_equal");    break;
+		case IR_INSTRUCTION_COMPARE_GREATER:          buffer->Write("compare_greater");          break;
+		case IR_INSTRUCTION_COMPARE_GREATER_OR_EQUAL: buffer->Write("compare_greater_or_equal"); break;
 
-		case OPERATION_AND: buffer->Write("and"); break;
-		case OPERATION_OR:  buffer->Write("or");  break;
+		case IR_INSTRUCTION_AND: buffer->Write("and"); break;
+		case IR_INSTRUCTION_OR:  buffer->Write("or");  break;
 	}
 }
 
 void Write(OutputBuffer* buffer, IrValue value)
 {
-	if (value.kind == IR_VALUE_REGISTER)
+	if (value.kind == IR_VALUE_INSTRUCTION)
 	{
 		Write(buffer, value.type);
 		Write(buffer, " %");
-		Write(buffer, value.reg->id);
+		Write(buffer, value.instruction->id);
 	}
-	else if (value.kind == IR_VALUE_ARGUMENT)
+	else if (value.kind == IR_VALUE_NONE)
 	{
-		Write(buffer, value.type);
-		Write(buffer, " %");
-		Write(buffer, value.argument->id);
+		Write(buffer, "NONE");
 	}
-	else if (value.kind == IR_VALUE_BLOCK)
-	{
-		Write(buffer, "block");
-		Write(buffer, value.block->id);
-	}
-	else if (value.kind == IR_VALUE_UNUSED)
-	{
-		Write(buffer, "UNUSED-FIXME");
-	}
-	else if (value.kind == IR_VALUE_INLINED_CONSTANT)
+	else if (value.kind == IR_VALUE_CONSTANT)
 	{
 		Write(buffer, value.type);
 		Write(buffer, ' ');
@@ -584,61 +575,53 @@ void Write(OutputBuffer* buffer, List<IrValue> values)
 	Write(buffer, ')');
 }
 
-void Write(OutputBuffer* buffer, IrOperation* op)
+void Write(OutputBuffer* buffer, IrInstruction* instruction)
 {
-	if (op->id != -1)
+	if (instruction->id != u16_max)
 	{
 		Write(buffer, '%');
-		Write(buffer, op->id);
+		Write(buffer, instruction->id);
 		Write(buffer, " = ");
 	}
 
-	Write(buffer, op->kind);
+	Write(buffer, instruction->kind);
 
-	if (op->a.kind != IR_VALUE_UNUSED)
+	if (instruction->a.kind != IR_VALUE_NONE)
 	{
 		Write(buffer, "(");
-		Write(buffer, op->a);
+		Write(buffer, instruction->a);
 
-		if (op->kind == OPERATION_JUMP)
-		{
-			Write(buffer, op->left_arguments);
-		}
-
-		if (op->b.kind != IR_VALUE_UNUSED)
+		if (instruction->b.kind != IR_VALUE_NONE)
 		{
 			Write(buffer, ", ");
-			Write(buffer, op->b);
+			Write(buffer, instruction->b);
 
-			if (op->kind == OPERATION_BRANCH)
-			{
-				Write(buffer, op->left_arguments);
-			}
-
-			if (op->c.kind != IR_VALUE_UNUSED)
+			if (instruction->c.kind != IR_VALUE_NONE)
 			{
 				Write(buffer, ", ");
-				Write(buffer, op->c);
-
-				if (op->kind == OPERATION_BRANCH)
-				{
-					Write(buffer, op->right_arguments);
-				}
+				Write(buffer, instruction->c);
 			}
 		}
 
 		Write(buffer, ")");
 	}
 
-	if (op->kind == OPERATION_RETURN)
+	if (instruction->branch_a)
 	{
-		Write(buffer, op->left_arguments);
+		Write(buffer, " branch");
+		Write(buffer, instruction->branch_a->id);
+
+		if (instruction->branch_b)
+		{
+			Write(buffer, ", branch");
+			Write(buffer, instruction->branch_b->id);
+		}
 	}
 
-	if (op->type)
+	if (instruction->type)
 	{
 		Write(buffer, " -> ");
-		Write(buffer, op->type);
+		Write(buffer, instruction->type);
 	}
 }
 
@@ -651,40 +634,50 @@ void Write(OutputBuffer* buffer, List<IrBlock*> blocks)
 	}
 }
 
-// void Write(OutputBuffer* buffer, IrPhiPair phi)
-// {
-// }
-
-void Write(OutputBuffer* buffer, IrArgument* argument)
+void Write(OutputBuffer* buffer, List<IrBlock> blocks)
 {
-	Write(buffer, '%');
-	Write(buffer, argument->id);
-	Write(buffer, ": ");
-	Write(buffer, argument->type);
+	for (u32 i = 0; i < blocks.count; i++)
+	{
+		IrBlock* block = &blocks[i];
+		Write(buffer, block);
+	}
+}
+
+void Write(OutputBuffer* buffer, IrFunction* function)
+{
+	Write(buffer, function->function->name);
+	Write(buffer, " {\n");
+	Write(buffer, function->blocks);
+	Write(buffer, "}\n");
+}
+
+void Write(OutputBuffer* buffer, IrPhi phi)
+{
+	Write(buffer, "(");
+	Write(buffer, phi.block);
+	Write(buffer, ", ");
+	Write(buffer, phi.value);
+	Write(buffer, ")");
 }
 
 void Write(OutputBuffer* buffer, IrBlock* block)
 {
 	Write(buffer, "block");
 	Write(buffer, block->id);
-	if (block->arguments)
-	{
-		Write(buffer, '(');
-		for (u32 i = 0; i < block->arguments.count; i++)
-		{
-			if (i) Write(buffer, ", ");
-			IrArgument* argument = block->arguments[i];
-			Write(buffer, argument);
-		}
-		Write(buffer, ')');
-	}
 	Write(buffer, ":\n");
 
-	for (u32 i = 0; i < block->operations.count; i++)
+	for (IrInstruction_Bucket* bucket = block->bucket; bucket; bucket = bucket->next)
 	{
-		Write(buffer, '\t');
-		Write(buffer, block->operations[i]);
-		Write(buffer, '\n');
+		for (u32 i = 0; i < IR_INSTRUCTION_BUCKET_COUNT; i++)
+		{
+			IrInstruction* instruction = bucket->instructions + i;
+			if (instruction->kind != IR_INSTRUCTION_NOP)
+			{
+				Write(buffer, '\t');
+				Write(buffer, instruction);
+				Write(buffer, '\n');
+			}
+		}
 	}
 }
 

@@ -431,7 +431,7 @@ struct Ast_Function
 	Type* return_type;
 	Ast_Code code;
 	Ast_Attribute attribute;
-	List<IrBlock*> blocks;
+	List<IrBlock> blocks;
 	u32 block_id_counter;
 	u32 register_id_counter;
 	bool is_pure;

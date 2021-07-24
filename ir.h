@@ -4,87 +4,23 @@
 #include "type.h"
 #include "list.h"
 
-struct IrOperation;
-struct IrValue;
-struct IrBlock;
-struct IrArgument;
-
 struct Ast_Function;
 struct Ast_Code;
 struct Ast_VariableDeclaration;
 struct Ast_Root;
 
-enum IrOperation_Kind
+struct IrBlock;
+struct IrInstruction;
+struct IrFunction;
+struct IrGlobal;
+
+enum IrValue_Kind : u8
 {
-	OPERATION_NOP = 0,
-
-	OPERATION_STACK_ALLOCATE,
-	OPERATION_MEMBER,
-	OPERATION_ELEMENT,
-
-	OPERATION_PHI,
-
-	OPERATION_BRANCH,
-	OPERATION_JUMP,
-	OPERATION_CALL,
-
-	OPERATION_RETURN,
-
-	OPERATION_COPY,
-	OPERATION_LOAD,
-	OPERATION_STORE,
-
-	// Binary expressions
-	OPERATION_ADD,
-	OPERATION_SUBTRACT,
-	OPERATION_MULTIPLY,
-	OPERATION_DIVIDE,
-	OPERATION_MODULO,
-	OPERATION_EXPONENTIAL,
-	OPERATION_BITWISE_OR,
-	OPERATION_BITWISE_AND,
-	OPERATION_BITWISE_XOR,
-	OPERATION_BITWISE_LEFT_SHIFT,
-	OPERATION_BITWISE_RIGHT_SHIFT,
-
-	// Unary expressions
-	OPERATION_BITWISE_NOT,
-	OPERATION_NOT,
-	OPERATION_FLIP_SIGN,
-	OPERATION_POSITIVE,
-	OPERATION_SIGN_EXTEND,
-
-	OPERATION_COMPARE_EQUAL,
-	OPERATION_COMPARE_NOT_EQUAL,
-	OPERATION_COMPARE_LESS,
-	OPERATION_COMPARE_LESS_OR_EQUAL,
-	OPERATION_COMPARE_GREATER,
-	OPERATION_COMPARE_GREATER_OR_EQUAL,
-	OPERATION_AND,
-	OPERATION_OR,
-};
-
-static bool IsControlFlowOperation(IrOperation_Kind kind)
-{
-	switch (kind)
-	{
-		case OPERATION_BRANCH:
-		case OPERATION_JUMP:
-		case OPERATION_RETURN:
-			return true;
-		default:
-			return false;
-	}
-}
-
-enum IrValue_Kind
-{
-	IR_VALUE_UNUSED = 0,
-	IR_VALUE_INLINED_CONSTANT,
+	IR_VALUE_NONE = 0,
+	IR_VALUE_INSTRUCTION,
 	IR_VALUE_CONSTANT,
-	IR_VALUE_ARGUMENT,
-	IR_VALUE_REGISTER,
-	IR_VALUE_BLOCK,
+	IR_VALUE_LARGE_CONSTANT,
+	IR_VALUE_GLOBAL,
 };
 
 struct IrValue
@@ -94,77 +30,134 @@ struct IrValue
 
 	union
 	{
-		IrOperation* reg;
-		IrBlock* block;
-		IrArgument* argument;
+		IrInstruction* instruction;
 
-		Value* value;
+		char data[8];
 
 		bool value_bool;
 
 		u64 value_pointer;
-
-		s8  value_int8;
-		s16 value_int16;
-		s32 value_int32;
-		s64 value_int64;
 
 		u8  value_uint8;
 		u16 value_uint16;
 		u32 value_uint32;
 		u64 value_uint64;
 
+		s8  value_int8;
+		s16 value_int16;
+		s32 value_int32;
+		s64 value_int64;
+
 		f32 value_float32;
 		f64 value_float64;
 	};
 };
 
-struct IrPhiPair
+enum IrInstruction_Kind : u8
 {
+	IR_INSTRUCTION_NOP = 0,
+
+	IR_INSTRUCTION_STACK_ALLOCATE,
+	IR_INSTRUCTION_PARAMETER,
+	IR_INSTRUCTION_MEMBER,
+	IR_INSTRUCTION_ELEMENT,
+
+	IR_INSTRUCTION_PHI,
+	IR_INSTRUCTION_SELECT,
+
+	IR_INSTRUCTION_BRANCH,
+	IR_INSTRUCTION_JUMP,
+	IR_INSTRUCTION_RETURN,
+
+	IR_INSTRUCTION_CALL,
+	IR_INSTRUCTION_COPY,
+	IR_INSTRUCTION_LOAD,
+	IR_INSTRUCTION_STORE,
+
+	IR_INSTRUCTION_ADD,
+	IR_INSTRUCTION_SUBTRACT,
+	IR_INSTRUCTION_MULTIPLY,
+	IR_INSTRUCTION_DIVIDE,
+	IR_INSTRUCTION_MODULO,
+	IR_INSTRUCTION_EXPONENTIAL,
+	IR_INSTRUCTION_BITWISE_OR,
+	IR_INSTRUCTION_BITWISE_AND,
+	IR_INSTRUCTION_BITWISE_XOR,
+	IR_INSTRUCTION_BITWISE_LEFT_SHIFT,
+	IR_INSTRUCTION_BITWISE_RIGHT_SHIFT,
+
+	IR_INSTRUCTION_BITWISE_NOT,
+	IR_INSTRUCTION_NOT,
+	IR_INSTRUCTION_FLIP_SIGN,
+	IR_INSTRUCTION_POSITIVE,
+	IR_INSTRUCTION_SIGN_EXTEND,
+
+	IR_INSTRUCTION_COMPARE_EQUAL,
+	IR_INSTRUCTION_COMPARE_NOT_EQUAL,
+	IR_INSTRUCTION_COMPARE_LESS,
+	IR_INSTRUCTION_COMPARE_LESS_OR_EQUAL,
+	IR_INSTRUCTION_COMPARE_GREATER,
+	IR_INSTRUCTION_COMPARE_GREATER_OR_EQUAL,
+
+	IR_INSTRUCTION_AND,
+	IR_INSTRUCTION_OR,
+};
+
+struct IrPhi
+{
+	IrBlock* block;
 	IrValue value;
-	IrBlock* block;
 };
 
-struct IrArgument
+struct IrInstruction
 {
-	List<IrOperation*> users;
-	IrBlock* block;
-	Type* type;
-	u32 id;
-};
-
-struct IrOperation
-{
-	IrOperation_Kind kind;
-	s32 id;
+	IrInstruction_Kind kind;
+	u16 id;
+	u16 block_id;
+	IrInstruction* next;
+	IrInstruction* dependency;
 	Type* type;
 	IrValue a;
 	IrValue b;
 	IrValue c;
-	List<IrValue> left_arguments;
-	List<IrValue> right_arguments;
-	List<IrOperation*> users;
+	IrBlock* branch_a;
+	IrBlock* branch_b;
+	List<IrPhi> phis;
+	List<IrInstruction*> users;
+};
+
+#define IR_INSTRUCTION_BUCKET_COUNT 64
+
+struct IrInstruction_Bucket
+{
+	IrInstruction instructions[IR_INSTRUCTION_BUCKET_COUNT];
+	IrInstruction_Bucket* next;
 };
 
 struct IrBlock
 {
-	Ast_Function* function;
-	List<IrOperation*> operations;
-	List<IrOperation*> users;
-	List<IrArgument*> arguments;
-	s32 id;
+	u16 id;
+	IrFunction* function;
+	IrInstruction_Bucket* bucket;
+	IrInstruction* bucket_head;
+	IrInstruction* control;
+	List<IrBlock*> users;
 };
 
-struct IrContext
+struct IrFunction
 {
+	u16 register_id_counter;
+	u16 block_id_counter;
 	Ast_Function* function;
-	Stack_Allocator stack;
+	List<IrBlock*> blocks;
 };
 
-void Write(OutputBuffer* buffer, IrOperation op);
-void Write(OutputBuffer* buffer, IrOperation_Kind kind); // Can't put this in print.h because C++ is a terrible language.
+void Write(OutputBuffer* buffer, IrInstruction instruction);
+void Write(OutputBuffer* buffer, IrInstruction_Kind kind); // Can't put this in print.h because C++ is a terrible language.
 void Write(OutputBuffer* buffer, IrBlock* block);
+void Write(OutputBuffer* buffer, IrFunction* function);
 void Write(OutputBuffer* buffer, List<IrBlock*> blocks);
+void Write(OutputBuffer* buffer, List<IrBlock> blocks);
 
 void ConvertToIR(Ast_Root* root);
 

@@ -345,7 +345,8 @@ static Type* GetDominantType(Type* a, Type* b)
 	return GetTypePrecedence(a) >= GetTypePrecedence(b) ? a : b;
 }
 
-Type* GetPointer(Type* type, Stack_Allocator* stack);
-Type* GetOptional(Type* type, Stack_Allocator* stack);
-Type* GetDynamicArray(Type* type, Stack_Allocator* stack);
-Type* GetFixedArray(Type* type, u64 length, Stack_Allocator* stack);
+void InitTypeSystem();
+Type* GetPointer(Type* type);
+Type* GetOptional(Type* type);
+Type* GetDynamicArray(Type* type);
+Type* GetFixedArray(Type* type, u64 length);

@@ -42,10 +42,18 @@ Type type_float16 = NewPrimitiveType(TYPE_BASETYPE_FLOAT16, 2);
 Type type_float32 = NewPrimitiveType(TYPE_BASETYPE_FLOAT32, 4);
 Type type_float64 = NewPrimitiveType(TYPE_BASETYPE_FLOAT64, 8);
 
-void InitSpecifiers(Type* type, Stack_Allocator* stack)
+Stack_Allocator type_allocator;
+
+void InitTypeSystem()
+{
+	type_allocator = NewStackAllocator();
+}
+
+void InitSpecifiers(Type* type)
 {
 	if (type->specifiers) return;
-	type->specifiers = stack->Allocate<Type>(3);
+
+	type->specifiers = type_allocator.Allocate<Type>(3);
 	ZeroMemory(type->specifiers, 3);
 
 	type->specifiers[0].kind = TYPE_SPECIFIER_POINTER;
@@ -61,25 +69,25 @@ void InitSpecifiers(Type* type, Stack_Allocator* stack)
 	type->specifiers[2].size = 16; // @FixMe
 }
 
-Type* GetPointer(Type* type, Stack_Allocator* stack)
+Type* GetPointer(Type* type)
 {
-	InitSpecifiers(type, stack);
+	InitSpecifiers(type);
 	return type->specifiers + 0;
 }
 
-Type* GetOptional(Type* type, Stack_Allocator* stack)
+Type* GetOptional(Type* type)
 {
-	InitSpecifiers(type, stack);
+	InitSpecifiers(type);
 	return type->specifiers + 1;
 }
 
-Type* GetDynamicArray(Type* type, Stack_Allocator* stack)
+Type* GetDynamicArray(Type* type)
 {
-	InitSpecifiers(type, stack);
+	InitSpecifiers(type);
 	return type->specifiers + 2;
 }
 
-Type* GetFixedArray(Type* type, u64 length, Stack_Allocator* stack)
+Type* GetFixedArray(Type* type, u64 length)
 {
 	for (u32 i = 0; i < type->fixed_arrays.count; i++)
 	{
@@ -89,7 +97,7 @@ Type* GetFixedArray(Type* type, u64 length, Stack_Allocator* stack)
 		}
 	}
 
-	Type* new_type = stack->Allocate<Type>();
+	Type* new_type = type_allocator.Allocate<Type>();
 	ZeroMemory(new_type);
 	new_type->kind = TYPE_SPECIFIER_FIXED_ARRAY;
 	new_type->subtype = type;

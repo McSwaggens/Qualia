@@ -33,6 +33,7 @@ static bool IsBinaryOperator(Token_Kind kind)
 		|| kind == TOKEN_BITWISE_XOR
 		|| kind == TOKEN_LEFT_SHIFT
 		|| kind == TOKEN_RIGHT_SHIFT
+		|| kind == TOKEN_AS
 		|| kind == TOKEN_EQUAL
 		|| kind == TOKEN_NOT_EQUAL
 		|| kind == TOKEN_LESS
@@ -64,7 +65,8 @@ static bool IsAssignment(Token_Kind kind)
 
 static bool IsPrimitive(Token_Kind kind)
 {
-	return kind == TOKEN_BOOL
+	return kind == TOKEN_BYTE
+		|| kind == TOKEN_BOOL
 		|| kind == TOKEN_INT
 		|| kind == TOKEN_INT8
 		|| kind == TOKEN_INT16
@@ -148,6 +150,9 @@ static u32 GetBinaryPrecedence(Token_Kind kind)
 		case TOKEN_RIGHT_SHIFT:
 			return 5;
 
+		case TOKEN_AS:
+			return 6;
+
 		case TOKEN_EQUAL:
 		case TOKEN_NOT_EQUAL:
 		case TOKEN_LESS:
@@ -164,7 +169,8 @@ static u32 GetBinaryPrecedence(Token_Kind kind)
 
 		default:
 			Assert("Invalid binary operator.");
-			Unreachable();
+			// Unreachable();
+			return -1;
 	}
 }
 
@@ -176,19 +182,20 @@ static u32 GetUnaryPrecedence(Token_Kind kind)
 		case TOKEN_AMPERSAND:
 		case TOKEN_EXCLAMATION_MARK:
 			return 1;
+			// Make sure *a^n = (*a)^n
+
+		case TOKEN_PLUS:  // I totally forgot why these are on 2 and not 1...
+		case TOKEN_MINUS: //    it isn't because of exponentials...
+		case TOKEN_BITWISE_NOT:
+			return 2;
 
 		case TOKEN_NOT:
 			return 8;
 
-		case TOKEN_PLUS:  // I totally forgot why these are on 2 and not 1...
-		case TOKEN_MINUS: //    it isn't because of exponentials...
-			return 2;
-
-		// @Bug: Not all unary operators are handled here.
-
 		default:
 			Assert("Invalid unary operator.");
-			Unreachable();
+			// Unreachable();
+			return -1;
 	}
 }
 
@@ -202,7 +209,8 @@ static u32 GetPostfixPrecedence(Token_Kind kind)
 
 		default:
 			Assert("Invalid postfix operator.");
-			Unreachable();
+			// Unreachable();
+			return -1;
 	}
 }
 
@@ -436,13 +444,13 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 		switch (token->kind)
 		{
-			case TOKEN_ASTERISK:         unary->kind = AST_EXPRESSION_UNARY_VALUE_OF;   break;
-			case TOKEN_AMPERSAND:        unary->kind = AST_EXPRESSION_UNARY_ADDRESS_OF; break;
-			case TOKEN_BITWISE_NOT:      unary->kind = AST_EXPRESSION_UNARY_BITWISE_NOT; break;
-			case TOKEN_NOT:              unary->kind = AST_EXPRESSION_UNARY_NOT;        break;
-			case TOKEN_MINUS:            unary->kind = AST_EXPRESSION_UNARY_MINUS;      break;
-			case TOKEN_PLUS:             unary->kind = AST_EXPRESSION_UNARY_PLUS;       break;
-			case TOKEN_EXCLAMATION_MARK: unary->kind = AST_EXPRESSION_UNARY_NOT;        break;
+			case TOKEN_ASTERISK:         unary->kind = AST_EXPRESSION_UNARY_REFERENCE_OF; break;
+			case TOKEN_AMPERSAND:        unary->kind = AST_EXPRESSION_UNARY_ADDRESS_OF;   break;
+			case TOKEN_BITWISE_NOT:      unary->kind = AST_EXPRESSION_UNARY_BITWISE_NOT;  break;
+			case TOKEN_NOT:              unary->kind = AST_EXPRESSION_UNARY_NOT;          break;
+			case TOKEN_MINUS:            unary->kind = AST_EXPRESSION_UNARY_MINUS;        break;
+			case TOKEN_PLUS:             unary->kind = AST_EXPRESSION_UNARY_PLUS;         break;
+			case TOKEN_EXCLAMATION_MARK: unary->kind = AST_EXPRESSION_UNARY_NOT;          break;
 			default: Assert();
 		}
 
@@ -488,11 +496,6 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			tuple->elements = null;
 			left = tuple;
 		}
-
-		// if (token == closure)
-		// {
-		// 	Error(info, open->location, "Empty tuples aren't allowed.\n");
-		// }
 
 		while (token < closure)
 		{
@@ -608,6 +611,20 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			if_else->right = ParseExpression(token, indent, info, assignment_break, GetTernaryPrecedence(TOKEN_IF));
 			if_else->span.end = token;
 			left = if_else;
+		}
+		else if (token->kind == TOKEN_AS)
+		{
+			Ast_Expression_As* as = info->stack.Allocate<Ast_Expression_As>();
+			CheckScope(token, indent, info);
+			as->op = token++;
+
+			as->kind = AST_EXPRESSION_AS;
+			as->span.begin = left->span.begin;
+			as->ast_type = ParseType(token, indent, info);
+			as->span.end = token;
+			as->expression = left;
+
+			left = as;
 		}
 		else if (token->kind == TOKEN_OPEN_PAREN)
 		{
@@ -924,7 +941,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 {
 	Ast_BranchBlock branch_block;
 	ZeroMemory(&branch_block);
-	branch_block.branches = null;
+	Pooled_Array<Ast_Branch> branches = NewPooledArray<Ast_Branch>();
 
 	Ast_Branch branch;
 	ZeroMemory(&branch);
@@ -942,7 +959,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 
 	token++;
 	branch.code = ParseCode(token, indent+1, info);
-	branch_block.branches.Add(branch);
+	branches.Add(branch);
 
 	while ((token->kind == TOKEN_ELSE || token->kind == TOKEN_THEN) && IsOnCorrectScope(token, indent))
 	{
@@ -992,8 +1009,10 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 			branch.code = ParseCode(token, indent+1, info);
 		}
 
-		branch_block.branches.Add(branch);
+		branches.Add(branch);
 	}
+
+	branch_block.branches = branches.Lock();
 
 	Ast_Branch* else_branch = null;
 	Ast_Branch* then_branch = null;
@@ -1265,7 +1284,8 @@ static Ast_Function ParseFunction(Token*& token, u32 indent, Parse_Info* info)
 {
 	Ast_Function function;
 	ZeroMemory(&function);
-	function.name = token++;
+	function.name = token->info.string;
+	function.name_token = token++;
 	ParseParameters(&function, token, indent, info);
 	token = token->GetClosure()+1;
 

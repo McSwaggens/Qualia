@@ -63,6 +63,7 @@ void LexicalParse(String file_path, Parse_Info* info)
 			if      (CompareStrings(str, ToString(TOKEN_IMPORT)))      token.kind = TOKEN_IMPORT;
 			else if (CompareStrings(str, ToString(TOKEN_STRUCT)))      token.kind = TOKEN_STRUCT;
 			else if (CompareStrings(str, ToString(TOKEN_ENUM)))        token.kind = TOKEN_ENUM;
+			else if (CompareStrings(str, ToString(TOKEN_ASM)))         token.kind = TOKEN_ASM;
 			else if (CompareStrings(str, ToString(TOKEN_IF)))          token.kind = TOKEN_IF;
 			else if (CompareStrings(str, ToString(TOKEN_ELSE)))        token.kind = TOKEN_ELSE;
 			else if (CompareStrings(str, ToString(TOKEN_THEN)))        token.kind = TOKEN_THEN;
@@ -81,6 +82,7 @@ void LexicalParse(String file_path, Parse_Info* info)
 			else if (CompareStrings(str, ToString(TOKEN_NULL)))        token.kind = TOKEN_NULL;
 			else if (CompareStrings(str, ToString(TOKEN_TRUE)))        token.kind = TOKEN_TRUE;
 			else if (CompareStrings(str, ToString(TOKEN_FALSE)))       token.kind = TOKEN_FALSE;
+			else if (CompareStrings(str, ToString(TOKEN_BYTE)))        token.kind = TOKEN_BYTE;
 			else if (CompareStrings(str, ToString(TOKEN_BOOL)))        token.kind = TOKEN_BOOL;
 			else if (CompareStrings(str, ToString(TOKEN_INT)))         token.kind = TOKEN_INT;
 			else if (CompareStrings(str, ToString(TOKEN_INT8)))        token.kind = TOKEN_INT8;

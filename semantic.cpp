@@ -31,7 +31,6 @@ static void Error(Parse_Info* info, Span<Token> where, String format, Args&&... 
 	Fail();
 }
 
-static Type* GetTypeFromTupleExpression(Ast_Expression_Tuple* tuple, Parse_Info* info);
 static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info);
 
 MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev)
@@ -151,88 +150,21 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Parse_Info* in
 			Error(info, basetype.token->location, "Empty tuple is an invalid type.\n");
 		}
 
-		for (u32 i = 0; i < tuple_count; i++)
-		{
-			Ast_Type* type = &basetype.tuple[i];
-			type->type = GetType(type, scope, info);
-		}
-
-		if (tuple_count == 1)
-		{
-			return basetype.tuple[0].type;
-		}
-
-		Type* front_type = basetype.tuple[0].type;
-		for (u32 i = 0; i < front_type->tuple_extensions.count; i++)
-		{
-			Type* tuple = front_type->tuple_extensions[i];
-
-			if (tuple->tuple.count != tuple_count)
-			{
-				continue;
-			}
-
-			bool fail = false;
-			for (u32 j = 0; j < tuple_count; j++)
-			{
-				if (tuple->tuple[j] != basetype.tuple[j].type)
-				{
-					fail = true;
-					break;
-				}
-			}
-
-			if (!fail)
-			{
-				return tuple;
-			}
-		}
-
-		Type* new_type = info->stack.Allocate<Type>();
-		Type** subtypes = info->stack.Allocate<Type*>(tuple_count);
-		ZeroMemory(new_type);
-		new_type->kind = TYPE_BASETYPE_TUPLE;
-		new_type->tuple.data = subtypes;
-		new_type->tuple.count = tuple_count;
+		Type* types[tuple_count];
 
 		for (u32 i = 0; i < tuple_count; i++)
 		{
-			subtypes[i] = basetype.tuple[i].type;
-			new_type->size += basetype.tuple[i].type->size;
+			types[i] = GetType(&basetype.tuple[i], scope, info);
 		}
 
-		front_type->tuple_extensions.Add(new_type);
-
-		return new_type;
+		return GetTuple(Array(types, tuple_count));
 	}
 	else if (basetype.kind == AST_BASETYPE_FUNCTION)
 	{
-		Type* input_tuple = GetType(basetype.function.input, scope, info);
-		Type* output_type = &empty_tuple;
+		Type* input = GetType(basetype.function.input, scope, info);
+		Type* output = GetType(basetype.function.output, scope, info);
 
-		if (basetype.function.output)
-		{
-			output_type = GetType(basetype.function.output, scope, info);
-		}
-
-		for (u32 i = 0; i < input_tuple->function_extensions.count; i++)
-		{
-			Type* func = input_tuple->function_extensions[i];
-			if (func->function.output == output_type)
-			{
-				return func;
-			}
-		}
-
-		Type* new_func = info->stack.Allocate<Type>();
-		ZeroMemory(new_func);
-		new_func->kind = TYPE_BASETYPE_FUNCTION;
-		new_func->function.input = input_tuple;
-		new_func->function.output = output_type;
-		new_func->size = 8;
-		input_tuple->function_extensions.Add(new_func);
-
-		return new_func;
+		return GetFunctionType(input, output);
 	}
 
 	Assert(basetype.kind == AST_BASETYPE_USERTYPE);
@@ -270,8 +202,25 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info)
 				{
 					ScanExpression(specifier->size_expression, scope, info);
 					Assert(specifier->size_expression->kind == AST_EXPRESSION_TERMINAL_LITERAL); // @RemoveMe @Todo: Need to be removed.
+
+					if (!specifier->size_expression->can_constantly_evaluate)
+					{
+						Error(info, specifier->size_expression->span, "Fixed array size must be constantly evaluatable.\n");
+					}
+
+					if (!IsInteger(specifier->size_expression->type))
+					{
+						Error(info, specifier->size_expression->span, "Fixed array size must be an integer.\n");
+					}
+
 					Ast_Expression_Literal* literal = (Ast_Expression_Literal*)specifier->size_expression;
-					u64 length = literal->token->info.integer.value;
+					s64 length = literal->token->info.integer.value;
+
+					if (length <= 0) // Shouldn't we just enforce uint?
+					{
+						Error(info, specifier->size_expression->span, "Fixed array size must be larger than 0.\n");
+					}
+
 					type = GetFixedArray(type, length);
 				}
 			}
@@ -279,33 +228,6 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Parse_Info* info)
 	}
 
 	return type;
-}
-
-bool IsConvertableTo(Type* from, Type* to)
-{
-	if (from == to) return true;
-	if (IsNumerical(from) && IsNumerical(to)) return true;
-
-	if (from->kind == TYPE_SPECIFIER_FIXED_ARRAY && to->kind == TYPE_SPECIFIER_FIXED_ARRAY)
-	{
-		return from->length == to->length && IsConvertableTo(from->subtype, to->subtype);
-	}
-	else if (from->kind == TYPE_BASETYPE_TUPLE && to->kind == TYPE_BASETYPE_TUPLE)
-	{
-		if (from->tuple.count != to->tuple.count) return false;
-
-		for (u32 i = 0; i < from->tuple.count; i++)
-		{
-			if (!IsConvertableTo(from->tuple[i], to->tuple[i]))
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	return false;
 }
 
 static Ast_VariableDeclaration* GetVariable(Token* token, Ast_Scope* scope)
@@ -327,8 +249,6 @@ static Ast_VariableDeclaration* GetVariable(Token* token, Ast_Scope* scope)
 	return null;
 }
 
-Type* GetTupleFromTypeArray(Array<Type*> types, Parse_Info* info);
-
 Intrinsic_Function intrinsic_functions_array[1];
 Array<Intrinsic_Function> intrinsic_functions = Array<Intrinsic_Function>(intrinsic_functions_array, 1);
 
@@ -342,7 +262,7 @@ void InitIntrinsicFunctions(Parse_Info* info)
 	intrinsic_functions[0] = {
 		"SystemCall",
 
-		GetTupleFromTypeArray({
+		GetTuple({
 			&type_uint64, // rax
 			&type_uint64, // rdi
 			&type_uint64, // rsi
@@ -350,7 +270,7 @@ void InitIntrinsicFunctions(Parse_Info* info)
 			&type_uint64, // r10
 			&type_uint64, // r8
 			&type_uint64, // r9
-		}, info),
+		}),
 
 		&type_uint64,
 
@@ -377,7 +297,7 @@ static Ast_Function* GetFunction(String name, Type* input_type, Ast_Scope* scope
 	{
 		for (Ast_Function* function = scope->functions; function < scope->functions.End(); function++)
 		{
-			if (CompareStrings(name, function->name->info.string) && IsConvertableTo(input_type, function->type->function.input))
+			if (CompareStrings(name, function->name) && IsConvertableTo(input_type, function->type->function.input))
 			{
 				return function;
 			}
@@ -413,21 +333,6 @@ static Ast_Enum_Member* FindEnumMember(Ast_Enum* ast_enum, String name)
 	}
 
 	return null;
-}
-
-static bool IsBaseType(Type* type)
-{
-	return IsPrimitive(type)
-		|| type->kind == TYPE_BASETYPE_STRUCT
-		|| type->kind == TYPE_BASETYPE_ENUM
-		|| type->kind == TYPE_BASETYPE_FUNCTION
-		|| type->kind == TYPE_BASETYPE_TUPLE;
-}
-
-static Type* FindBaseType(Type* type)
-{
-	while (!IsBaseType(type)) type = type->subtype;
-	return type;
 }
 
 void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info)
@@ -576,48 +481,46 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			}
 			else if (literal->token->kind == TOKEN_NULL)
 			{
-				literal->type = GetPointer(&empty_tuple);
+				literal->type = GetPointer(&type_byte);
 			}
 			else if (literal->token->kind == TOKEN_STRING_LITERAL)
 			{
-				u64 length = literal->token->info.string.length;
-				bool found = false;
-
-				for (u32 i = 0; i < type_uint8.fixed_arrays.count; i++)
-				{
-					if (type_uint8.fixed_arrays[i]->length == length)
-					{
-						literal->type = type_uint8.fixed_arrays[i];
-						found = true;
-						break;
-					}
-				}
-
-				if (!found)
-				{
-					Type* type = info->stack.Allocate<Type>();
-					ZeroMemory(type);
-					type->kind = TYPE_SPECIFIER_FIXED_ARRAY;
-					type->length = length;
-					type->size = length;
-					type->subtype = &type_uint8;
-					type_uint8.fixed_arrays.Add(type);
-					literal->type = type;
-				}
+				literal->is_referential_value = true;
+				literal->type = GetFixedArray(&type_uint8, literal->token->info.string.length);
 			}
 		} break;
 
 		case AST_EXPRESSION_TUPLE:
 		{
 			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
+			tuple->is_referential_value = false;
+
 			tuple->can_constantly_evaluate = true;
 			tuple->is_pure = true;
-			tuple->is_referential_value = true;
+
+			tuple->recursive_count = 0;
+
+			Type* types[tuple->elements.count];
 
 			for (u32 i = 0; i < tuple->elements.count; i++)
 			{
 				Ast_Expression* element = tuple->elements[i];
 				ScanExpression(element, scope, info);
+				types[i] = element->type;
+
+				if (element->kind == AST_EXPRESSION_TUPLE)
+				{
+					tuple->recursive_count += ((Ast_Expression_Tuple*)element)->recursive_count;
+				}
+				else
+				{
+					tuple->recursive_count++;
+				}
+
+				if (element->type == &empty_tuple && (element->kind != AST_EXPRESSION_TUPLE || tuple->elements.count > 1))
+				{
+					Error(info, element->span, "Tuple elements aren't allowed to be of type %.\n", element->type);
+				}
 
 				if (!element->can_constantly_evaluate)
 				{
@@ -628,14 +531,9 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 				{
 					tuple->is_pure = false;
 				}
-
-				if (!element->is_referential_value)
-				{
-					tuple->is_referential_value = false;
-				}
 			}
 
-			tuple->type = GetTypeFromTupleExpression(tuple, info);
+			tuple->type = GetTuple(Array(types, tuple->elements.count));
 		} break;
 
 		case AST_EXPRESSION_UNARY_ADDRESS_OF:
@@ -653,7 +551,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			}
 		} break;
 
-		case AST_EXPRESSION_UNARY_VALUE_OF:
+		case AST_EXPRESSION_UNARY_REFERENCE_OF:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, info);
@@ -763,7 +661,6 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 				}
 
 				member_terminal->member = member;
-
 				member_terminal->type = type;
 				member_terminal->can_constantly_evaluate = true;
 				member_terminal->is_pure = true;
@@ -785,17 +682,22 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 						Error(info, binary->span, "Invalid dot expression on array.\n");
 					}
 
-					if (CompareStrings(terminal->token->info.string, "data") && type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY)
+					if (type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY && (
+						CompareStrings(terminal->token->info.string, "data") ||
+						CompareStrings(terminal->token->info.string, "begin")))
+						// @Todo: array.end
 					{
 						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_DATA;
 						binary->type = GetPointer(binary->left->type->subtype);
 						binary->is_referential_value = binary->left->is_referential_value;
 					}
-					else if (CompareStrings(terminal->token->info.string, "length"))
+					else if (CompareStrings(terminal->token->info.string, "length") ||
+						CompareStrings(terminal->token->info.string, "count"))
 					{
 						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_LENGTH;
 						binary->type = &type_uint64;
 						binary->is_referential_value = binary->left->is_referential_value && binary->left->type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY;
+						binary->can_constantly_evaluate = binary->left->type->kind == TYPE_SPECIFIER_FIXED_ARRAY;
 					}
 					else
 					{
@@ -848,8 +750,19 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!IsConvertableTo(binary->right->type, binary->left->type) && // @FixMe
-				!(IsNumerical(binary->left->type) && IsNumerical(binary->right->type)))
+			if (binary->left->type == &empty_tuple || binary->right->type == &empty_tuple)
+			{
+				Error(info, binary->span, "Cannot compare % and %.\n", binary->left->type, binary->right->type);
+			}
+
+			if (!IsNumerical(binary->left->type) || !IsNumerical(binary->right->type))
+			{
+				Error(info, binary->span, "% and % are incompatible types.\n", binary->left->type, binary->right->type);
+			}
+
+			Type* dominant = GetDominantType(binary->left->type, binary->right->type);
+
+			if (!IsConvertableTo(binary->right->type, dominant) || !IsConvertableTo(binary->left->type, dominant))
 			{
 				Error(info, binary->span, "% and % are incompatible types.\n", binary->left->type, binary->right->type);
 			}
@@ -877,6 +790,13 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			{
 				Error(info, binary->span, "% is not a numerical type.\n", binary->right->type);
 			}
+
+			Type* dominant = GetDominantType(binary->left->type, binary->right->type);
+
+			if (!IsConvertableTo(binary->left->type, dominant) || !IsConvertableTo(binary->left->type, dominant))
+			{
+				Error(info, binary->span, "Incompatible types % and %\n", binary->left->type, binary->right->type);
+			}
 		} break;
 
 		case AST_EXPRESSION_BINARY_ADD:
@@ -893,21 +813,13 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!IsNumerical(binary->left->type))
+			if (IsPointer(binary->left->type) && IsConvertableTo(binary->right->type, &type_int64))
 			{
-				Error(info, binary->span, "% is not a numerical type.\n", binary->left->type);
+				binary->type = binary->left->type;
 			}
-
-			if (!IsNumerical(binary->right->type))
+			else if (IsPointer(binary->left->type) && IsPointer(binary->right->type))
 			{
-				Error(info, binary->span, "% is not a numerical type.\n", binary->right->type);
-			}
-
-			binary->type = GetDominantType(binary->left->type, binary->right->type);
-
-			if (IsPointer(binary->left->type) && IsPointer(binary->right->type))
-			{
-				if (binary->left->type != binary->right->type)
+				if (binary->left->type != binary->right->type && !IsBytePointer(binary->left->type) && !IsBytePointer(binary->right->type))
 				{
 					Error(info, binary->span,
 						"Cannot perform binary operation '%' on two pointers of different types: '%' and '%'.\n",
@@ -918,8 +830,30 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 				{
 					binary->type = &type_int64;
 				}
+				else
+				{
+					binary->type = binary->left->type;
+				}
 			}
+			else
+			{
+				binary->type = GetDominantType(binary->left->type, binary->right->type);
 
+				if (!IsNumerical(binary->left->type))
+				{
+					Error(info, binary->span, "% is not a numerical type.\n", binary->left->type);
+				}
+
+				if (!IsNumerical(binary->right->type))
+				{
+					Error(info, binary->span, "% is not a numerical type.\n", binary->right->type);
+				}
+
+				if (!IsConvertableTo(binary->left->type, binary->type) || !IsConvertableTo(binary->right->type, binary->type))
+				{
+					Error(info, binary->span, "Types % and % are incompatible.\n", binary->left->type, binary->right->type);
+				}
+			}
 		} break;
 
 		case AST_EXPRESSION_BINARY_BITWISE_OR:
@@ -935,12 +869,12 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 
 			if (!IsNumerical(binary->left->type) || IsFloat(binary->left->type))
 			{
-				Error(info, binary->span, "Cannot use bitwise AND with type: %\n", binary->left->type);
+				Error(info, binary->span, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
 			}
 
 			if (!IsNumerical(binary->right->type) || IsFloat(binary->right->type))
 			{
-				Error(info, binary->span, "Cannot use bitwise AND with type: %\n", binary->right->type);
+				Error(info, binary->span, "Cannot use bitwise % with type: %\n", binary->op, binary->right->type);
 			}
 
 			binary->type = GetDominantType(binary->left->type, binary->right->type);
@@ -979,14 +913,14 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
 			binary->is_referential_value = false;
 
-			if (!IsNumerical(binary->left->type))
+			if (!IsConvertableTo(binary->left->type, &type_bool))
 			{
-				Error(info, binary->span, "% is not a numerical type.\n", binary->left->type);
+				Error(info, binary->span, "% cannot be converted to bool.\n", binary->left->type);
 			}
 
-			if (!IsNumerical(binary->right->type))
+			if (!IsConvertableTo(binary->right->type, &type_bool))
 			{
-				Error(info, binary->span, "% is not a numerical type.\n", binary->right->type);
+				Error(info, binary->span, "% cannot be converted to bool.\n", binary->right->type);
 			}
 
 			binary->type = GetDominantType(binary->left->type, binary->right->type);
@@ -998,14 +932,21 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			ScanExpression(ternary->left,   scope, info);
 			ScanExpression(ternary->middle, scope, info);
 			ScanExpression(ternary->right,  scope, info);
-			ternary->type = ternary->left->type;
 			ternary->can_constantly_evaluate = ternary->left->can_constantly_evaluate && ternary->middle->can_constantly_evaluate && ternary->right->can_constantly_evaluate;
 			ternary->is_pure = ternary->left->is_pure && ternary->middle->is_pure && ternary->right->is_pure;
 			ternary->is_referential_value = false;
 
-			if (ternary->left->type != ternary->right->type)
+			ternary->type = GetDominantType(ternary->left->type, ternary->right->type);
+
+			if (!IsConvertableTo(ternary->left->type, ternary->type) ||
+				!IsConvertableTo(ternary->right->type, ternary->type))
 			{
-				Error(info, ternary->span, "Type mismatch between % and %.\n", ternary->left->type, ternary->right->type);
+				Error(info, ternary->left->span, "Type mismatch between % and %\n", ternary->left->type, ternary->right->type);
+			}
+
+			if (!IsConvertableTo(ternary->middle->type, &type_bool))
+			{
+				Error(info, ternary->middle->span, "Type % not convertable to bool\n", ternary->middle->type);
 			}
 		} break;
 
@@ -1013,23 +954,20 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 		{
 			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
 
-			if (call->parameters) // @RemoveMe? Is this just empty tuple? So this is never null?
-			{
-				ScanExpression(call->parameters, scope, info);
-			}
-
 			Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)call->function;
+			ScanExpression(call->parameters, scope, info);
 
 			if (call->function->kind == AST_EXPRESSION_TERMINAL && terminal->token->kind == TOKEN_IDENTIFIER)
 			{
-				// @Note: call->function could still be a variable and not a function!
-
 				if (Ast_Function* function = GetFunction(terminal->token->info.string, call->parameters->type, scope); function)
 				{
 					Ast_Expression_Function* function_expression = (Ast_Expression_Function*)call->function;
 					call->function->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
 					function_expression->function = function;
 					call->type = function->return_type;
+					call->can_constantly_evaluate = false; // @FixMe: Need to figure out how to prove this.
+					call->is_pure = false;                 // @FixMe: This too.
+					call->is_referential_value = false;
 				}
 				else if (Intrinsic_Function* intrinsic_function = GetIntrinsicFunction(terminal->token->info.string, call->parameters->type); intrinsic_function)
 				{
@@ -1037,20 +975,31 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 					call->function->kind = AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION;
 					intrinsic_function_expression->intrinsic_function = intrinsic_function;
 					call->type = intrinsic_function->output;
+					call->can_constantly_evaluate = false; // @FixMe: Might not always be false.
+					call->is_pure = false;                 // @FixMe: This too.
+					call->is_referential_value = false;
 				}
 				else if (Ast_VariableDeclaration* variable = GetVariable(terminal->token, scope); variable)
 				{
 					Ast_Expression_Variable* variable_expression = (Ast_Expression_Variable*)call->function;
 					call->function->kind = AST_EXPRESSION_TERMINAL_VARIABLE;
 					variable_expression->variable = variable;
-					call->type = variable->type->function.output;
-					if (!call->type) call->type = &empty_tuple;
-					call->is_pure = variable->is_pure;
-					call->can_constantly_evaluate = variable->can_constantly_evaluate;
 
-					if (variable->type->kind != TYPE_BASETYPE_FUNCTION)
+					if (!IsFunctionPointer(variable->type))
 					{
 						Error(info, variable_expression->token->location, "Variable % with type % cannot be called like a function.\n", variable->name, variable->type);
+					}
+
+					Type* function_type = variable->type->subtype;
+
+					call->type = function_type->function.output;
+					call->is_pure = false;
+					call->can_constantly_evaluate = false;
+					call->is_referential_value = false;
+
+					if (!IsConvertableTo(call->parameters->type, variable->type->function.input))
+					{
+						Error(info, call->function->span, "Function of type % called with invalid arguments: %.\n", call->function->type, call->parameters->type);
 					}
 				}
 				else
@@ -1061,6 +1010,21 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			else
 			{
 				ScanExpression(call->function, scope, info);
+
+				if (!IsFunctionPointer(call->function->type))
+				{
+					Error(info, call->function->span, "Expression of type % cannot be called like a function.\n", call->function->type);
+				}
+
+				Type* function_type = call->function->type->subtype;
+				call->can_constantly_evaluate = false;
+				call->is_pure = false;
+				call->type = function_type->function.output;
+
+				if (!IsConvertableTo(call->parameters->type, function_type->function.input))
+				{
+					Error(info, call->function->span, "Function of type % called with invalid arguments: %.\n", call->function->type, call->parameters->type);
+				}
 			}
 		} break;
 
@@ -1095,6 +1059,22 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* in
 			if (subscript->array->type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
 			{
 				subscript->is_referential_value = subscript->array->is_referential_value;
+			}
+		} break;
+
+		case AST_EXPRESSION_AS:
+		{
+			Ast_Expression_As* as = (Ast_Expression_As*)expression;
+			ScanExpression(as->expression, scope, info);
+			as->type = GetType(&as->ast_type, scope, info);
+
+			as->can_constantly_evaluate = as->expression->can_constantly_evaluate;
+			as->is_pure = as->expression->is_pure;
+			as->is_referential_value = false;
+
+			if (!IsConvertableTo(as->expression->type, as->type))
+			{
+				Error(info, as->span, "Type % is not convertable to %\n", as->expression->type, as->type);
 			}
 		} break;
 
@@ -1256,6 +1236,8 @@ void ScanScope(Ast_Scope* scope, Parse_Info* info)
 		ZeroMemory(&e->type);
 		e->type.kind = TYPE_BASETYPE_ENUM;
 		e->type.enumeration = e;
+		e->underlying_type = &type_int64;
+		e->type.size = e->underlying_type->size;
 
 		for (Ast_Enum* eo = scope->enums; eo < e; eo++)
 		{
@@ -1312,9 +1294,9 @@ void ScanScope(Ast_Scope* scope, Parse_Info* info)
 
 		for (Ast_Function* other = scope->functions; other < f; other++)
 		{
-			if (f->type == other->type && CompareStrings(f->name->info.string, other->name->info.string))
+			if (f->type == other->type && CompareStrings(f->name, other->name))
 			{
-				Error(info, f->name->location, "Function '%' with type % already exists.\n", f->name, f->type);
+				Error(info, f->name_token->location, "Function '%' with type % already exists.\n", f->name, f->type);
 			}
 		}
 	}
@@ -1322,8 +1304,33 @@ void ScanScope(Ast_Scope* scope, Parse_Info* info)
 	for (Ast_Function* f = scope->functions; f < scope->functions.End(); f++)
 	{
 		ScanCode(&f->code, scope, f, info);
+
+		if (f->return_type != &empty_tuple)
+		{
+			if (!f->code.does_return)
+			{
+				Error(info, f->name_token->location, "Function does not return a value.\n");
+			}
+		}
 	}
 
+}
+
+bool IsAssignable(Ast_Expression* expression)
+{
+	if (expression->is_referential_value) return true;
+	if (expression->type->kind != TYPE_BASETYPE_TUPLE) return false;
+	if (expression->type == &empty_tuple) return false;
+
+	Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
+
+	for (u32 i = 0; i < tuple->elements.count; i++)
+	{
+		Ast_Expression* element = tuple->elements[i];
+		if (!IsAssignable(element)) return false;
+	}
+
+	return true;
 }
 
 void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info)
@@ -1331,7 +1338,7 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_In
 	code->scope.parent = scope;
 	ScanScope(&code->scope, info);
 
-	for (Ast_Statement* statement = code->statements; statement < code->statements.End(); statement++)
+	for (Ast_Statement* statement = code->statements.Begin(); statement < code->statements.End(); statement++)
 	{
 		switch (statement->kind)
 		{
@@ -1459,9 +1466,10 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_In
 					{
 						Error(info, variable->assignment->span, "Expression does not have a type.\n");
 					}
+
 				}
 
-				if (variable->explicit_type != null)
+				if (variable->explicit_type)
 				{
 					variable->type = GetType(variable->explicit_type, &code->scope, info);
 					variable->explicit_type->type = variable->type;
@@ -1484,24 +1492,22 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_In
 					variable->type = variable->assignment->type;
 				}
 
-				// Print("Variable % has type %\n", variable->name, variable->type);
+				if (variable->type == &empty_tuple)
+				{
+					Error(info, variable->assignment->span, "Cannot declare variable with type %\n", variable->type);
+				}
 
 				code->scope.variables.Add(variable);
 			} break;
 
 			case AST_STATEMENT_ASSIGNMENT:
-			case AST_STATEMENT_ASSIGNMENT_ADD:
-			case AST_STATEMENT_ASSIGNMENT_SUBTRACT:
-			case AST_STATEMENT_ASSIGNMENT_MULTIPLY:
-			case AST_STATEMENT_ASSIGNMENT_DIVIDE:
-			case AST_STATEMENT_ASSIGNMENT_POWER:
 			{
 				ScanExpression(statement->assignment.right, &code->scope, info);
 				ScanExpression(statement->assignment.left,  &code->scope, info);
 
-				if (!statement->assignment.left->is_referential_value)
+				if (!IsAssignable(statement->assignment.left))
 				{
-					Error(info, statement->assignment.left->span, "Expression is not referential.\n");
+					Error(info, statement->assignment.left->span, "Expression is not assignable.\n");
 				}
 
 				if (!IsConvertableTo(statement->assignment.right->type, statement->assignment.left->type))
@@ -1509,17 +1515,59 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_In
 					Error(info, statement->assignment.token->location, "Left and right types are incompatible.\n");
 				}
 
-				if (statement->kind != AST_STATEMENT_ASSIGNMENT)
+			} break;
+
+			case AST_STATEMENT_ASSIGNMENT_ADD:
+			case AST_STATEMENT_ASSIGNMENT_SUBTRACT:
+			case AST_STATEMENT_ASSIGNMENT_MULTIPLY:
+			case AST_STATEMENT_ASSIGNMENT_DIVIDE:
+			case AST_STATEMENT_ASSIGNMENT_POWER:
+			{
+				Ast_Assignment* assignment = &statement->assignment;
+
+				ScanExpression(assignment->right, &code->scope, info);
+				ScanExpression(assignment->left,  &code->scope, info);
+
+				if (!assignment->left->is_referential_value)
 				{
-					if (!IsNumerical(statement->assignment.left->type))
+					Error(info, assignment->left->span, "Expression is not assignable.\n");
+				}
+
+				if (!IsInteger(assignment->left->type) &&
+					!IsFloat(assignment->left->type) &&
+					assignment->left->type->kind != TYPE_SPECIFIER_POINTER)
+				{
+					Error(info, assignment->left->span, "Arithmetic assignment type must be to an integer, float or pointer, not: %\n", assignment->left->type);
+				}
+
+				// ptr += int
+				// ptr -= int
+
+				// int += int
+				// int -= int
+				// int *= int
+				// int /= int
+
+				// float += float
+				// float -= float
+				// float *= float
+				// float /= float
+
+				if (assignment->left->type->kind == TYPE_SPECIFIER_POINTER)
+				{
+					if (statement->kind != AST_STATEMENT_ASSIGNMENT_ADD && statement->kind != AST_STATEMENT_ASSIGNMENT_SUBTRACT)
 					{
-						Error(info, statement->assignment.left->span, "Expression is not numerical.\n");
+						Error(info, assignment->left->span, "Pointer arithmetic assignment only allows += and -=.\n");
 					}
 
-					if (!IsNumerical(statement->assignment.right->type))
+					if (!IsConvertableTo(assignment->right->type, &type_int64))
 					{
-						Error(info, statement->assignment.right->span, "Expression is not numerical.\n");
+						Error(info, assignment->right->span, "Expression type must be an integer.\n");
 					}
+				}
+				else if (!IsConvertableTo(assignment->right->type, assignment->left->type))
+				{
+					Error(info, assignment->right->span, "Expression is not numerical.\n");
 				}
 			} break;
 		}
@@ -1528,158 +1576,13 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_In
 
 static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Parse_Info* info)
 {
-	if (params.count == 0)
-	{
-		return &empty_tuple;
-	}
-	else if (params.count == 1)
-	{
-		return params[0].type;
-	}
-
-	Type* first = params[0].type;
-
-	for (u32 i = 0; i < first->tuple_extensions.count; i++)
-	{
-		Type* tuple = first->tuple_extensions[i];
-		bool fail = false;
-
-		if (tuple->tuple.count != params.count) continue;
-
-		for (u32 j = 0; j < tuple->tuple.count; j++)
-		{
-			if (tuple->tuple[j] != params[j].type)
-			{
-				fail = true;
-				break;
-			}
-		}
-
-		if (!fail)
-		{
-			return tuple;
-		}
-	}
-
-	Type* tuple = info->stack.Allocate<Type>();
-	Type** tuple_members = info->stack.Allocate<Type*>(params.count);
-	ZeroMemory(tuple);
-	tuple->kind = TYPE_BASETYPE_TUPLE;
-
+	Type* types[params.count];
 	for (u32 i = 0; i < params.count; i++)
 	{
-		tuple_members[i] = params[i].type;
-		Assert(params[i].type->size); // @Note @Bug: I don't think this will work with recursive tuples or maybe even structs?
-		tuple->size += params[i].type->size;
+		types[i] = params[i].type;
 	}
 
-	tuple->tuple = Array(tuple_members, params.count);
-	first->tuple_extensions.Add(tuple);
-	return tuple;
-}
-
-Type* GetTupleFromTypeArray(Array<Type*> types, Parse_Info* info)
-{
-	if (types.count == 0)
-	{
-		return &empty_tuple;
-	}
-
-	if (types.count == 1)
-	{
-		return types[0];
-	}
-
-	Type* first = types[0];
-
-	for (u32 i = 0; i < first->tuple_extensions.count; i++)
-	{
-		Type* type = first->tuple_extensions[i];
-		bool fail = false;
-
-		if (type->tuple.count != types.count) continue;
-
-		for (u32 j = 0; j < type->tuple.count; j++)
-		{
-			if (type->tuple[j] != types[j])
-			{
-				fail = true;
-				break;
-			}
-		}
-
-		if (!fail)
-		{
-			return type;
-		}
-	}
-
-	Type* type = info->stack.Allocate<Type>();
-	Type** tuple_members = info->stack.Allocate<Type*>(types.count);
-	ZeroMemory(type);
-	type->kind = TYPE_BASETYPE_TUPLE;
-
-	for (u32 i = 0; i < types.count; i++)
-	{
-		tuple_members[i] = types[i];
-		type->size += types[i]->size;
-	}
-
-	type->tuple = Array(tuple_members, types.count);
-	first->tuple_extensions.Add(type);
-	return type;
-}
-
-static Type* GetTypeFromTupleExpression(Ast_Expression_Tuple* tuple, Parse_Info* info)
-{
-	if (tuple->elements.count == 0)
-	{
-		return &empty_tuple;
-	}
-
-	if (tuple->elements.count == 1)
-	{
-		return tuple->elements[0]->type;
-	}
-
-	Type* first = tuple->elements[0]->type;
-
-	for (u32 i = 0; i < first->tuple_extensions.count; i++)
-	{
-		Type* type = first->tuple_extensions[i];
-		bool fail = false;
-
-		if (type->tuple.count != tuple->elements.count) continue;
-
-		for (u32 j = 0; j < type->tuple.count; j++)
-		{
-			if (type->tuple[j] != tuple->elements[j]->type)
-			{
-				fail = true;
-				break;
-			}
-		}
-
-		if (!fail)
-		{
-			return type;
-		}
-	}
-
-	Type* type = info->stack.Allocate<Type>();
-	Type** tuple_members = info->stack.Allocate<Type*>(tuple->elements.count);
-	ZeroMemory(type);
-	type->kind = TYPE_BASETYPE_TUPLE;
-
-	for (u32 i = 0; i < tuple->elements.count; i++)
-	{
-		tuple_members[i] = tuple->elements[i]->type;
-		type->size += tuple->elements[i]->type->size;
-	}
-
-	type->tuple = Array(tuple_members, tuple->elements.count);
-	first->tuple_extensions.Add(type);
-	return type;
+	return GetTuple(Array(types, params.count));
 }
 
 void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info)
@@ -1740,6 +1643,7 @@ void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info)
 		param_type->function_extensions.Add(func_type);
 		function->type = func_type;
 	}
+
 }
 
 void SemanticParse(Parse_Info* info)
@@ -1752,7 +1656,7 @@ void SemanticParse(Parse_Info* info)
 	{
 		Ast_Function* function = &root->scope.functions[i];
 
-		if (Compare(function->name->info.string, "Test") && !function->parameters.count)
+		if (Compare(function->name, "Test") && !function->parameters.count)
 		{
 			Interpreter* interpreter = CreateInterpreter(info);
 			u64 data_size = 0;

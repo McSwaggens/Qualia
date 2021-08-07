@@ -52,3 +52,9 @@ static void Assert(String message, InternalSourceLocation pos = GetSourcePositio
 	Fail();
 }
 
+template<u32 N>
+static void Assert(const char (&s)[N], InternalSourceLocation pos = GetSourcePosition())
+{
+	Assert(String(s, N-1), pos);
+}
+

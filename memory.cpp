@@ -16,7 +16,8 @@
 //
 void* AllocateVirtualPage(u64 size, bool write, bool execute, bool prefault)
 {
-	Assert(size == (size & -PageSize), "Invalid page size detected.");
+	Assert(size);
+	Assert((size & 4095) == 0, "Invalid page size detected.");
 
 	u32 protection = 1; // Might as well put READ flag on by default, not like it matters anyway... >:(
 	if (write)   protection |= 2;
@@ -52,19 +53,22 @@ struct ArenaPool
 	u32   count;
 };
 
+#define ARENA_MIN_POW 3
+#define ARENA_POOL_COUNT (16 - ARENA_MIN_POW)
+
 struct Arena
 {
-	ArenaPool pools[16-3];
+	ArenaPool pools[ARENA_POOL_COUNT];
 } arena;
 
 void InitGlobalArena()
 {
 	ZeroMemory(&arena);
-	char* pages = (char*)AllocateVirtualPage((1<<21)*13);
+	char* pages = (char*)AllocateVirtualPage((1<<21) * ARENA_POOL_COUNT);
 
-	for (u32 index = 0; index < 13; index++)
+	for (u32 index = 0; index < ARENA_POOL_COUNT; index++)
 	{
-		u32 pow = index + 3;
+		u32 pow = index + ARENA_MIN_POW;
 
 		arena.pools[index].head = null;
 		arena.pools[index].data = pages;
@@ -81,44 +85,66 @@ u64 GetArenaEffectiveSize(u64 size)
 
 void* Allocate(u64 size)
 {
+	// Check if size is 0?
 	Assert(size);
 
 	size = GetArenaEffectiveSize(size);
 	u32 pow = CountTrailingZeroes(size);
-	u32 index = pow - 3;
+	u32 index = pow - ARENA_MIN_POW;
 
-	ArenaPool* pool = &arena.pools[index];
+	void* result = null;
 
-	if (pool->head)
+	if (index < ARENA_POOL_COUNT)
 	{
-		void* result = pool->head;
-		pool->head = *(char**)result;
-		return result;
+		ArenaPool* pool = &arena.pools[index];
+
+		if (pool->head)
+		{
+			void* result = pool->head;
+			pool->head = *(char**)result;
+			return result;
+		}
+		else if (!pool->count)
+		{
+			pool->data = AllocateVirtualPage(1<<21);
+			pool->count = 1<<(21-pow);
+		}
+
+		result = pool->data;
+		pool->data = (char*)pool->data + size;
+		pool->count--;
 	}
-	else if (!pool->count)
+	else
 	{
-		pool->data = AllocateVirtualPage(1<<21);
-		pool->count = 1<<(21-pow);
+		result = AllocateVirtualPage(size);
 	}
 
-	void* result = pool->data;
-	pool->data = (char*)pool->data + size;
-	pool->count--;
+	// Print("result = %, size = %, pow = %\n", (u64)result, size, pow);
+	// standard_output_buffer.Flush();
+
 	return result;
 }
 
 void DeAllocate(void* p, u64 size)
 {
+	// Check if p is not null? Or leave that up to the caller?
 	Assert(p);
 	Assert(size);
 
 	size = GetArenaEffectiveSize(size);
 	u32 pow = CountTrailingZeroes(size);
-	u32 index = pow - 3;
+	u32 index = pow - ARENA_MIN_POW;
 
-	ArenaPool* pool = &arena.pools[index];
-	*(void**)p = pool->head;
-	pool->head = p;
+	if (index < ARENA_POOL_COUNT)
+	{
+		ArenaPool* pool = &arena.pools[index];
+		*(void**)p = pool->head;
+		pool->head = p;
+	}
+	else
+	{
+		DeAllocateVirtualPage(p, size);
+	}
 }
 
 void* ReAllocate(void* p, u64 old_size, u64 new_size)

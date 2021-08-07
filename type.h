@@ -7,8 +7,9 @@
 struct Ast_Struct;
 struct Ast_Enum;
 
-enum Type_Kind
+enum Type_Kind : u8
 {
+	TYPE_BASETYPE_BYTE,
 	TYPE_BASETYPE_BOOL,
 	TYPE_BASETYPE_UINT8,
 	TYPE_BASETYPE_UINT16,
@@ -46,7 +47,12 @@ struct Type
 			Type* output;
 		} function;
 
-		Array<Type*> tuple;
+		struct
+		{
+			Array<Type*> tuple;
+			u16 recursive_count;
+		};
+
 		Type* subtype;
 	};
 
@@ -61,6 +67,7 @@ struct Type
 };
 
 extern Type empty_tuple;
+extern Type type_byte;
 extern Type type_bool;
 extern Type type_int8;
 extern Type type_int16;
@@ -78,6 +85,7 @@ static bool IsPrimitive(Type* type)
 {
 	switch (type->kind)
 	{
+		case TYPE_BASETYPE_BYTE:
 		case TYPE_BASETYPE_BOOL:
 		case TYPE_BASETYPE_UINT8:
 		case TYPE_BASETYPE_UINT16:
@@ -90,24 +98,6 @@ static bool IsPrimitive(Type* type)
 		case TYPE_BASETYPE_FLOAT16:
 		case TYPE_BASETYPE_FLOAT32:
 		case TYPE_BASETYPE_FLOAT64:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static bool IsInteger(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_UINT8:
-		case TYPE_BASETYPE_UINT16:
-		case TYPE_BASETYPE_UINT32:
-		case TYPE_BASETYPE_UINT64:
-		case TYPE_BASETYPE_INT8:
-		case TYPE_BASETYPE_INT16:
-		case TYPE_BASETYPE_INT32:
-		case TYPE_BASETYPE_INT64:
 			return true;
 		default:
 			return false;
@@ -136,6 +126,24 @@ static bool IsUnsignedInteger(Type* type)
 		case TYPE_BASETYPE_UINT16:
 		case TYPE_BASETYPE_UINT32:
 		case TYPE_BASETYPE_UINT64:
+			return true;
+		default:
+			return false;
+	}
+}
+
+static bool IsInteger(Type* type)
+{
+	switch (type->kind)
+	{
+		case TYPE_BASETYPE_UINT8:
+		case TYPE_BASETYPE_UINT16:
+		case TYPE_BASETYPE_UINT32:
+		case TYPE_BASETYPE_UINT64:
+		case TYPE_BASETYPE_INT8:
+		case TYPE_BASETYPE_INT16:
+		case TYPE_BASETYPE_INT32:
+		case TYPE_BASETYPE_INT64:
 			return true;
 		default:
 			return false;
@@ -181,46 +189,22 @@ static bool IsNumerical(Type* type)
 
 static bool IsEnum(Type* type)
 {
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_ENUM:
-			return true;
-		default:
-			return false;
-	}
+	return type->kind == TYPE_BASETYPE_ENUM;
 }
 
 static bool IsStruct(Type* type)
 {
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_STRUCT:
-			return true;
-		default:
-			return false;
-	}
+	return type->kind == TYPE_BASETYPE_STRUCT;
 }
 
 static bool IsPointer(Type* type)
 {
-	switch (type->kind)
-	{
-		case TYPE_SPECIFIER_POINTER:
-			return true;
-		default:
-			return false;
-	}
+	return type->kind == TYPE_SPECIFIER_POINTER;
 }
 
 static bool IsOptional(Type* type)
 {
-	switch (type->kind)
-	{
-		case TYPE_SPECIFIER_OPTIONAL:
-			return true;
-		default:
-			return false;
-	}
+	return type->kind == TYPE_SPECIFIER_OPTIONAL;
 }
 
 static u32 GetTypePrecedence(Type* type)
@@ -233,27 +217,27 @@ static u32 GetTypePrecedence(Type* type)
 		case TYPE_SPECIFIER_OPTIONAL:
 		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
 		case TYPE_SPECIFIER_FIXED_ARRAY:
-			return 0;
 
-		case TYPE_BASETYPE_BOOL:    return 1;
+		case TYPE_BASETYPE_BYTE:     return 20;
+		case TYPE_BASETYPE_ENUM:     return 21;
 
-		case TYPE_BASETYPE_UINT8:   return 2;
-		case TYPE_BASETYPE_UINT16:  return 3;
-		case TYPE_BASETYPE_UINT32:  return 4;
-		case TYPE_BASETYPE_UINT64:  return 5;
+		case TYPE_BASETYPE_UINT8:    return 30;
+		case TYPE_BASETYPE_UINT16:   return 31;
+		case TYPE_BASETYPE_UINT32:   return 32;
+		case TYPE_BASETYPE_UINT64:   return 33;
 
-		case TYPE_BASETYPE_INT8:    return 6;
-		case TYPE_BASETYPE_INT16:   return 7;
-		case TYPE_BASETYPE_INT32:   return 8;
-		case TYPE_BASETYPE_INT64:   return 9;
+		case TYPE_BASETYPE_INT8:     return 60;
+		case TYPE_BASETYPE_INT16:    return 61;
+		case TYPE_BASETYPE_INT32:    return 62;
+		case TYPE_BASETYPE_INT64:    return 63;
 
-		case TYPE_BASETYPE_FLOAT16: return 10;
-		case TYPE_BASETYPE_FLOAT32: return 11;
-		case TYPE_BASETYPE_FLOAT64: return 12;
+		case TYPE_BASETYPE_FLOAT16:  return 70;
+		case TYPE_BASETYPE_FLOAT32:  return 71;
+		case TYPE_BASETYPE_FLOAT64:  return 72;
 
-		case TYPE_BASETYPE_ENUM:
-		case TYPE_SPECIFIER_POINTER:
-			return 13;
+		case TYPE_SPECIFIER_POINTER: return 80;
+
+		case TYPE_BASETYPE_BOOL:     return 90;
 	}
 }
 
@@ -261,6 +245,7 @@ static constexpr Type* GetPrimitiveTypeFromTokenKind(Token_Kind kind)
 {
 	switch (kind)
 	{
+		case TOKEN_BYTE:    return &type_byte;
 		case TOKEN_BOOL:    return &type_bool;
 		case TOKEN_INT:     return &type_int64;
 		case TOKEN_INT8:    return &type_int8;
@@ -286,6 +271,7 @@ static constexpr Type* GetPrimitiveTypeFromKind(Type_Kind kind)
 {
 	switch (kind)
 	{
+		case TYPE_BASETYPE_BYTE:    return &type_byte;
 		case TYPE_BASETYPE_BOOL:    return &type_bool;
 		case TYPE_BASETYPE_UINT8:   return &type_uint8;
 		case TYPE_BASETYPE_UINT16:  return &type_uint16;
@@ -335,14 +321,79 @@ static constexpr Type_Kind GetSignedVersionOf(Type_Kind kind)
 	}
 }
 
-// @RemoveMe:
-//  The idea of a "dominant" type needs to be replaced with something else.
-//  int8 + uint64 = int64
-//  *int + int = *int
-//  *int - int =  int
+static bool IsBaseType(Type* type)
+{
+	return IsPrimitive(type)
+		|| type->kind == TYPE_BASETYPE_STRUCT
+		|| type->kind == TYPE_BASETYPE_ENUM
+		|| type->kind == TYPE_BASETYPE_FUNCTION
+		|| type->kind == TYPE_BASETYPE_TUPLE;
+}
+
+static Type* FindBaseType(Type* type)
+{
+	while (!IsBaseType(type)) type = type->subtype;
+	return type;
+}
+
+static Type* GetOptimalInteger(Type* a, Type* b)
+{
+	if (a == b) return a;
+
+	if (IsSignedInteger(a) != IsSignedInteger(b))
+	{
+		if (IsSignedInteger(a))
+		{
+			b = GetPrimitiveTypeFromKind(GetSignedVersionOf(b->kind));
+		}
+		else
+		{
+			a = GetPrimitiveTypeFromKind(GetSignedVersionOf(a->kind));
+		}
+	}
+
+	return a->size >= b->size ? a : b;
+}
+
 static Type* GetDominantType(Type* a, Type* b)
 {
+	if (a == b) return a;
+
+	if (IsInteger(a) && IsInteger(b))
+	{
+		return GetOptimalInteger(a, b);
+	}
+
 	return GetTypePrecedence(a) >= GetTypePrecedence(b) ? a : b;
+}
+
+static bool IsTrivialType(Type* type)
+{
+	return type->size <= 8 && (IsPrimitive(type) || IsPointer(type) || IsEnum(type));
+}
+
+static bool IsFunctionPointer(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_POINTER
+		&& type->subtype->kind == TYPE_BASETYPE_FUNCTION;
+}
+
+static bool IsBytePointer(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_POINTER
+		&& type->subtype->kind == TYPE_BASETYPE_BYTE;
+}
+
+static bool IsDynamicByteArray(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY
+		&& type->subtype->kind == TYPE_BASETYPE_BYTE;
+}
+
+static bool IsFixedByteArray(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_FIXED_ARRAY
+		&& type->subtype->kind == TYPE_BASETYPE_BYTE;
 }
 
 void InitTypeSystem();
@@ -350,3 +401,7 @@ Type* GetPointer(Type* type);
 Type* GetOptional(Type* type);
 Type* GetDynamicArray(Type* type);
 Type* GetFixedArray(Type* type, u64 length);
+Type* GetTuple(Array<Type*> types);
+Type* GetFunctionType(Type* input, Type* output);
+bool IsConvertableTo(Type* from, Type* to);
+

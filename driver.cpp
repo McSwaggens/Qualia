@@ -5,7 +5,6 @@
 #include "pooled_array.h"
 #include "memory.h"
 #include "ir.h"
-#include "random.h"
 
 static void HandleProgramArguements(Array<String> arguments)
 {
@@ -16,8 +15,8 @@ static void HandleProgramArguements(Array<String> arguments)
 
 s32 main(s32 argc, const char** argv)
 {
+	auto x = 1 + true;
 	InitArrayPool();
-	InitRandom();
 	InitGlobalArena();
 	InitTypeSystem();
 
@@ -41,7 +40,7 @@ s32 main(s32 argc, const char** argv)
 		for (u32 i = 0; i < root->scope.functions.count; i++)
 		{
 			Ast_Function* function = &root->scope.functions[i];
-			String name = function->name->info.string;
+			String name = function->name;
 
 			// if (Compare(name, "Test") && !function->parameters.count)
 			// {

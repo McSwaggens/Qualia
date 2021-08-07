@@ -39,9 +39,9 @@ static void FreeBucket(Bucket* bucket)
 	free_head = bucket;
 }
 
-Alloc ExpandArray(char* p, u64 size)
+Pool_Allocation ExpandArray(char* p, u64 size)
 {
-	Alloc result;
+	Pool_Allocation result;
 
 	if (!p)
 	{
@@ -64,7 +64,6 @@ Alloc ExpandArray(char* p, u64 size)
 		bucket->data = p;
 		bucket->size = size;
 		SetHeadBucket(bucket);
-
 
 		// @Todo: Make sure allocated size is larger than input size.
 		u64 new_size = NextPow2(size + BUCKET_SIZE);

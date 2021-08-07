@@ -64,8 +64,6 @@ struct Ast_Specifier
 enum Ast_BaseType_Kind
 {
 	AST_BASETYPE_USERTYPE,
-	AST_BASETYPE_STRUCT,
-	AST_BASETYPE_ENUM,
 	AST_BASETYPE_PRIMITIVE,
 	AST_BASETYPE_FUNCTION,
 	AST_BASETYPE_TUPLE
@@ -87,8 +85,6 @@ struct Ast_BaseType
 	{
 		Array<Ast_Type> tuple;
 		Ast_BaseType_Function function;
-		Ast_Struct* structure;
-		Ast_Enum*   enumeration;
 	};
 };
 
@@ -118,7 +114,7 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_UNARY_NOT,
 	AST_EXPRESSION_UNARY_MINUS,
 	AST_EXPRESSION_UNARY_PLUS,
-	AST_EXPRESSION_UNARY_VALUE_OF,
+	AST_EXPRESSION_UNARY_REFERENCE_OF,
 	AST_EXPRESSION_UNARY_ADDRESS_OF,
 	AST_EXPRESSION_BINARY_COMPARE_EQUAL,
 	AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL,
@@ -188,11 +184,19 @@ struct Ast_Expression_Call : Ast_Expression
 struct Ast_Expression_Tuple : Ast_Expression
 {
 	Array<Ast_Expression*> elements;
+	u64 recursive_count;
 };
 
 struct Ast_Expression_Fixed_Array : Ast_Expression
 {
 	Array<Ast_Expression*> elements;
+};
+
+struct Ast_Expression_As : Ast_Expression
+{
+	Ast_Expression* expression;
+	Ast_Type ast_type;
+	Token* op;
 };
 
 struct Ast_Expression_Literal : Ast_Expression
@@ -201,6 +205,7 @@ struct Ast_Expression_Literal : Ast_Expression
 
 	union
 	{
+		u8 value_byte;
 		bool value_bool;
 
 		s8  value_int8;
@@ -289,7 +294,6 @@ struct Ast_Code
 	Ast_Scope scope;
 	u64 frame_size;
 	bool does_return;
-	bool has_return_statement;
 	bool is_inside_loop;
 	bool has_deferrer_that_returns;
 };
@@ -336,19 +340,31 @@ struct Ast_Branch
 
 struct Ast_BranchBlock
 {
-	List<Ast_Branch> branches;
+	Array<Ast_Branch> branches;
 };
 
 struct Ast_Defer
 {
 	Token* token;
 	Ast_Code code;
+	// Ast_Defer* next;
 };
 
 struct Ast_Return
 {
 	Token* token;
 	Ast_Expression* expression;
+	// Ast_Defer* defer;
+	// Prevent return statement if a prior defer in defer chain contains a return statement.
+};
+
+struct Ast_Break
+{
+	Token* token;
+	// Ast_BranchBlock* block;
+	// Ast_Branch* branch;
+	// Ast_Defer* defer_begin;
+	// Ast_Defer* defer_end;
 };
 
 struct Ast_Claim
@@ -399,11 +415,6 @@ struct Ast_Assignment
 	Ast_Expression* right;
 };
 
-struct Ast_Break
-{
-	Token* token;
-};
-
 struct Ast_Statement
 {
 	Ast_Statement_Kind kind;
@@ -424,14 +435,15 @@ struct Ast_Statement
 
 struct Ast_Function
 {
-	Token* name;
+	String name;
+	Token* name_token;
 	Array<Ast_VariableDeclaration> parameters;
 	Type* type;
 	Ast_Type* ast_return_type;
 	Type* return_type;
 	Ast_Code code;
 	Ast_Attribute attribute;
-	List<IrBlock> blocks;
+	IrFunction* ir;
 	u32 block_id_counter;
 	u32 register_id_counter;
 	bool is_pure;
@@ -475,6 +487,7 @@ struct Ast_Enum
 {
 	Token* name;
 	Type type;
+	Type* underlying_type;
 	Array<Ast_Enum_Member> members;
 	Ast_Attribute attribute;
 };

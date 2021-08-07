@@ -16,6 +16,7 @@ enum Token_Kind
 	TOKEN_IMPORT,
 	TOKEN_STRUCT,
 	TOKEN_ENUM,
+	TOKEN_ASM,
 	TOKEN_IF,
 	TOKEN_ELSE,
 	TOKEN_THEN,
@@ -37,6 +38,7 @@ enum Token_Kind
 	TOKEN_NULL,
 	TOKEN_TRUE,
 	TOKEN_FALSE,
+	TOKEN_BYTE,
 	TOKEN_BOOL,
 	TOKEN_INT,
 	TOKEN_INT8,
@@ -106,6 +108,7 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_IMPORT:            return "import";
 		case TOKEN_STRUCT:            return "struct";
 		case TOKEN_ENUM:              return "enum";
+		case TOKEN_ASM:               return "asm";
 		case TOKEN_IF:                return "if";
 		case TOKEN_ELSE:              return "else";
 		case TOKEN_THEN:              return "then";
@@ -127,6 +130,7 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_NULL:              return "null";
 		case TOKEN_TRUE:              return "true";
 		case TOKEN_FALSE:             return "false";
+		case TOKEN_BYTE:              return "byte";
 		case TOKEN_BOOL:              return "bool";
 		case TOKEN_INT:               return "int";
 		case TOKEN_INT8:              return "int8";
@@ -200,6 +204,8 @@ struct DynamicArray_Value
 union Value
 {
 	bool value_bool;
+
+	u8  value_byte;
 
 	u8  value_uint8;
 	u16 value_uint16;

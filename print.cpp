@@ -156,6 +156,7 @@ void Write(OutputBuffer* buffer, Type* type)
 			Write(buffer, type->subtype);
 			break;
 
+		case TYPE_BASETYPE_BYTE:    Write(buffer, TOKEN_BYTE);    break;
 		case TYPE_BASETYPE_BOOL:    Write(buffer, TOKEN_BOOL);    break; 
 		case TYPE_BASETYPE_INT8:    Write(buffer, TOKEN_INT8);    break; 
 		case TYPE_BASETYPE_INT16:   Write(buffer, TOKEN_INT16);   break; 
@@ -228,8 +229,6 @@ void Write(OutputBuffer* buffer, Ast_Type type)
 	{
 		case AST_BASETYPE_PRIMITIVE: Write(buffer, type.basetype.token); break;
 		case AST_BASETYPE_USERTYPE:  Write(buffer, type.basetype.token); break;
-		case AST_BASETYPE_ENUM:      Write(buffer, type.basetype.enumeration->name); break;
-		case AST_BASETYPE_STRUCT:    Write(buffer, type.basetype.structure->name); break;
 
 		case AST_BASETYPE_TUPLE:
 		{
@@ -378,7 +377,7 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 			Write(buffer, ")");
 		} break;
 
-		case AST_EXPRESSION_UNARY_VALUE_OF:
+		case AST_EXPRESSION_UNARY_REFERENCE_OF:
 		case AST_EXPRESSION_UNARY_ADDRESS_OF:
 		case AST_EXPRESSION_UNARY_MINUS:
 		case AST_EXPRESSION_UNARY_PLUS:
@@ -444,7 +443,13 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 
 		case AST_EXPRESSION_AS:
 		{
-			Write(buffer, "(AS)");
+			Ast_Expression_As* as = (Ast_Expression_As*)expression;
+
+			Write(buffer, "(");
+			Write(buffer, as->expression);
+			Write(buffer, " as ");
+			Write(buffer, as->type);
+			Write(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_LAMBDA:
@@ -484,9 +489,17 @@ void Write(OutputBuffer* buffer, IrInstruction_Kind kind)
 		case IR_INSTRUCTION_EXPONENTIAL:         buffer->Write("exponential"); break;
 
 		case IR_INSTRUCTION_NOT:                 buffer->Write("not");  break;
-		case IR_INSTRUCTION_FLIP_SIGN:           buffer->Write("flip"); break;
 		case IR_INSTRUCTION_POSITIVE:            buffer->Write("pos");  break;
+
 		case IR_INSTRUCTION_SIGN_EXTEND:         buffer->Write("sign_extend"); break;
+		case IR_INSTRUCTION_ZERO_EXTEND:         buffer->Write("zero_extend"); break;
+
+		case IR_INSTRUCTION_NARROW:              buffer->Write("narrow"); break;
+
+		case IR_INSTRUCTION_INT_TO_FLOAT:        buffer->Write("to_float"); break;
+		case IR_INSTRUCTION_FLOAT_TO_INT:        buffer->Write("to_int");   break;
+
+		case IR_INSTRUCTION_FLOAT_CONVERT:       buffer->Write("float_convert"); break;
 
 		case IR_INSTRUCTION_BITWISE_NOT:         buffer->Write("NOT"); break;
 		case IR_INSTRUCTION_BITWISE_OR:          buffer->Write("OR");  break;
@@ -510,22 +523,33 @@ void Write(OutputBuffer* buffer, IrInstruction_Kind kind)
 
 void Write(OutputBuffer* buffer, IrValue value)
 {
-	if (value.kind == IR_VALUE_INSTRUCTION)
+	if (value.kind == IR_VALUE_NONE)
+	{
+		Write(buffer, "NONE");
+	}
+	else if (value.kind == IR_VALUE_INSTRUCTION)
 	{
 		Write(buffer, value.type);
 		Write(buffer, " %");
 		Write(buffer, value.instruction->id);
 	}
-	else if (value.kind == IR_VALUE_NONE)
+	else if (value.kind == IR_VALUE_BLOCK)
 	{
-		Write(buffer, "NONE");
+		Write(buffer, "block");
+		Write(buffer, value.block->id);
+	}
+	else if (value.kind == IR_VALUE_FUNCTION)
+	{
+		Write(buffer, value.function->function->name);
 	}
 	else if (value.kind == IR_VALUE_CONSTANT)
 	{
 		Write(buffer, value.type);
 		Write(buffer, ' ');
+
 		switch (value.type->kind)
 		{
+			case TYPE_BASETYPE_BYTE:           Write(buffer, value.value_byte);               break;
 			case TYPE_BASETYPE_BOOL:           Write(buffer, value.value_bool);               break;
 			case TYPE_BASETYPE_UINT8:          Write(buffer, value.value_uint8);              break;
 			case TYPE_BASETYPE_UINT16:         Write(buffer, value.value_uint16);             break;
@@ -539,10 +563,10 @@ void Write(OutputBuffer* buffer, IrValue value)
 			case TYPE_BASETYPE_FLOAT32:        Write(buffer, value.value_float32);            break;
 			case TYPE_BASETYPE_FLOAT64:        Write(buffer, value.value_float64);            break;
 			case TYPE_BASETYPE_STRUCT:         Write(buffer, "TYPE_BASETYPE_STRUCT");         break;
-			case TYPE_BASETYPE_ENUM:           Write(buffer, "TYPE_BASETYPE_ENUM");           break;
+			case TYPE_BASETYPE_ENUM:           Write(buffer, value.value_int64);              break;
 			case TYPE_BASETYPE_TUPLE:          Write(buffer, "TYPE_BASETYPE_TUPLE");          break;
 			case TYPE_BASETYPE_FUNCTION:       Write(buffer, "TYPE_BASETYPE_FUNCTION");       break;
-			case TYPE_SPECIFIER_POINTER:       Write(buffer, "TYPE_SPECIFIER_POINTER");       break;
+			case TYPE_SPECIFIER_POINTER:       Write(buffer, (u64)value.value_pointer);       break;
 			case TYPE_SPECIFIER_OPTIONAL:      Write(buffer, "TYPE_SPECIFIER_OPTIONAL");      break;
 			case TYPE_SPECIFIER_DYNAMIC_ARRAY: Write(buffer, "TYPE_SPECIFIER_DYNAMIC_ARRAY"); break;
 			case TYPE_SPECIFIER_FIXED_ARRAY:   Write(buffer, "TYPE_SPECIFIER_FIXED_ARRAY");   break;
@@ -551,6 +575,20 @@ void Write(OutputBuffer* buffer, IrValue value)
 				Write(buffer, value.type);
 				break;
 		}
+	}
+	else if (value.kind == IR_VALUE_TUPLE)
+	{
+		Write(buffer, "(");
+		for (u32 i = 0; i < value.tuple.count; i++)
+		{
+			if (i)
+			{
+				Write(buffer, ", ");
+			}
+
+			Write(buffer, value.tuple[i]);
+		}
+		Write(buffer, ")");
 	}
 	else
 	{
@@ -575,6 +613,16 @@ void Write(OutputBuffer* buffer, List<IrValue> values)
 	Write(buffer, ')');
 }
 
+void Write(OutputBuffer* buffer, IrPhi phi)
+{
+	Write(buffer, "(");
+	Write(buffer, "block");
+	Write(buffer, phi.block->id);
+	Write(buffer, " -> ");
+	Write(buffer, phi.value);
+	Write(buffer, ")");
+}
+
 void Write(OutputBuffer* buffer, IrInstruction* instruction)
 {
 	if (instruction->id != u16_max)
@@ -586,7 +634,21 @@ void Write(OutputBuffer* buffer, IrInstruction* instruction)
 
 	Write(buffer, instruction->kind);
 
-	if (instruction->a.kind != IR_VALUE_NONE)
+	if (instruction->kind == IR_INSTRUCTION_PHI)
+	{
+		Write(buffer, " (");
+		for (u32 i = 0; i < instruction->phis.count; i++)
+		{
+			if (i)
+			{
+				Write(buffer, ", ");
+			}
+
+			Write(buffer, instruction->phis[i]);
+		}
+		Write(buffer, ")");
+	}
+	else if (instruction->a.kind != IR_VALUE_NONE)
 	{
 		Write(buffer, "(");
 		Write(buffer, instruction->a);
@@ -606,18 +668,6 @@ void Write(OutputBuffer* buffer, IrInstruction* instruction)
 		Write(buffer, ")");
 	}
 
-	if (instruction->branch_a)
-	{
-		Write(buffer, " branch");
-		Write(buffer, instruction->branch_a->id);
-
-		if (instruction->branch_b)
-		{
-			Write(buffer, ", branch");
-			Write(buffer, instruction->branch_b->id);
-		}
-	}
-
 	if (instruction->type)
 	{
 		Write(buffer, " -> ");
@@ -629,6 +679,7 @@ void Write(OutputBuffer* buffer, List<IrBlock*> blocks)
 {
 	for (u32 i = 0; i < blocks.count; i++)
 	{
+		if (i) Write(buffer, '\n');
 		IrBlock* block = blocks[i];
 		Write(buffer, block);
 	}
@@ -638,6 +689,7 @@ void Write(OutputBuffer* buffer, List<IrBlock> blocks)
 {
 	for (u32 i = 0; i < blocks.count; i++)
 	{
+		if (i) Write(buffer, '\n');
 		IrBlock* block = &blocks[i];
 		Write(buffer, block);
 	}
@@ -651,26 +703,19 @@ void Write(OutputBuffer* buffer, IrFunction* function)
 	Write(buffer, "}\n");
 }
 
-void Write(OutputBuffer* buffer, IrPhi phi)
-{
-	Write(buffer, "(");
-	Write(buffer, phi.block);
-	Write(buffer, ", ");
-	Write(buffer, phi.value);
-	Write(buffer, ")");
-}
-
 void Write(OutputBuffer* buffer, IrBlock* block)
 {
 	Write(buffer, "block");
 	Write(buffer, block->id);
 	Write(buffer, ":\n");
 
-	for (IrInstruction_Bucket* bucket = block->bucket; bucket; bucket = bucket->next)
+	for (u32 i = 0; i < block->buckets.count; i++)
 	{
-		for (u32 i = 0; i < IR_INSTRUCTION_BUCKET_COUNT; i++)
+		IrInstruction_Bucket* bucket = block->buckets[i];
+
+		for (u32 j = 0; j < IR_INSTRUCTION_BUCKET_COUNT; j++)
 		{
-			IrInstruction* instruction = bucket->instructions + i;
+			IrInstruction* instruction = bucket->instructions + j;
 			if (instruction->kind != IR_INSTRUCTION_NOP)
 			{
 				Write(buffer, '\t');

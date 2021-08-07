@@ -68,6 +68,29 @@ struct List
 		count += amount;
 	}
 
+	void Replace(T old_item, T new_item)
+	{
+		for (T* p = Begin(); p < End(); p++)
+		{
+			if (*p == old_item)
+			{
+				*p = new_item;
+				return;
+			}
+		}
+	}
+
+	void ReplaceAll(T old_item, T new_item)
+	{
+		for (T* p = Begin(); p < End(); p++)
+		{
+			if (*p == old_item)
+			{
+				*p = new_item;
+			}
+		}
+	}
+
 	void Pop()
 	{
 		count--;

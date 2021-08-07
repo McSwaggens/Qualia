@@ -9,6 +9,7 @@ static T ConvertNumerical(Value* value, Type_Kind type)
 {
 	switch (type)
 	{
+		case TYPE_BASETYPE_BYTE: return value->value_byte;
 		case TYPE_BASETYPE_BOOL: return value->value_bool;
 
 		case TYPE_BASETYPE_INT8:  return value->value_int8;
@@ -42,6 +43,7 @@ void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value)
 	}
 	else switch (to_type->kind)
 	{
+		case TYPE_BASETYPE_BYTE: to_value->value_byte = ConvertNumerical<u64>(from_value, from_type->kind);  break;
 		case TYPE_BASETYPE_BOOL: to_value->value_bool = ConvertNumerical<bool>(from_value, from_type->kind); break;
 
 		case TYPE_BASETYPE_INT8:  to_value->value_int8  = ConvertNumerical<s64>(from_value, from_type->kind); break;
@@ -54,8 +56,8 @@ void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value)
 		case TYPE_BASETYPE_UINT32: to_value->value_uint32 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 		case TYPE_BASETYPE_UINT64: to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
 
-		case TYPE_BASETYPE_ENUM:     to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
-		case TYPE_SPECIFIER_POINTER: to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break;
+		case TYPE_BASETYPE_ENUM:     to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break; // @FixMe
+		case TYPE_SPECIFIER_POINTER: to_value->value_uint64 = ConvertNumerical<u64>(from_value, from_type->kind); break; // @FixMe
 
 		case TYPE_BASETYPE_FLOAT16: Assert();
 		case TYPE_BASETYPE_FLOAT32: to_value->value_float32 = ConvertNumerical<f64>(from_value, from_type->kind); break;
@@ -210,6 +212,13 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			{
 				Assert();
 			}
+		} break;
+
+		case AST_EXPRESSION_AS:
+		{
+			Ast_Expression_As* as = (Ast_Expression_As*)expression;
+			// Interpret(as->expression, as->
+			Assert();
 		} break;
 
 		case AST_EXPRESSION_SUBSCRIPT:
@@ -672,7 +681,7 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			}
 		} break;
 
-		case AST_EXPRESSION_UNARY_VALUE_OF:
+		case AST_EXPRESSION_UNARY_REFERENCE_OF:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			char* ref;
@@ -1081,7 +1090,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 
 void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter)
 {
-	DebugPrint("Interpreting function: %\n", function->name);
+	DebugPrint("Interpreting function: %\n", function->name_token);
 	StackFrame frame = CreateStackFrame(function, interpreter);
 
 	if (function->parameters.count)

@@ -7,9 +7,7 @@
 #define ALLOCATOR __attribute__((malloc))
 #define ALLIGNED(n) __attribute__((assume_aligned((n))))
 
-static constexpr u64 PageSize = 4096;
-
-ALLIGNED(PageSize)
+ALLIGNED(4096)
 void* AllocateVirtualPage(u64 size, bool write = true, bool execute = false, bool prefault = false);
 void DeAllocateVirtualPage(void* page, u64 size);
 
@@ -38,6 +36,21 @@ template<typename T>
 static inline void DeAllocate(T* p, u64 count = 1)
 {
 	DeAllocate((void*)p, count*sizeof(T));
+}
+
+template<typename T>
+static inline Array<T> AllocateArray(u32 count)
+{
+	Array<T> array;
+	array.data = Allocate<T>(count);
+	array.count = count;
+	return array;
+}
+
+template<typename T>
+static inline void DeAllocateArray(Array<T> array)
+{
+	DeAllocate(array.data, array.count);
 }
 
 template<typename T>
@@ -93,12 +106,13 @@ static constexpr void ZeroMemory(T* begin, T* end)
 template<typename T>
 static constexpr void ZeroMemory(T* p, u64 count = 1)
 {
-	if (IsConstEval())
-	{
-		char* bytes = reinterpret_cast<char*>(p);
-		for (u64 i = 0; i < count * sizeof(T); i++) bytes[i] = 0;
-	}
-	else __builtin_memset(p, 0, sizeof(T) * count);
+	ZeroMemory(p, p + count);
+}
+
+template<typename T>
+static constexpr void ZeroMemory(Array<T> array)
+{
+	ZeroMemory(array.data, array.count);
 }
 
 struct Stack_Allocator_Block
@@ -148,8 +162,8 @@ struct Stack_Allocator
 	Array<T> AllocateArray(u32 count)
 	{
 		Array<T> array;
+		array.data = count ? Allocate<T>(count) : null;
 		array.count = count;
-		array.data = array.count ? Allocate<T>(count) : null;
 		return array;
 	}
 };

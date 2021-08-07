@@ -8,13 +8,13 @@
 #define POOL_SIZE 1024
 #define BUCKET_SIZE (4096 * 1024)
 
-struct Alloc
+struct Pool_Allocation
 {
 	void* data;
 	u64 size;
 };
 
-Alloc ExpandArray(char* p, u64 size);
+Pool_Allocation ExpandArray(char* p, u64 size);
 void ReleaseArray(char* p, u64 free_size);
 void InitArrayPool();
 
@@ -30,7 +30,7 @@ struct Pooled_Array
 	{
 		if (count >= cap)
 		{
-			Alloc alloc = ExpandArray((char*)data, size);
+			Pool_Allocation alloc = ExpandArray((char*)data, size);
 			data = (T*)alloc.data;
 			size = alloc.size;
 			cap = size / sizeof(T);

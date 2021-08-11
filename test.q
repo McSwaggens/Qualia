@@ -130,3 +130,18 @@ BranchBlocks(a : int, b : int, p : *int, q : *bool):
 	then:
 		*q = true
 
+
+Foo(a : int, b : int) -> int:
+	return a + b
+
+Bar():
+	1.Foo(2)
+
+
+ImplicitTypeCasting():
+	p : *int
+	i : int
+
+	j := p + true
+	k := i + true
+

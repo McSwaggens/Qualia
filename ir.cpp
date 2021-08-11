@@ -233,6 +233,21 @@ IrValue PushConvertToBool(IrValue v, IrBlock* block)
 	return GetValue(PushInstruction(IR_INSTRUCTION_COMPARE_NOT_EQUAL, &type_bool, v, Constant(0, v.type), block));
 }
 
+IrValue PushSelect(IrValue selector, IrValue a, IrValue b, IrBlock* block)
+{
+	return GetValue(PushInstruction(IR_INSTRUCTION_SELECT, a.type, selector, a, b, block));
+}
+
+IrValue PushSignExtend(IrValue v, Type* to, IrBlock* block)
+{
+	return GetValue(PushInstruction(IR_INSTRUCTION_SIGN_EXTEND, to, v, block));
+}
+
+IrValue PushZeroExtend(IrValue v, Type* to, IrBlock* block)
+{
+	return GetValue(PushInstruction(IR_INSTRUCTION_SIGN_EXTEND, to, v, block));
+}
+
 IrValue ConvertValue(IrValue v, Type* to, IrBlock* block)
 {
 	Type* from = v.type;
@@ -273,6 +288,11 @@ IrValue ConvertValue(IrValue v, Type* to, IrBlock* block)
 		return PushConvertToBool(v, block);
 	}
 
+	if (from->kind == TYPE_BASETYPE_BOOL)
+	{
+		return PushSelect(v, Constant(1, to), Constant(0, to), block);
+	}
+
 	if (IsEnum(from) && IsInteger(to))
 	{
 		v.type = from->enumeration->underlying_type;
@@ -289,12 +309,12 @@ IrValue ConvertValue(IrValue v, Type* to, IrBlock* block)
 
 	if (IsSignedInteger(from) && IsInteger(to) && from->size < to->size)
 	{
-		return GetValue(PushInstruction(IR_INSTRUCTION_SIGN_EXTEND, to, v, block));
+		return PushSignExtend(v, to, block);
 	}
 
 	if (IsUnsignedInteger(from) && IsInteger(to) && from->size < to->size)
 	{
-		return GetValue(PushInstruction(IR_INSTRUCTION_ZERO_EXTEND, to, v, block));
+		return PushZeroExtend(v, to, block);
 	}
 
 	if (IsInteger(from) && IsFloat(to))
@@ -491,7 +511,15 @@ IrValue ConvertToIR(Ast_Expression* expression, bool force_dereference, IrBlock*
 
 	switch (expression->kind)
 	{
-		case AST_EXPRESSION_TERMINAL:
+		case AST_EXPRESSION_IMPLICIT_CAST:
+		{
+			Ast_Expression_Implicit_Cast* cast = (Ast_Expression_Implicit_Cast*)expression;
+			IrValue value = ConvertToIR(cast->subexpression, true, block);
+			value = ConvertValue(value, cast->type, block);
+			result = value;
+		} break;
+
+		case AST_EXPRESSION_TERMINAL_NAME:
 		case AST_EXPRESSION_TERMINAL_FUNCTION:
 		case AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION:
 			Assert();
@@ -762,14 +790,21 @@ IrValue ConvertToIR(Ast_Expression* expression, bool force_dereference, IrBlock*
 
 				result = GetStructMember(left, member, block);
 			}
+		} break;
 
-			// @Todo: Handle function calls.
+		case AST_EXPRESSION_DOT_CALL:
+		{
+			Ast_Expression_Dot_Call* call = (Ast_Expression_Dot_Call*)expression;
+			IrValue params = ConvertToIR(call->parameters, true, block);
+			Assert(call->dot->right->kind == AST_EXPRESSION_TERMINAL_FUNCTION);
+			PushInstruction(IR_INSTRUCTION_CALL, null, GetValue(((Ast_Expression_Function*)call->dot->right)->function), block);
 		} break;
 
 		case AST_EXPRESSION_CALL:
 		{
 			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
 			Assert(call->function->kind == AST_EXPRESSION_TERMINAL_FUNCTION);
+			IrValue params = ConvertToIR(call->parameters, true, block);
 			PushInstruction(IR_INSTRUCTION_CALL, null, GetValue(((Ast_Expression_Function*)call->function)->function), block);
 		} break;
 
@@ -861,9 +896,9 @@ IrValue ConvertToIR(Ast_Expression* expression, bool force_dereference, IrBlock*
 			Assert();
 	}
 
-	Assert(result.kind != IR_VALUE_NONE || expression->kind == AST_EXPRESSION_CALL);
+	Assert(result.kind != IR_VALUE_NONE || expression->type == &empty_tuple || expression->kind == AST_EXPRESSION_CALL || expression->kind == AST_EXPRESSION_DOT_CALL);
 
-	if ((expression->is_referential_value) && force_dereference)
+	if (expression->is_referential_value && force_dereference)
 	{
 		result = DeReference(result, block);
 	}

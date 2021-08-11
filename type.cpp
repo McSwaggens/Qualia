@@ -29,19 +29,6 @@ static consteval Type NewEmptyTupleType()
 	return type;
 }
 
-static consteval Type NewSpecifier(Type_Kind kind, u64 size, Type* subtype)
-{
-	Type type;
-	type.kind = kind;
-	type.size = size;
-	type.length = 0;
-	type.specifiers = null;
-	type.fixed_arrays = null;
-	type.tuple_extensions = null;
-	type.function_extensions = null;
-	return type;
-}
-
 Type empty_tuple  = NewEmptyTupleType();
 Type type_byte    = NewPrimitiveType(TYPE_BASETYPE_BYTE,    1);
 Type type_bool    = NewPrimitiveType(TYPE_BASETYPE_BOOL,    1);
@@ -56,10 +43,6 @@ Type type_uint64  = NewPrimitiveType(TYPE_BASETYPE_UINT64,  8);
 Type type_float16 = NewPrimitiveType(TYPE_BASETYPE_FLOAT16, 2);
 Type type_float32 = NewPrimitiveType(TYPE_BASETYPE_FLOAT32, 4);
 Type type_float64 = NewPrimitiveType(TYPE_BASETYPE_FLOAT64, 8);
-
-// Type type_byte_pointer       = NewSpecifier(TYPE_SPECIFIER_POINTER,        8, &type_byte);
-// Type type_byte_optional      = NewSpecifier(TYPE_SPECIFIER_OPTIONAL,       2, &type_byte);
-// Type type_byte_dynamic_array = NewSpecifier(TYPE_SPECIFIER_DYNAMIC_ARRAY, 16, &type_byte);
 
 Stack_Allocator type_allocator;
 
@@ -187,35 +170,64 @@ Type* GetTuple(Array<Type*> types)
 	return type;
 }
 
+// () + A = A
+// A + () = A
+// A + B = (A, B)
+// (A, B) + C = ((A, B), C)
+// A + (B, C) = (A, B, C)
+Type* MergeTypeRight(Type* a, Type* b)
+{
+	if (a == &empty_tuple) return b;
+	if (b == &empty_tuple) return a;
+
+	if (b->kind == TYPE_BASETYPE_TUPLE)
+	{
+		u32 count = 1 + b->tuple.count;
+		Type* types[count];
+		types[0] = a;
+		CopyMemory(types+1, b->tuple.data, b->tuple.count);
+		return GetTuple(Array(types, count));
+	}
+	else
+	{
+		Type* types[2];
+		types[0] = a;
+		types[1] = b;
+		return GetTuple(Array(types, 2));
+	}
+}
+
 Type* GetFunctionType(Type* input, Type* output)
 {
 	for (u32 i = 0; i < input->function_extensions.count; i++)
 	{
-		Type* func = input->function_extensions[i];
-		if (func->function.output == output)
+		Type* extension = input->function_extensions[i];
+		if (extension->output == output)
 		{
-			return func;
+			return extension;
 		}
 	}
 
-	Type* new_func = type_allocator.Allocate<Type>();
-	ZeroMemory(new_func);
-	new_func->kind = TYPE_BASETYPE_FUNCTION;
-	new_func->function.input = input;
-	new_func->function.output = output;
-	new_func->size = 0;
-	input->function_extensions.Add(new_func);
+	Type* function_type = type_allocator.Allocate<Type>();
+	ZeroMemory(function_type);
 
-	return new_func;
+	function_type->kind = TYPE_BASETYPE_FUNCTION;
+	function_type->input = input;
+	function_type->output = output;
+	function_type->size = 0;
+	input->function_extensions.Add(function_type);
+
+	return function_type;
 }
 
 bool IsConvertableTo(Type* from, Type* to)
 {
 	if (from == to) return true;
 
-	if (IsFixedByteArray(from) ||
-		IsFixedByteArray(to))
+	if (IsFixedByteArray(from) || IsFixedByteArray(to) || to->kind == TYPE_BASETYPE_BYTE)
+	{
 		return from->size == to->size;
+	}
 
 	switch (from->kind)
 	{
@@ -223,15 +235,10 @@ bool IsConvertableTo(Type* from, Type* to)
 			return to->size == 1;
 
 		case TYPE_BASETYPE_BOOL:
-			return IsInteger(to)
-				|| IsFloat(to)
-				|| to->kind == TYPE_BASETYPE_BYTE
-				|| to->kind == TYPE_BASETYPE_ENUM;
+			return IsInteger(to);
 
 		case TYPE_BASETYPE_UINT8:
 		case TYPE_BASETYPE_INT8:
-			if (to->kind == TYPE_BASETYPE_BYTE) return true;
-
 		case TYPE_BASETYPE_UINT16:
 		case TYPE_BASETYPE_UINT32:
 		case TYPE_BASETYPE_UINT64:
@@ -276,7 +283,9 @@ bool IsConvertableTo(Type* from, Type* to)
 			return false;
 
 		case TYPE_SPECIFIER_POINTER:
-			return IsBytePointer(from) || IsBytePointer(to);
+			return to->kind == TYPE_BASETYPE_BOOL
+				|| IsBytePointer(to)
+				|| (IsBytePointer(from) && IsPointer(to));
 
 		case TYPE_SPECIFIER_OPTIONAL:
 			return to->kind == TYPE_BASETYPE_BOOL
@@ -286,9 +295,10 @@ bool IsConvertableTo(Type* from, Type* to)
 			return false;
 
 		case TYPE_SPECIFIER_FIXED_ARRAY:
-			return to->kind == TYPE_SPECIFIER_FIXED_ARRAY
+			return (to->kind == TYPE_SPECIFIER_FIXED_ARRAY
 				&& from->length == to->length
-				&& IsConvertableTo(from->subtype, to->subtype);
+				&& IsConvertableTo(from->subtype, to->subtype));
+				// || (from->length == 1 && IsConvertableTo(from->subtype, to->subtype));
 	}
 
 	return false;

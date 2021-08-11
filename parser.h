@@ -9,6 +9,7 @@
 #include "ir.h"
 
 struct Ast_Expression;
+struct Ast_Expression_Tuple;
 struct Ast_VariableDeclaration;
 struct Ast_Import;
 struct Ast_Struct_Member;
@@ -23,6 +24,8 @@ struct Ast_Struct;
 struct Ast_Enum;
 struct Ast_Code;
 struct Ast_Scope;
+struct Ast_Return;
+struct Ast_Break;
 struct Ast_Attribute;
 struct StackFrame;
 
@@ -38,6 +41,7 @@ struct Intrinsic_Function
 	String name;
 	Type* input;
 	Type* output;
+	Type* type;
 	void (*function)(void* input, void* output);
 };
 
@@ -97,7 +101,7 @@ struct Ast_Type
 
 enum Ast_Expression_Kind
 {
-	AST_EXPRESSION_TERMINAL,
+	AST_EXPRESSION_TERMINAL_NAME,
 	AST_EXPRESSION_TERMINAL_FUNCTION,
 	AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION,
 	AST_EXPRESSION_TERMINAL_LITERAL,
@@ -137,6 +141,8 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_BINARY_AND,
 	AST_EXPRESSION_BINARY_OR,
 	AST_EXPRESSION_CALL,
+	AST_EXPRESSION_DOT_CALL,
+	AST_EXPRESSION_IMPLICIT_CAST,
 	AST_EXPRESSION_SUBSCRIPT,
 	AST_EXPRESSION_LAMBDA,
 	AST_EXPRESSION_TUPLE,
@@ -152,6 +158,11 @@ struct Ast_Expression
 	bool is_referential_value;
 	Type* type;
 	Span<Token> span;
+};
+
+struct Ast_Expression_Implicit_Cast : Ast_Expression
+{
+	Ast_Expression* subexpression;
 };
 
 struct Ast_Expression_Unary : Ast_Expression
@@ -178,13 +189,19 @@ struct Ast_Expression_Ternary : Ast_Expression
 struct Ast_Expression_Call : Ast_Expression
 {
 	Ast_Expression* function;
-	Ast_Expression* parameters;
+	Ast_Expression_Tuple* parameters;
+};
+
+struct Ast_Expression_Dot_Call : Ast_Expression
+{
+	Ast_Expression_Binary* dot;
+	Ast_Expression_Tuple* parameters;
 };
 
 struct Ast_Expression_Tuple : Ast_Expression
 {
 	Array<Ast_Expression*> elements;
-	u64 recursive_count;
+	u32 recursive_count;
 };
 
 struct Ast_Expression_Fixed_Array : Ast_Expression
@@ -293,9 +310,14 @@ struct Ast_Code
 	List<Ast_Defer*> defers;
 	Ast_Scope scope;
 	u64 frame_size;
+	bool vertical_has_return;
+	bool vertical_has_break;
+	bool all_paths_return;
+	bool all_paths_break;
 	bool does_return;
+	bool does_break;
 	bool is_inside_loop;
-	bool has_deferrer_that_returns;
+	bool has_defer_that_returns;
 };
 
 enum Ast_Statement_Kind 
@@ -317,25 +339,38 @@ enum Ast_Statement_Kind
 	AST_STATEMENT_ASSIGNMENT_POWER,
 };
 
-// @Todo: Redo this branch shit
-//       this is ECH!
-enum Ast_Branch_Kind
+enum Ast_Branch_Clause_Kind : u8
 {
-	AST_BRANCH_INIT,
-	AST_BRANCH_ELSE,
-	AST_BRANCH_THEN,
+	AST_BRANCH_CLAUSE_INIT = 0,
+	AST_BRANCH_CLAUSE_ELSE,
+	AST_BRANCH_CLAUSE_THEN
+};
+
+enum Ast_Branch_Kind : u8
+{
+	AST_BRANCH_NAKED = 0,
+	AST_BRANCH_IF,
+	AST_BRANCH_WHILE,
+	AST_BRANCH_FOR,
+	AST_BRANCH_FOR_IN,
+	AST_BRANCH_FOR_IN_WHERE,
 };
 
 struct Ast_Branch
 {
 	Ast_Branch_Kind kind;
+	Ast_Branch_Clause_Kind clause;
+	u16 user_count;
 	Token* token;
+
+	Ast_VariableDeclaration* iterator;
+	Ast_Expression* range;
 	Ast_Expression* condition;
+
 	Ast_Branch* else_branch;
 	Ast_Branch* then_branch;
 	IrBlock* initial_condition_block;
 	Ast_Code code;
-	bool used;
 };
 
 struct Ast_BranchBlock
@@ -390,9 +425,10 @@ struct Ast_VariableDeclaration
 	Ast_Expression* assignment;
 	Ast_Attribute attribute;
 	bool is_parameter;
-	bool can_constantly_evaluate;
 	bool is_pure;
 	bool is_global;
+	bool is_iterator;
+	bool can_constantly_evaluate;
 };
 
 struct StackFrame
@@ -438,23 +474,25 @@ struct Ast_Function
 	String name;
 	Token* name_token;
 	Array<Ast_VariableDeclaration> parameters;
-	Type* type;
-	Ast_Type* ast_return_type;
-	Type* return_type;
 	Ast_Code code;
+	Type* type;
+	Type* return_type;
+	List<Ast_Return*> returns; // @Todo: Infer return type.
+	Ast_Type* ast_return_type;
 	Ast_Attribute attribute;
 	IrFunction* ir;
-	u32 block_id_counter;
-	u32 register_id_counter;
 	bool is_pure;
-	bool does_have_return_type_appendage;
+	bool does_have_return_type_appendage; // Why is this here again? Just use ast_return_type != null?
 	bool is_global;
+	// @Todo: Implement 'inline' keyword.
 };
 
 struct Ast_Import
 {
 	Token* token;
 	Token* module;
+	// @Todo: Finalize import syntax.
+	// @Todo: Allow for 'naming' with 'as' keyword.
 };
 
 struct Ast_Struct_Member
@@ -532,7 +570,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter);
 void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter);
 StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
-u32 GetTypePrecedence(Type* type);
+u8 GetTypePrecedence(Type* type);
 Type* GetDominantType(Type* a, Type* b);
 void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value);
 u64 CalculateStackFrameSize(Ast_Function* function);

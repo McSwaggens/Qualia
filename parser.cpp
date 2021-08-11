@@ -17,6 +17,12 @@ static bool IsTernaryOperator(Token_Kind kind)
 	return kind == TOKEN_IF;
 }
 
+static bool IsIdentifier(Token_Kind kind)
+{
+	return kind == TOKEN_IDENTIFIER_CASUAL
+		|| kind == TOKEN_IDENTIFIER_FORMAL;
+}
+
 static bool IsBinaryOperator(Token_Kind kind)
 {
 	return kind == TOKEN_DOT
@@ -84,7 +90,8 @@ static bool IsPrimitive(Token_Kind kind)
 
 static bool IsTerm(Token_Kind kind)
 {
-	return kind == TOKEN_IDENTIFIER
+	return kind == TOKEN_IDENTIFIER_CASUAL
+		|| kind == TOKEN_IDENTIFIER_FORMAL
 		|| kind == TOKEN_INTEGER_LITERAL
 		|| kind == TOKEN_FLOAT_LITERAL
 		|| kind == TOKEN_STRING_LITERAL
@@ -281,7 +288,7 @@ static void SkipSemiColon(Token*& token, u32 indent, Parse_Info* info)
 {
 	if (token->kind == TOKEN_SEMICOLON && IsOnCorrectScope(token, indent))
 	{
-		token++;
+		token += 1;
 	}
 }
 
@@ -294,16 +301,23 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 {
 	Ast_Struct structure;
 	ZeroMemory(&structure);
-	token++;
+	token += 1;
 
-	if (token->kind != TOKEN_IDENTIFIER)
+	if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 	{
-		Error(info, token->location, "Struct name missing\n");
+		if (token->kind == TOKEN_IDENTIFIER_CASUAL)
+		{
+			Error(info, token->location, "Struct name must start with an uppercase letter.\n");
+		}
+		else
+		{
+			Error(info, token->location, "Struct name missing\n");
+		}
 	}
 
 	CheckScope(token, indent, info);
 	structure.name = token;
-	token++;
+	token += 1;
 
 	if (token->kind != TOKEN_COLON)
 	{
@@ -311,18 +325,18 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 	}
 
 	CheckScope(token, indent, info);
-	token++;
+	token += 1;
 
 	Pooled_Array<Ast_Struct_Member> members = NewPooledArray<Ast_Struct_Member>();
 
  	while (IsOnCorrectScope(token, indent+1))
 	{
-		if (token->kind == TOKEN_IDENTIFIER)
+		if (token->kind == TOKEN_IDENTIFIER_CASUAL)
 		{
 			Ast_Struct_Member member;
 			member.name = token;
 			member.index = members.count;
-			token++;
+			token += 1;
 
 			if (token->kind != TOKEN_COLON)
 			{
@@ -330,7 +344,7 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 			}
 
 			CheckScope(token, indent+1, info);
-			token++;
+			token += 1;
 
 			member.type = ParseType(token, indent+2, info);
 			members.Add(member);
@@ -343,13 +357,17 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 			if (token->kind == TOKEN_SEMICOLON)
 			{
 				CheckScope(token, indent+1, info);
-				token++;
+				token += 1;
 			}
 
 			if (token->kind == TOKEN_SEMICOLON && IsOnCorrectScope(token, indent+1))
 			{
-				token++;
+				token += 1;
 			}
+		}
+		else if (token->kind == TOKEN_IDENTIFIER_FORMAL)
+		{
+			Error(info, token->location, "Struct member names must start with a lowercase letter.\n");
 		}
 		else
 		{
@@ -365,16 +383,23 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 {
 	Ast_Enum enumeration;
-	token++;
+	token += 1;
 
-	if (token->kind != TOKEN_IDENTIFIER)
+	if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 	{
-		Error(info, token->location, "Enum name missing\n");
+		if (token->kind == TOKEN_IDENTIFIER_CASUAL)
+		{
+			Error(info, token->location, "Enum names must start with an uppercase letter.\n");
+		}
+		else
+		{
+			Error(info, token->location, "Enum name missing.\n");
+		}
 	}
 
 	CheckScope(token, indent, info);
 	enumeration.name = token;
-	token++;
+	token += 1;
 
 	if (token->kind != TOKEN_COLON)
 	{
@@ -382,18 +407,18 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 	}
 
 	CheckScope(token, indent, info);
-	token++;
+	token += 1;
 
 	Pooled_Array<Ast_Enum_Member> members = NewPooledArray<Ast_Enum_Member>();
 
 	while (IsOnCorrectScope(token, indent+1))
 	{
-		if (token->kind == TOKEN_IDENTIFIER)
+		if (token->kind == TOKEN_IDENTIFIER_FORMAL)
 		{
 			Ast_Enum_Member member;
 			member.name = token;
 			member.index = members.count;
-			token++;
+			token += 1;
 
 			if (token->kind != TOKEN_EQUAL)
 			{
@@ -401,7 +426,7 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 			}
 
 			CheckScope(token, indent+2, info);
-			token++;
+			token += 1;
 
 			if (token->kind == TOKEN_SEMICOLON)
 			{
@@ -418,10 +443,14 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 			if (token->kind == TOKEN_SEMICOLON)
 			{
 				CheckScope(token, indent+1, info);
-				token++;
+				token += 1;
 			}
 
 			members.Add(member);
+		}
+		else if (token->kind == TOKEN_IDENTIFIER_CASUAL)
+		{
+			Error(info, token->location, "Enum member names must start with a uppercase letter.\n");
 		}
 		else
 		{
@@ -472,10 +501,10 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		literal->span.end = token;
 		left = literal;
 	}
-	else if (IsTerm(token->kind))
+	else if (IsIdentifier(token->kind))
 	{
 		Ast_Expression_Terminal* term = info->stack.Allocate<Ast_Expression_Terminal>();
-		term->kind = AST_EXPRESSION_TERMINAL;
+		term->kind = AST_EXPRESSION_TERMINAL_NAME;
 		term->span.begin = token;
 		term->token = token++;
 		term->span.end = token;
@@ -483,63 +512,51 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN)
 	{
-		Token* open = token++;
-		Token* closure = open->GetClosure();
+		Token* closure = token->GetClosure();
+
+		Ast_Expression_Tuple* tuple = info->stack.Allocate<Ast_Expression_Tuple>();
+		ZeroMemory(tuple);
+
+		tuple->kind  = AST_EXPRESSION_TUPLE;
+		tuple->span.begin = token;
+		tuple->span.end = closure+1;
+
+		token += 1;
+
 		Pooled_Array<Ast_Expression*> elements = NewPooledArray<Ast_Expression*>();
 
-		if (token == closure)
+		if (closure[-1].kind == TOKEN_COMMA)
 		{
-			Ast_Expression_Tuple* tuple = info->stack.Allocate<Ast_Expression_Tuple>();
-			tuple->kind  = AST_EXPRESSION_TUPLE;
-			// tuple->token = open;
-			tuple->span.begin = open;
-			tuple->elements = null;
-			left = tuple;
+			Error(info, token->location, "Expected expression after ','\n");
 		}
 
 		while (token < closure)
 		{
 			CheckScope(token, indent+1, info);
-			Ast_Expression* element = ParseExpression(token, indent+1, info);
+			elements.Add(ParseExpression(token, indent+1, info));
 
 			if (token->kind == TOKEN_COMMA)
 			{
-				elements.Add(element);
 				CheckScope(token, indent, info);
-				token++;
-
-				if (token == closure)
-				{
-					Error(info, token->location, "Expected expression after ','\n");
-				}
+				token += 1;
 			}
-			else if (token == closure)
-			{
-				if (!elements.IsEmpty())
-				{
-					elements.Add(element);
-					Ast_Expression_Tuple* tuple = info->stack.Allocate<Ast_Expression_Tuple>();
-					tuple->kind  = AST_EXPRESSION_TUPLE;
-					tuple->span.begin = open;
-					tuple->elements = elements.Lock();
-					left = tuple;
-				}
-				else left = element;
-			}
-			else
+			else if (token < closure)
 			{
 				Error(info, token->location, "Invalid expression, unexpected token: %\n", token);
 			}
 		}
 
+		tuple->elements = elements.Lock();
+
 		CheckScope(token, indent, info);
 		token = closure+1;
-		left->span.end = token;
+		left = tuple;
 	}
 	else if (token->kind == TOKEN_OPEN_BRACE)
 	{
 		Ast_Expression_Fixed_Array* fixed_array = info->stack.Allocate<Ast_Expression_Fixed_Array>();
 		ZeroMemory(fixed_array);
+
 		fixed_array->kind = AST_EXPRESSION_FIXED_ARRAY;
 		fixed_array->span = Span(token, token->GetClosure());
 
@@ -551,7 +568,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			Error(info, token->location, "Empty arrays literals aren't allowed.\n");
 		}
 
-		token++;
+		token += 1;
 
 		while (token < closure)
 		{
@@ -562,7 +579,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 			if (token->kind == TOKEN_COMMA)
 			{
-				token++;
+				token += 1;
 
 				if (token == closure)
 				{
@@ -592,6 +609,8 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		if (token->kind == TOKEN_IF)
 		{
 			Ast_Expression_Ternary* if_else = info->stack.Allocate<Ast_Expression_Ternary>();
+			ZeroMemory(if_else);
+
 			if_else->kind   = AST_EXPRESSION_IF_ELSE;
 			if_else->span.begin = left->span.begin;
 			if_else->ops[0] = token++;
@@ -615,6 +634,8 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		else if (token->kind == TOKEN_AS)
 		{
 			Ast_Expression_As* as = info->stack.Allocate<Ast_Expression_As>();
+			ZeroMemory(as);
+
 			CheckScope(token, indent, info);
 			as->op = token++;
 
@@ -628,13 +649,15 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		}
 		else if (token->kind == TOKEN_OPEN_PAREN)
 		{
+			Ast_Expression_Call* call = info->stack.Allocate<Ast_Expression_Call>();
+			ZeroMemory(call);
+
 			Token* open = token;
 			Token* closure = open->GetClosure();
 			List<Ast_Expression*> arguments = null;
-			Ast_Expression_Call* call = info->stack.Allocate<Ast_Expression_Call>();
 
 			CheckScope(token, indent, info);
-			call->parameters = ParseExpression(token, indent, info, false, GetOperatorPrecedence(token->kind));
+			call->parameters = (Ast_Expression_Tuple*)ParseExpression(token, indent, info, false, GetOperatorPrecedence(token->kind));
 
 			token = closure + 1;
 
@@ -651,6 +674,8 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			Token* closure = open->GetClosure();
 
 			Ast_Expression_Subscript* subscript = info->stack.Allocate<Ast_Expression_Subscript>();
+			ZeroMemory(subscript);
+
 			subscript->kind  = AST_EXPRESSION_SUBSCRIPT;
 			subscript->span.begin = left->span.begin;
 			subscript->span.end = closure+1;
@@ -678,6 +703,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		{
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
 			Ast_Expression_Binary* binary = info->stack.Allocate<Ast_Expression_Binary>();
+			ZeroMemory(binary);
 
 			switch (token->kind)
 			{
@@ -735,7 +761,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 			specifier.kind = AST_SPECIFIER_ARRAY;
 			Token* closure = token->GetClosure();
 			CheckScope(closure, indent, info);
-			token++;
+			token += 1;
 
 			if (token != closure)
 			{
@@ -747,12 +773,12 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 		else if (token->kind == TOKEN_ASTERISK)
 		{
 			specifier.kind = AST_SPECIFIER_POINTER;
-			token++;
+			token += 1;
 		}
 		else if (token->kind == TOKEN_QUESTION_MARK)
 		{
 			specifier.kind = AST_SPECIFIER_OPTIONAL;
-			token++;
+			token += 1;
 		}
 
 		specifiers.Add(specifier);
@@ -765,13 +791,13 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 	{
 		CheckScope(token, indent, info);
 		type.basetype.kind = AST_BASETYPE_PRIMITIVE;
-		token++;
+		token += 1;
 	}
-	else if (token->kind == TOKEN_IDENTIFIER)
+	else if (token->kind == TOKEN_IDENTIFIER_FORMAL)
 	{
 		CheckScope(token, indent, info);
 		type.basetype.kind = AST_BASETYPE_USERTYPE;
-		token++;
+		token += 1;
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN && token->GetClosure()[1].kind == TOKEN_ARROW)
 	{
@@ -782,7 +808,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 		type.basetype.kind = AST_BASETYPE_FUNCTION;
 		type.basetype.function.input = null;
 		type.basetype.function.output = null;
-		token++;
+		token += 1;
 
 		List<Ast_Type> params = null;
 
@@ -794,7 +820,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 			if (token->kind == TOKEN_COMMA)
 			{
 				CheckScope(token, indent, info);
-				token++;
+				token += 1;
 
 				if (token == closure)
 				{
@@ -836,7 +862,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 		CheckScope(closure, indent, info);
 		type.basetype.kind = AST_BASETYPE_TUPLE;
 		type.basetype.tuple = null;
-		token++;
+		token += 1;
 
 		List<Ast_Type> members = null;
 
@@ -847,7 +873,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 			if (token->kind == TOKEN_COMMA)
 			{
 				CheckScope(token, indent, info);
-				token++;
+				token += 1;
 
 				if (token == closure)
 				{
@@ -890,9 +916,16 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 			Error(info, token->location, "Empty parameters not allowed. (Remove redundant ',')\n");
 		}
 
-		if (token->kind != TOKEN_IDENTIFIER)
+		if (token->kind != TOKEN_IDENTIFIER_CASUAL)
 		{
-			Error(info, token->location, "Parameter name missing, unexpected: %\n", token);
+			if (token->kind == TOKEN_IDENTIFIER_FORMAL)
+			{
+				Error(info, token->location, "Parameter names must start with a lowercase letter, not: %\n", token);
+			}
+			else
+			{
+				Error(info, token->location, "Parameter name missing, unexpected: %\n", token);
+			}
 		}
 
 		CheckScope(token, indent+1, info);
@@ -904,7 +937,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 		}
 
 		CheckScope(token, indent+1, info);
-		token++;
+		token += 1;
 
 		param.explicit_type = info->stack.Allocate<Ast_Type>();
 		*param.explicit_type = ParseType(token, indent+2, info);
@@ -919,23 +952,12 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 		if (token->kind == TOKEN_COMMA)
 		{
 			CheckScope(token, indent, info);
-			token++;
+			token += 1;
 		}
 	}
 
 	function->parameters = params.Lock();
 }
-
-// static Ast_Branch_Loop_Kind GetBranchLoopKind(Token_Kind* kind)
-// {
-// 	switch (kind)
-// 	{
-// 		case TOKEN_IF:    return AST_BRANCH_LOOP_IF;
-// 		case TOKEN_WHILE: return AST_BRANCH_LOOP_WHILE;
-// 		case TOKEN_FOR:   return AST_BRANCH_LOOP_FOR;
-// 		default: Assert(); Unreachable();
-// 	}
-// }
 
 static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* info)
 {
@@ -943,74 +965,109 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 	ZeroMemory(&branch_block);
 	Pooled_Array<Ast_Branch> branches = NewPooledArray<Ast_Branch>();
 
-	Ast_Branch branch;
-	ZeroMemory(&branch);
-
-	branch.token = token;
-	token++;
-	branch.condition = ParseExpression(token, indent+1, info, false);
-
-	if (token->kind != TOKEN_COLON)
+	do
 	{
-		Error(info, token->location, "Expected ':' after branch condition, not: %\n", token);
-	}
-
-	CheckScope(token, indent, info);
-
-	token++;
-	branch.code = ParseCode(token, indent+1, info);
-	branches.Add(branch);
-
-	while ((token->kind == TOKEN_ELSE || token->kind == TOKEN_THEN) && IsOnCorrectScope(token, indent))
-	{
+		Ast_Branch branch;
 		ZeroMemory(&branch);
-		Token* continuation_token = token;
+
+		Token* clause_token = token;
 
 		if (token->kind == TOKEN_ELSE)
 		{
-			branch.kind = AST_BRANCH_ELSE;
+			branch.clause = AST_BRANCH_CLAUSE_ELSE;
+			token += 1;
 		}
 		else if (token->kind == TOKEN_THEN)
 		{
-			branch.kind = AST_BRANCH_THEN;
-		}
-
-		token++;
-
-		if (token->kind != TOKEN_COLON &&
- 			token->kind != TOKEN_WHILE &&
-			token->kind != TOKEN_FOR   &&
-			token->kind != TOKEN_IF)
-		{
-			Error(info, token->location, "Expected 'if', 'while', 'for' or ':' after %, not: %\n", continuation_token, token);
-		}
-
-		CheckScope(token, indent, info);
-		branch.token = token;
-
-		if (token->kind == TOKEN_COLON)
-		{
-			CheckScope(token, indent, info);
-			token++;
-			branch.code = ParseCode(token, indent+1, info);
+			branch.clause = AST_BRANCH_CLAUSE_THEN;
+			token += 1;
 		}
 		else
 		{
-			token++;
-			branch.condition = ParseExpression(token, indent+1, info, false);
-
-			if (token->kind != TOKEN_COLON)
-			{
-				Error(info, token->location, "Expected ':' after branch condition, not: %\n", token);
-			}
-
-			token++;
-
-			branch.code = ParseCode(token, indent+1, info);
+			branch.clause = AST_BRANCH_CLAUSE_INIT;
 		}
 
+		switch (token->kind)
+		{
+			case TOKEN_IF:
+			{
+				branch.kind = AST_BRANCH_IF;
+				CheckScope(token, indent, info);
+				branch.token = token;
+				token += 1;
+				branch.condition = ParseExpression(token, indent+1, info, false);
+			} break;
+
+			case TOKEN_WHILE:
+			{
+				branch.kind = AST_BRANCH_WHILE;
+				CheckScope(token, indent, info);
+				branch.token = token;
+				token += 1;
+				branch.condition = ParseExpression(token, indent+1, info, false);
+			} break;
+
+			case TOKEN_FOR:
+			{
+				CheckScope(token, indent, info);
+				branch.token = token;
+				token += 1;
+
+				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_IN)
+				{
+					Error(info, token->location, "Iterator names must start with a lowercase letter.\n");
+				}
+
+				if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_IN)
+				{
+					branch.kind = AST_BRANCH_FOR_IN;
+
+					CheckScope(token, indent+1, info);
+					CheckScope(token+1, indent, info);
+
+					Ast_VariableDeclaration* iterator = info->stack.Allocate<Ast_VariableDeclaration>();
+					ZeroMemory(iterator);
+					iterator->name = token;
+					iterator->is_iterator = true;
+					iterator->is_global = false;
+					branch.iterator = iterator;
+
+					token += 2;
+
+					branch.range = ParseExpression(token, indent+1, info, false);
+
+					if (token->kind == TOKEN_WHERE)
+					{
+						CheckScope(token, indent, info);
+						token += 1;
+						branch.kind = AST_BRANCH_FOR_IN_WHERE;
+						branch.condition = ParseExpression(token, indent+1, info, false);
+					}
+				}
+				else
+				{
+					branch.range = ParseExpression(token, indent+1, info, false);
+					branch.kind = AST_BRANCH_FOR;
+				}
+			} break;
+
+			case TOKEN_COLON: branch.kind = AST_BRANCH_NAKED; break;
+
+			default: Error(info, token->location, "Expected 'if', 'while', 'for' or ':' after %, not: %\n", clause_token, token);
+		}
+
+		if (token->kind != TOKEN_COLON)
+		{
+			Error(info, token->location, "Expected ':' after branch, not: %\n", token);
+		}
+
+		CheckScope(token, indent, info);
+
+		token += 1;
+
+		branch.code = ParseCode(token, indent+1, info);
 		branches.Add(branch);
-	}
+	} while ((token->kind == TOKEN_ELSE || token->kind == TOKEN_THEN) && IsOnCorrectScope(token, indent));
 
 	branch_block.branches = branches.Lock();
 
@@ -1019,17 +1076,19 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 
 	for (Ast_Branch* branch = branch_block.branches.End()-1; branch >= branch_block.branches.Begin(); branch--)
 	{
-		if (branch->condition)
+		if (branch->kind != AST_BRANCH_NAKED)
 		{
 			branch->else_branch = else_branch;
 			branch->then_branch = then_branch;
+			if (else_branch) else_branch->user_count++;
+			if (then_branch) then_branch->user_count++;
 		}
 
-		if (branch->kind == AST_BRANCH_ELSE)
+		if (branch->clause == AST_BRANCH_CLAUSE_ELSE)
 		{
 			else_branch = branch;
 		}
-		else if (branch->kind == AST_BRANCH_THEN)
+		else if (branch->clause == AST_BRANCH_CLAUSE_THEN)
 		{
 			then_branch = branch;
 		}
@@ -1043,7 +1102,12 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 	Ast_Statement statement;
 	ZeroMemory(&statement);
 
-	if (token[0].kind == TOKEN_IDENTIFIER && token[1].kind == TOKEN_COLON)
+	if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
+	{
+		Error(info, token->location, "Variable names must start with a lowercase letter.\n");
+	}
+
+	if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON)
 	{
 		CheckScope(token+1, indent, info);
 
@@ -1067,7 +1131,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 		if (token->kind == TOKEN_EQUAL)
 		{
 			CheckScope(token, indent+1, info);
-			token++;
+			token += 1;
 			statement.variable_declaration.assignment = ParseExpression(token, indent+1, info);
 		}
 
@@ -1088,7 +1152,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 			else if (token->kind == TOKEN_EXPONENTIAL_EQUAL) statement.kind = AST_STATEMENT_ASSIGNMENT_POWER;
 
 			CheckScope(token, indent+1, info);
-			token++;
+			token += 1;
 			CheckScope(token, indent+1, info);
 
 			statement.assignment.left  = expression;
@@ -1141,7 +1205,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 		}
 
 		CheckScope(token, indent, info);
-		token++;
+		token += 1;
 
 		Ast_Code code = ParseCode(token, indent+1, info);
 		statement.defer.code = code;
@@ -1171,12 +1235,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 	{
 		statement.kind = AST_STATEMENT_CLAIM;
 		statement.claim.token = token++;
-		statement.claim.expression = null;
-
-		if (IsOnCorrectScope(token, indent+1))
-		{
-			statement.claim.expression = ParseExpression(token, indent+1, info, false);
-		}
+		statement.claim.expression = ParseExpression(token, indent+1, info, false);
 
 		return statement;
 	}
@@ -1235,9 +1294,14 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 			enumeration.attribute = attribute;
 			enums.Add(enumeration);
 		}
-		else if (token->kind == TOKEN_IDENTIFIER && token[1].kind == TOKEN_OPEN_PAREN
+		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN
 			&&  (token[1].GetClosure()[1].kind == TOKEN_COLON || token[1].GetClosure()[1].kind == TOKEN_ARROW))
 		{
+			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
+			{
+				Error(info, token->location, "Function names must start with an uppercase letter.\n", token);
+			}
+
 			Ast_Function function = ParseFunction(token, indent, info);
 			function.attribute = attribute;
 			function.is_global = false;
@@ -1257,7 +1321,7 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 			{
 				if (IsOnCorrectScope(token, indent))
 				{
-					token++;
+					token += 1;
 				}
 				else if (token->newline && token->indent > indent)
 				{
@@ -1297,7 +1361,7 @@ static Ast_Function ParseFunction(Token*& token, u32 indent, Parse_Info* info)
 	if (token->kind == TOKEN_ARROW)
 	{
 		CheckScope(token, indent+1, info);
-		token++;
+		token += 1;
 		function.does_have_return_type_appendage = true;
 		function.ast_return_type = info->stack.Allocate<Ast_Type>();
 		*function.ast_return_type = ParseType(token, indent, info);
@@ -1310,10 +1374,40 @@ static Ast_Function ParseFunction(Token*& token, u32 indent, Parse_Info* info)
 
 	CheckScope(token, indent, info);
 
-	token++;
+	token += 1;
 	function.code = ParseCode(token, indent+1, info);
 
 	return function;
+}
+
+static Ast_Import ParseImport(Token*& token, Parse_Info* info)
+{
+	Ast_Import import;
+	import.token = token;
+	token += 1;
+
+	if (token->kind != TOKEN_IDENTIFIER_FORMAL)
+	{
+		Error(info, token->location, "Expected identifier after import token, instead got: %\n", token);
+	}
+
+	CheckScope(token, 1, info);
+	import.module = token;
+	token += 1;
+
+	if (token->kind == TOKEN_SEMICOLON)
+	{
+		CheckScope(token, 1, info);
+		token += 1;
+	}
+	else if (IsOnCorrectScope(token, 1))
+	{
+		Error(info, token->location, "Unexpected token after import statement: %\n", token);
+	}
+
+	CheckScope(token, 0, info);
+
+	return import;
 }
 
 static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
@@ -1337,32 +1431,8 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 
 		if (token->kind == TOKEN_IMPORT)
 		{
-			Ast_Import import;
-			import.token = token;
-			token++;
-
-			if (token->kind != TOKEN_IDENTIFIER)
-			{
-				Error(info, token->location, "Expected identifier after import token, instead got: %\n", token);
-			}
-
-			CheckScope(token, 1, info);
-			import.module = token;
-			token++;
+			Ast_Import import = ParseImport(token, info);
 			imports.Add(import);
-
-			if (token->kind == TOKEN_SEMICOLON)
-			{
-				CheckScope(token, 1, info);
-				token++;
-			}
-			else if (IsOnCorrectScope(token, 1))
-			{
-				// @Bug: IsOnCorrectScope(token, 1) allows indent > 1
-				Error(info, token->location, "Unexpected token after import statement: %\n", token);
-			}
-
-			CheckScope(token, 0, info);
 		}
 		else if (token->kind == TOKEN_STRUCT)
 		{
@@ -1376,8 +1446,13 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 			enumeration.attribute = attribute;
 			enums.Add(enumeration);
 		}
-		else if (token[0].kind == TOKEN_IDENTIFIER && token[1].kind == TOKEN_OPEN_PAREN)
+		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN)
 		{
+			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
+			{
+				Error(info, token->location, "Function names must start with an uppercase letter.\n", token);
+			}
+
 			Ast_Function function = ParseFunction(token, 0, info);
 			function.attribute = attribute;
 			function.is_global = true;

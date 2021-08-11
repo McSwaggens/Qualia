@@ -38,6 +38,8 @@ struct Type
 
 	union
 	{
+		Type* subtype;
+
 		Ast_Struct* structure;
 		Ast_Enum*   enumeration;
 
@@ -45,15 +47,13 @@ struct Type
 		{
 			Type* input;
 			Type* output;
-		} function;
+		};
 
 		struct
 		{
-			Array<Type*> tuple;
 			u16 recursive_count;
+			Array<Type*> tuple;
 		};
-
-		Type* subtype;
 	};
 
 	Type* specifiers;
@@ -163,11 +163,10 @@ static bool IsFloat(Type* type)
 	}
 }
 
-static bool IsNumerical(Type* type)
+static bool IsArithmetic(Type* type)
 {
 	switch (type->kind)
 	{
-		case TYPE_BASETYPE_BOOL:
 		case TYPE_BASETYPE_UINT8:
 		case TYPE_BASETYPE_UINT16:
 		case TYPE_BASETYPE_UINT32:
@@ -180,11 +179,15 @@ static bool IsNumerical(Type* type)
 		case TYPE_BASETYPE_FLOAT32:
 		case TYPE_BASETYPE_FLOAT64:
 		case TYPE_SPECIFIER_POINTER:
-		case TYPE_BASETYPE_ENUM:
 			return true;
 		default:
 			return false;
 	}
+}
+
+static bool IsConvertableToArithmeticType(Type* type)
+{
+	return IsArithmetic(type) || type->kind == TYPE_BASETYPE_BOOL || type->kind == TYPE_BASETYPE_ENUM;
 }
 
 static bool IsEnum(Type* type)
@@ -207,7 +210,7 @@ static bool IsOptional(Type* type)
 	return type->kind == TYPE_SPECIFIER_OPTIONAL;
 }
 
-static u32 GetTypePrecedence(Type* type)
+static u8 GetTypePrecedence(Type* type)
 {
 	switch (type->kind)
 	{
@@ -217,6 +220,7 @@ static u32 GetTypePrecedence(Type* type)
 		case TYPE_SPECIFIER_OPTIONAL:
 		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
 		case TYPE_SPECIFIER_FIXED_ARRAY:
+			return 10;
 
 		case TYPE_BASETYPE_BYTE:     return 20;
 		case TYPE_BASETYPE_ENUM:     return 21;
@@ -237,7 +241,7 @@ static u32 GetTypePrecedence(Type* type)
 
 		case TYPE_SPECIFIER_POINTER: return 80;
 
-		case TYPE_BASETYPE_BOOL:     return 90;
+		case TYPE_BASETYPE_BOOL:     return 255;
 	}
 }
 
@@ -321,18 +325,22 @@ static constexpr Type_Kind GetSignedVersionOf(Type_Kind kind)
 	}
 }
 
+static bool IsSpecifier(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_POINTER
+		|| type->kind == TYPE_SPECIFIER_OPTIONAL
+		|| type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY
+		|| type->kind == TYPE_SPECIFIER_FIXED_ARRAY;
+}
+
 static bool IsBaseType(Type* type)
 {
-	return IsPrimitive(type)
-		|| type->kind == TYPE_BASETYPE_STRUCT
-		|| type->kind == TYPE_BASETYPE_ENUM
-		|| type->kind == TYPE_BASETYPE_FUNCTION
-		|| type->kind == TYPE_BASETYPE_TUPLE;
+	return !IsSpecifier(type);
 }
 
 static Type* FindBaseType(Type* type)
 {
-	while (!IsBaseType(type)) type = type->subtype;
+	while (IsSpecifier(type)) type = type->subtype;
 	return type;
 }
 
@@ -403,5 +411,6 @@ Type* GetDynamicArray(Type* type);
 Type* GetFixedArray(Type* type, u64 length);
 Type* GetTuple(Array<Type*> types);
 Type* GetFunctionType(Type* input, Type* output);
+Type* MergeTypeRight(Type* a, Type* b);
 bool IsConvertableTo(Type* from, Type* to);
 

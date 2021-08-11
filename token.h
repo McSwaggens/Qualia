@@ -9,7 +9,8 @@
 enum Token_Kind
 {
 	TOKEN_EOF = 0,
-	TOKEN_IDENTIFIER,
+	TOKEN_IDENTIFIER_FORMAL,
+	TOKEN_IDENTIFIER_CASUAL,
 	TOKEN_INTEGER_LITERAL,
 	TOKEN_FLOAT_LITERAL,
 	TOKEN_STRING_LITERAL,
@@ -101,7 +102,8 @@ static constexpr String ToString(Token_Kind kind)
 	switch (kind)
 	{
 		case TOKEN_EOF:               return "<Eof>";
-		case TOKEN_IDENTIFIER:        return "<identifier>";
+		case TOKEN_IDENTIFIER_FORMAL: return "<formal_identifier>";
+		case TOKEN_IDENTIFIER_CASUAL: return "<casual_identifier>";
 		case TOKEN_INTEGER_LITERAL:   return "<integer>";
 		case TOKEN_FLOAT_LITERAL:     return "<float>";
 		case TOKEN_STRING_LITERAL:    return "<string>";

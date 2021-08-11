@@ -76,7 +76,7 @@ void Write(OutputBuffer* buffer, Token_Kind kind)
 
 void Write(OutputBuffer* buffer, Token& token)
 {
-	if (token.kind == TOKEN_IDENTIFIER)
+	if (token.kind == TOKEN_IDENTIFIER_CASUAL || token.kind == TOKEN_IDENTIFIER_FORMAL)
 	{
 		Write(buffer, token.info.string);
 	}
@@ -171,9 +171,9 @@ void Write(OutputBuffer* buffer, Type* type)
 		case TYPE_BASETYPE_FLOAT64: Write(buffer, TOKEN_FLOAT64); break; 
 
 		case TYPE_BASETYPE_FUNCTION:
-			Write(buffer, type->function.input);
+			Write(buffer, type->input);
 			Write(buffer, " -> ");
-			Write(buffer, type->function.output);
+			Write(buffer, type->output);
 			break;
 
 		case TYPE_BASETYPE_TUPLE:
@@ -336,7 +336,7 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 			Write(buffer, " }");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL:
+		case AST_EXPRESSION_TERMINAL_NAME:
 		case AST_EXPRESSION_TERMINAL_LITERAL:
 		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
 		case AST_EXPRESSION_TERMINAL_ARRAY_DATA:
@@ -401,6 +401,7 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 			Write(buffer, "]");
 		} break;
 
+		case AST_EXPRESSION_DOT_CALL:
 		case AST_EXPRESSION_CALL:
 		{
 			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
@@ -449,6 +450,16 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 			Write(buffer, as->expression);
 			Write(buffer, " as ");
 			Write(buffer, as->type);
+			Write(buffer, ")");
+		} break;
+
+		case AST_EXPRESSION_IMPLICIT_CAST:
+		{
+			Ast_Expression_Implicit_Cast* cast = (Ast_Expression_Implicit_Cast*)expression;
+			Write(buffer, "(Implicit_Cast: ");
+			Write(buffer, cast->type);
+			Write(buffer, ", ");
+			Write(buffer, cast->subexpression);
 			Write(buffer, ")");
 		} break;
 

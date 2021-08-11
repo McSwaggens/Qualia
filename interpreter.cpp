@@ -769,8 +769,8 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 				char uncasted_arguments[call->parameters->type->size];
 				Interpret(call->parameters, uncasted_arguments, false, frame, interpreter);
 
-				char arguments[function->type->function.input->size];
-				Convert(call->parameters->type, (Value*)uncasted_arguments, function->type->function.input, (Value*)arguments);
+				char arguments[function->type->input->size];
+				Convert(call->parameters->type, (Value*)uncasted_arguments, function->type->input, (Value*)arguments);
 				Interpret(function, arguments, output, interpreter);
 			}
 			else
@@ -923,7 +923,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 				{
 					if (branch->condition)
 					{
-						bool is_if = branch->token->kind == TOKEN_IF;
+						bool is_if = branch->kind == AST_BRANCH_IF;
 						u64 loop_count = 0;
 						char data[branch->condition->type->size];
 
@@ -1097,7 +1097,7 @@ void Interpret(Ast_Function* function, char* input, char* output, Interpreter* i
 	{
 		// @Note: Assuming The front of the stack is the input parameters.
 		// @Warn: This might not always be the case.
-		CopyMemory(frame.data, input, function->type->function.input->size);
+		CopyMemory(frame.data, input, function->type->input->size);
 	}
 
 	for (Ast_VariableDeclaration** variable = function->code.scope.variables; variable < function->code.scope.variables.End(); variable++)

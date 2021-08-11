@@ -113,7 +113,15 @@ void LexicalParse(String file_path, Parse_Info* info)
 					Fail();
 				}
 
-				token.kind = TOKEN_IDENTIFIER;
+				if (IsUpperCase(*start))
+				{
+					token.kind = TOKEN_IDENTIFIER_FORMAL;
+				}
+				else
+				{
+					token.kind = TOKEN_IDENTIFIER_CASUAL;
+				}
+
 				token.info.string = String(start, size);
 			}
 		}
@@ -217,7 +225,7 @@ void LexicalParse(String file_path, Parse_Info* info)
 					Fail();
 				}
 
-				if (*cursor == '.')
+				if (cursor[0] == '.' && IsDigit(cursor[1]))
 				{
 					// @OptimizeMe: This is a very slow way of doing this.
 					// @Bug: Not even sure if this handles weird floating point edge cases.

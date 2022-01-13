@@ -1,6 +1,10 @@
 #include "util.h"
 #include "file.h"
 
+static void InitTime()
+{
+}
+
 [[noreturn]]
 void ExitProcess(bool failure)
 {

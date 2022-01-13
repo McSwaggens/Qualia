@@ -6,9 +6,6 @@
 template<typename T>
 struct Span
 {
-	// T* data; // Dog-shit-ass language won't allow me to use `begin` and `end`
-	// T* end;  //  because range based for loops will TRY TO FUCKING CALL THEM!
-
 	T* begin;
 	T* end;
 

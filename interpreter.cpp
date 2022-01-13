@@ -711,24 +711,24 @@ void Interpret(Ast_Expression* expression, char* output, bool allow_referential,
 			{
 				case TOKEN_STRING_LITERAL:
 				{
-					String string = literal->token->info.string;
+					String string = literal->token->string;
 					CopyMemory(output, string.data, string.length);
 				} break;
 
 				case TOKEN_INTEGER_LITERAL:
 				{
-					CopyMemory(output, (char*)&literal->token->info.integer.value, literal->type->size);
+					CopyMemory(output, (char*)&literal->token->integer.value, literal->type->size);
 				} break;
 
 				case TOKEN_FLOAT_LITERAL:
 				{
 					if (literal->type->kind == TYPE_BASETYPE_FLOAT32)
 					{
-						*(f32*)output = (f32)literal->token->info.floating_point.value;
+						*(f32*)output = (f32)literal->token->floating_point.value;
 					}
 					else if (literal->type->kind == TYPE_BASETYPE_FLOAT64)
 					{
-						*(f64*)output = (f64)literal->token->info.floating_point.value;
+						*(f64*)output = (f64)literal->token->floating_point.value;
 					}
 					else Assert();
 				} break;
@@ -949,9 +949,7 @@ void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* int
 							frame->do_break = false;
 						}
 
-						branch = loop_count
-							? branch->then_branch
-							: branch->else_branch;
+						branch = &block->branches[loop_count ? branch->then_branch_index : branch->else_branch_index];
 					}
 					else
 					{
@@ -1140,9 +1138,9 @@ StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter)
 	return frame;
 }
 
-Interpreter* CreateInterpreter(Parse_Info* info)
+Interpreter* CreateInterpreter(Ast_Module* module)
 {
-	Interpreter* interpreter = info->stack.Allocate<Interpreter>();
+	Interpreter* interpreter = StackAllocate<Interpreter>(&module->stack);
 	ZeroMemory(interpreter);
 	interpreter->block = CreateMemoryBlock(0x10000);
 	return interpreter;

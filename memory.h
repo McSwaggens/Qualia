@@ -1,23 +1,71 @@
 #pragma once
 
-#include "int.h"
 #include "util.h"
 #include "array.h"
 
 #define ALLOCATOR __attribute__((malloc))
 #define ALLIGNED(n) __attribute__((assume_aligned((n))))
 
+enum PageFlags
+{
+	PAGE_WRITE_FLAG   = (1 << 0),
+	PAGE_EXECUTE_FLAG = (1 << 1),
+};
+
 ALLIGNED(4096)
-void* AllocateVirtualPage(u64 size, bool write = true, bool execute = false, bool prefault = false);
-void DeAllocateVirtualPage(void* page, u64 size);
+static void* AllocateVirtualPage(u64 size, PageFlags flags);
+static void DeAllocateVirtualPage(void* page, u64 size, PageFlags flags);
 
-void InitGlobalArena();
+static void* GetPage(u64 size);
+static void RetirePage(void* page, u64 size);
+
+static void InitPageCache();
+static void InitGlobalArena();
+
+struct Stack_Block
+{
+	Stack_Block* previous;
+	u64 size;
+	char data[];
+};
+
+struct Stack
+{
+	Stack_Block* block;
+	char* head;
+	char* end;
+};
+
+static Stack CreateStack(u64 size = 1<<21);
+static void FreeStack(Stack* stack);
+static void* StackAllocate(Stack* stack, u64 size) ALLOCATOR;
+
+template<typename T>
+static T* StackAllocate(Stack* stack)
+{
+	return (T*)StackAllocate(stack, sizeof(T));
+}
+
+template<typename T>
+static T* StackAllocate(Stack* stack, u64 count)
+{
+	return (T*)StackAllocate(stack, sizeof(T) * count);
+}
+
+template<typename T>
+static Array<T> StackAllocateArray(Stack* stack, u64 count)
+{
+	Array<T> array;
+	array.data = count ? StackAllocate<T>(stack, count) : null;
+	array.count = count;
+	return array;
+}
 
 ALLIGNED(8)
-void* Allocate(u64 size);
+static void* Allocate(u64 size);
 ALLIGNED(8)
-void* ReAllocate(void* p, u64 old_size, u64 new_size);
-void DeAllocate(void* p, u64 size);
+static void* ReAllocate(void* p, u64 old_size, u64 new_size);
+static void DeAllocate(void* p, u64 size);
 
 template<typename T>
 [[nodiscard]]
@@ -39,7 +87,7 @@ static inline void DeAllocate(T* p, u64 count = 1)
 }
 
 template<typename T>
-static inline Array<T> AllocateArray(u32 count)
+static inline Array<T> AllocateArray(u64 count)
 {
 	Array<T> array;
 	array.data = Allocate<T>(count);
@@ -110,63 +158,8 @@ static constexpr void ZeroMemory(T* p, u64 count = 1)
 }
 
 template<typename T>
-static constexpr void ZeroMemory(Array<T> array)
+static constexpr void ZeroArray(Array<T> array)
 {
 	ZeroMemory(array.data, array.count);
 }
-
-struct Stack_Allocator_Block
-{
-	Stack_Allocator_Block* previous;
-	char data[];
-};
-
-struct Stack_Allocator
-{
-	Stack_Allocator_Block* block;
-	char* head;
-	u64 block_size;
-
-	void Free()
-	{
-		while (block)
-		{
-			Stack_Allocator_Block* previous = block->previous;
-			DeAllocateVirtualPage(block, block_size);
-			block = previous;
-		}
-	}
-
-	template<typename T>
-	T* Allocate(u32 count = 1) ALLOCATOR
-	{
-		u64 size = sizeof(T) * count;
-
-		if (head + size >= block->data + block_size - sizeof(Stack_Allocator_Block))
-		{
-			block_size <<= 1;
-			block_size = block_size | (size & -block_size);
-			Stack_Allocator_Block* new_block = (Stack_Allocator_Block*)AllocateVirtualPage(block_size);
-			new_block->previous = block;
-			head = new_block->data;
-			block = new_block;
-		}
-
-		T* p = (T*)head;
-		head += size;
-
-		return p;
-	}
-
-	template<typename T>
-	Array<T> AllocateArray(u32 count)
-	{
-		Array<T> array;
-		array.data = count ? Allocate<T>(count) : null;
-		array.count = count;
-		return array;
-	}
-};
-
-Stack_Allocator NewStackAllocator(u64 size = 1<<21);
 

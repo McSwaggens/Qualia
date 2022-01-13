@@ -32,6 +32,20 @@ enum Type_Kind : u8
 	TYPE_SPECIFIER_FIXED_ARRAY
 };
 
+struct Type;
+
+struct Type_Extension
+{
+	Type* type;
+	Type_Kind kind;
+
+	union
+	{
+		Type* output;
+		u64 length;
+	};
+};
+
 struct Type
 {
 	Type_Kind kind;
@@ -60,10 +74,7 @@ struct Type
 	u64 length; // Fixed array size
 	u64 size;   // Size of the type in bytes
 
-	// @Optimization: Combine these into single List?
-	List<Type*> fixed_arrays;
-	List<Type*> tuple_extensions;
-	List<Type*> function_extensions;
+	List<Type_Extension> extensions;
 };
 
 extern Type empty_tuple;
@@ -183,31 +194,6 @@ static bool IsArithmetic(Type* type)
 		default:
 			return false;
 	}
-}
-
-static bool IsConvertableToArithmeticType(Type* type)
-{
-	return IsArithmetic(type) || type->kind == TYPE_BASETYPE_BOOL || type->kind == TYPE_BASETYPE_ENUM;
-}
-
-static bool IsEnum(Type* type)
-{
-	return type->kind == TYPE_BASETYPE_ENUM;
-}
-
-static bool IsStruct(Type* type)
-{
-	return type->kind == TYPE_BASETYPE_STRUCT;
-}
-
-static bool IsPointer(Type* type)
-{
-	return type->kind == TYPE_SPECIFIER_POINTER;
-}
-
-static bool IsOptional(Type* type)
-{
-	return type->kind == TYPE_SPECIFIER_OPTIONAL;
 }
 
 static u8 GetTypePrecedence(Type* type)
@@ -375,9 +361,29 @@ static Type* GetDominantType(Type* a, Type* b)
 	return GetTypePrecedence(a) >= GetTypePrecedence(b) ? a : b;
 }
 
-static bool IsTrivialType(Type* type)
+static bool IsConvertableToArithmeticType(Type* type)
 {
-	return type->size <= 8 && (IsPrimitive(type) || IsPointer(type) || IsEnum(type));
+	return IsArithmetic(type) || type->kind == TYPE_BASETYPE_BOOL || type->kind == TYPE_BASETYPE_ENUM;
+}
+
+static bool IsEnum(Type* type)
+{
+	return type->kind == TYPE_BASETYPE_ENUM;
+}
+
+static bool IsStruct(Type* type)
+{
+	return type->kind == TYPE_BASETYPE_STRUCT;
+}
+
+static bool IsPointer(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_POINTER;
+}
+
+static bool IsOptional(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_OPTIONAL;
 }
 
 static bool IsFunctionPointer(Type* type)
@@ -404,13 +410,23 @@ static bool IsFixedByteArray(Type* type)
 		&& type->subtype->kind == TYPE_BASETYPE_BYTE;
 }
 
-void InitTypeSystem();
-Type* GetPointer(Type* type);
-Type* GetOptional(Type* type);
-Type* GetDynamicArray(Type* type);
-Type* GetFixedArray(Type* type, u64 length);
-Type* GetTuple(Array<Type*> types);
-Type* GetFunctionType(Type* input, Type* output);
-Type* MergeTypeRight(Type* a, Type* b);
-bool IsConvertableTo(Type* from, Type* to);
+static bool IsDynamicArray(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY;
+}
+
+static bool IsFixedArray(Type* type)
+{
+	return type->kind == TYPE_SPECIFIER_FIXED_ARRAY;
+}
+
+static void InitTypeSystem();
+static Type* GetPointer(Type* type);
+static Type* GetOptional(Type* type);
+static Type* GetDynamicArray(Type* type);
+static Type* GetFixedArray(Type* type, u64 length);
+static Type* GetTuple(Array<Type*> types);
+static Type* GetFunctionType(Type* input, Type* output);
+static Type* MergeTypeRight(Type* a, Type* b);
+static bool CanImplicitCast(Type* from, Type* to);
 

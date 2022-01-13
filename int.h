@@ -17,15 +17,15 @@ static_assert(sizeof(u16) == 2);
 static_assert(sizeof(u32) == 4);
 static_assert(sizeof(u64) == 8);
 
-static constexpr u64 u8_min  = 0x0;
-static constexpr u64 u16_min = 0x0;
-static constexpr u64 u32_min = 0x0;
-static constexpr u64 u64_min = 0x0;
+static const u64 U8_MIN  = 0x0;
+static const u64 U16_MIN = 0x0;
+static const u64 U32_MIN = 0x0;
+static const u64 U64_MIN = 0x0;
 
-static constexpr u64 u8_max  = 0xFF;
-static constexpr u64 u16_max = 0xFFFF;
-static constexpr u64 u32_max = 0xFFFFFFFF;
-static constexpr u64 u64_max = 0xFFFFFFFFFFFFFFFF;
+static const u64 U8_MAX  = 0xFF;
+static const u64 U16_MAX = 0xFFFF;
+static const u64 U32_MAX = 0xFFFFFFFF;
+static const u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
 
 // -------------------------------------------- //
 
@@ -39,15 +39,15 @@ static_assert(sizeof(s16) == 2);
 static_assert(sizeof(s32) == 4);
 static_assert(sizeof(s64) == 8);
 
-static constexpr u64 s8_max  = 0x7F;
-static constexpr u64 s16_max = 0x7FFF;
-static constexpr u64 s32_max = 0x7FFFFFFF;
-static constexpr u64 s64_max = 0x7FFFFFFFFFFFFFFF;
+static const u64 S8_MAX  = 0x7F;
+static const u64 S16_MAX = 0x7FFF;
+static const u64 S32_MAX = 0x7FFFFFFF;
+static const u64 S64_MAX = 0x7FFFFFFFFFFFFFFF;
 
-static constexpr u64 s8_min  = 0x80;
-static constexpr u64 s16_min = 0x8000;
-static constexpr u64 s32_min = 0x80000000;
-static constexpr u64 s64_min = 0x8000000000000000;
+static const u64 S8_MIN  = 0x80;
+static const u64 S16_MIN = 0x8000;
+static const u64 S32_MIN = 0x80000000;
+static const u64 S64_MIN = 0x8000000000000000;
 
 // -------------------------------------------- //
 

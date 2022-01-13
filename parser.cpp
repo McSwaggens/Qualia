@@ -26,6 +26,7 @@ static bool IsIdentifier(Token_Kind kind)
 static bool IsBinaryOperator(Token_Kind kind)
 {
 	return kind == TOKEN_DOT
+		// || kind == TOKEN_DOT_DOT
 		|| kind == TOKEN_EXPONENT
 		|| kind == TOKEN_ASTERISK
 		|| kind == TOKEN_DIVIDE
@@ -115,6 +116,7 @@ static bool IsExpressionStarter(Token_Kind kind)
 	return IsUnaryOperator(kind)
 		|| IsTerm(kind)
 		|| kind == TOKEN_OPEN_PAREN
+		|| kind == TOKEN_OPEN_BRACKET
 		|| kind == TOKEN_OPEN_BRACE;
 }
 
@@ -123,7 +125,7 @@ static u32 GetTernaryPrecedence(Token_Kind kind)
 	switch (kind)
 	{
 		case TOKEN_IF:
-			return 6;
+			return 7;
 
 		default:
 			Assert("Invalid ternary operator.");
@@ -160,19 +162,22 @@ static u32 GetBinaryPrecedence(Token_Kind kind)
 		case TOKEN_AS:
 			return 6;
 
+		// case TOKEN_DOT_DOT:
+		// 	return 8;
+
 		case TOKEN_EQUAL:
 		case TOKEN_NOT_EQUAL:
 		case TOKEN_LESS:
 		case TOKEN_LESS_OR_EQUAL:
 		case TOKEN_GREATER:
 		case TOKEN_GREATER_OR_EQUAL:
-			return 7;
+			return 9;
 
 		case TOKEN_AND:
-			return 8;
+			return 10;
 
 		case TOKEN_OR:
-			return 9;
+			return 11;
 
 		default:
 			Assert("Invalid binary operator.");
@@ -197,7 +202,7 @@ static u32 GetUnaryPrecedence(Token_Kind kind)
 			return 2;
 
 		case TOKEN_NOT:
-			return 8;
+			return 10;
 
 		default:
 			Assert("Invalid unary operator.");
@@ -249,18 +254,18 @@ static u32 GetOperatorPrecedence(Token_Kind kind)
 
 template<typename ...Args>
 [[noreturn]]
-static void Error(Parse_Info* info, SourceLocation where, String format, Args&&... message_args)
+static void Error(Ast_Module* module, SourceLocation where, String format, Args&&... message_args)
 {
 	u32 margin = 2;
 	u32 start = where.line;
 	u32 number_of_lines = 1 + margin;
 
-	Print("%:%:%: error: ", info->file_path, (where.line+1), (where.offset+1));
+	Print("%:%:%: error: ", module->file_path, (where.line+1), (where.offset+1));
 	Print(format, message_args...);
 
-	for (u32 line = start; line < start + number_of_lines && line < info->lines.count; line++)
+	for (u32 line = start; line < start + number_of_lines && line < module->lines.count; line++)
 	{
-		Print("%\n", String(info->lines[line], info->lines[line].Length()));
+		Print("%\n", String(module->lines[line], module->lines[line].Length()));
 	}
 
 	Fail();
@@ -276,15 +281,15 @@ static bool IsOnCorrectScope(Token* token, u32 indent)
 	return !token->newline || token->indent == indent;
 }
 
-static void CheckScope(Token* token, u32 indent, Parse_Info* info)
+static void CheckScope(Token* token, u32 indent, Ast_Module* module)
 {
 	if (!IsOnCorrectScope(token, indent))
 	{
-		Error(info, token->location, "Invalid indentation.\n");
+		Error(module, token->location, "Invalid indentation.\n");
 	}
 }
 
-static void SkipSemiColon(Token*& token, u32 indent, Parse_Info* info)
+static void SkipSemiColon(Token*& token, u32 indent, Ast_Module* module)
 {
 	if (token->kind == TOKEN_SEMICOLON && IsOnCorrectScope(token, indent))
 	{
@@ -292,12 +297,12 @@ static void SkipSemiColon(Token*& token, u32 indent, Parse_Info* info)
 	}
 }
 
-static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info);
-static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* info, bool assignment_break = false, u32 parent_precedence = -2);
-static Ast_Function ParseFunction(Token*& token, u32 indent, Parse_Info* info);
-static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info);
+static Ast_Type ParseType(Token*& token, u32 indent, Ast_Module* module);
+static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* module, bool assignment_break = false, u32 parent_precedence = -2);
+static Ast_Function ParseFunction(Token*& token, u32 indent, Ast_Module* module);
+static Ast_Code ParseCode(Token*& token, u32 indent, Ast_Module* module);
 
-static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
+static Ast_Struct ParseStruct(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Struct structure;
 	ZeroMemory(&structure);
@@ -307,27 +312,27 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 	{
 		if (token->kind == TOKEN_IDENTIFIER_CASUAL)
 		{
-			Error(info, token->location, "Struct name must start with an uppercase letter.\n");
+			Error(module, token->location, "Struct name must start with an uppercase letter.\n");
 		}
 		else
 		{
-			Error(info, token->location, "Struct name missing\n");
+			Error(module, token->location, "Struct name missing\n");
 		}
 	}
 
-	CheckScope(token, indent, info);
+	CheckScope(token, indent, module);
 	structure.name = token;
 	token += 1;
 
 	if (token->kind != TOKEN_COLON)
 	{
-		Error(info, token->location, "Invalid struct declaration syntax, unexpected token %, Expected ':'\n", token);
+		Error(module, token->location, "Invalid struct declaration syntax, unexpected token %, Expected ':'\n", token);
 	}
 
-	CheckScope(token, indent, info);
+	CheckScope(token, indent, module);
 	token += 1;
 
-	Pooled_Array<Ast_Struct_Member> members = NewPooledArray<Ast_Struct_Member>();
+	Array_Buffer<Ast_Struct_Member> members = CreateArrayBuffer<Ast_Struct_Member>();
 
  	while (IsOnCorrectScope(token, indent+1))
 	{
@@ -340,23 +345,23 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 
 			if (token->kind != TOKEN_COLON)
 			{
-				Error(info, token->location, "Expected ':', not: %\n", token);
+				Error(module, token->location, "Expected ':', not: %\n", token);
 			}
 
-			CheckScope(token, indent+1, info);
+			CheckScope(token, indent+1, module);
 			token += 1;
 
-			member.type = ParseType(token, indent+2, info);
+			member.type = ParseType(token, indent+2, module);
 			members.Add(member);
 
 			if (!token->newline && token->kind != TOKEN_SEMICOLON)
 			{
-				Error(info, token->location, "Unexpected token: % after struct member.\n", token);
+				Error(module, token->location, "Unexpected token: % after struct member.\n", token);
 			}
 
 			if (token->kind == TOKEN_SEMICOLON)
 			{
-				CheckScope(token, indent+1, info);
+				CheckScope(token, indent+1, module);
 				token += 1;
 			}
 
@@ -367,11 +372,11 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 		}
 		else if (token->kind == TOKEN_IDENTIFIER_FORMAL)
 		{
-			Error(info, token->location, "Struct member names must start with a lowercase letter.\n");
+			Error(module, token->location, "Struct member names must start with a lowercase letter.\n");
 		}
 		else
 		{
-			Error(info, token->location, "Unexpected token in struct: %\n", token);
+			Error(module, token->location, "Unexpected token in struct: %\n", token);
 		}
 	}
 
@@ -380,7 +385,7 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Parse_Info* info)
 	return structure;
 }
 
-static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
+static Ast_Enum ParseEnum(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Enum enumeration;
 	token += 1;
@@ -389,27 +394,27 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 	{
 		if (token->kind == TOKEN_IDENTIFIER_CASUAL)
 		{
-			Error(info, token->location, "Enum names must start with an uppercase letter.\n");
+			Error(module, token->location, "Enum names must start with an uppercase letter.\n");
 		}
 		else
 		{
-			Error(info, token->location, "Enum name missing.\n");
+			Error(module, token->location, "Enum name missing.\n");
 		}
 	}
 
-	CheckScope(token, indent, info);
+	CheckScope(token, indent, module);
 	enumeration.name = token;
 	token += 1;
 
 	if (token->kind != TOKEN_COLON)
 	{
-		Error(info, token->location, "Invalid enum declaration syntax, unexpected token %, Expected ':'\n", token);
+		Error(module, token->location, "Invalid enum declaration syntax, unexpected token %, Expected ':'\n", token);
 	}
 
-	CheckScope(token, indent, info);
+	CheckScope(token, indent, module);
 	token += 1;
 
-	Pooled_Array<Ast_Enum_Member> members = NewPooledArray<Ast_Enum_Member>();
+	Array_Buffer<Ast_Enum_Member> members = CreateArrayBuffer<Ast_Enum_Member>();
 
 	while (IsOnCorrectScope(token, indent+1))
 	{
@@ -422,27 +427,27 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 
 			if (token->kind != TOKEN_EQUAL)
 			{
-				Error(info, token->location, "Expected '=', not: %\n", token);
+				Error(module, token->location, "Expected '=', not: %\n", token);
 			}
 
-			CheckScope(token, indent+2, info);
+			CheckScope(token, indent+2, module);
 			token += 1;
 
 			if (token->kind == TOKEN_SEMICOLON)
 			{
-				Error(info, token->location, "Expected expression before ';'\n");
+				Error(module, token->location, "Expected expression before ';'\n");
 			}
 
-			member.expression = ParseExpression(token, indent+2, info);
+			member.expression = ParseExpression(token, indent+2, module);
 
 			if (!token->newline && token->kind != TOKEN_SEMICOLON)
 			{
-				Error(info, token->location, "Unexpected token: % after enum member.\n", token);
+				Error(module, token->location, "Unexpected token: % after enum member.\n", token);
 			}
 
 			if (token->kind == TOKEN_SEMICOLON)
 			{
-				CheckScope(token, indent+1, info);
+				CheckScope(token, indent+1, module);
 				token += 1;
 			}
 
@@ -450,11 +455,11 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 		}
 		else if (token->kind == TOKEN_IDENTIFIER_CASUAL)
 		{
-			Error(info, token->location, "Enum member names must start with a uppercase letter.\n");
+			Error(module, token->location, "Enum member names must start with a uppercase letter.\n");
 		}
 		else
 		{
-			Error(info, token->location, "Unexpected token in enum: %\n", token);
+			Error(module, token->location, "Unexpected token in enum: %\n", token);
 		}
 	}
 
@@ -463,13 +468,14 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Parse_Info* info)
 	return enumeration;
 }
 
-static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* info, bool assignment_break, u32 parent_precedence)
+static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* module, bool assignment_break, u32 parent_precedence)
 {
 	Ast_Expression* left;
 
 	if (IsUnaryOperator(token->kind))
 	{
-		Ast_Expression_Unary* unary = info->stack.Allocate<Ast_Expression_Unary>();
+		Ast_Expression_Unary* unary = StackAllocate<Ast_Expression_Unary>(&module->stack);
+		ZeroMemory(unary);
 
 		switch (token->kind)
 		{
@@ -484,37 +490,88 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		}
 
 		unary->span.begin = token;
-		unary->op = token++;
-		CheckScope(token, indent, info);
-		unary->subexpression = ParseExpression(token, indent, info, assignment_break, GetUnaryPrecedence(unary->op->kind));
+		unary->op = token;
+		token++;
+		CheckScope(token, indent, module);
+		unary->subexpression = ParseExpression(token, indent, module, assignment_break, GetUnaryPrecedence(unary->op->kind));
 		unary->span.end = token;
 		left = unary;
 	}
 	else if (IsLiteral(token->kind))
 	{
-		Ast_Expression_Literal* literal = info->stack.Allocate<Ast_Expression_Literal>();
+		Ast_Expression_Literal* literal = StackAllocate<Ast_Expression_Literal>(&module->stack);
+		ZeroMemory(literal);
 		literal->kind  = AST_EXPRESSION_TERMINAL_LITERAL;
 		literal->can_constantly_evaluate = true;
 		literal->is_pure = true;
 		literal->span.begin = token;
-		literal->token = token++;
+		literal->token = token;
+		token++;
 		literal->span.end = token;
 		left = literal;
 	}
 	else if (IsIdentifier(token->kind))
 	{
-		Ast_Expression_Terminal* term = info->stack.Allocate<Ast_Expression_Terminal>();
+		Ast_Expression_Terminal* term = StackAllocate<Ast_Expression_Terminal>(&module->stack);
+		ZeroMemory(term);
 		term->kind = AST_EXPRESSION_TERMINAL_NAME;
 		term->span.begin = token;
-		term->token = token++;
+		term->token = token;
+		token++;
 		term->span.end = token;
 		left = term;
+	}
+	else if (token->kind == TOKEN_OPEN_BRACKET)
+	{
+		Token* closure = token->GetClosure();
+		Ast_Expression_Dynamic_Array* array = StackAllocate<Ast_Expression_Dynamic_Array>(&module->stack);
+		ZeroMemory(array);
+
+		array->kind = AST_EXPRESSION_DYNAMIC_ARRAY;
+		array->span.begin = token;
+		array->span.end = closure+1;
+
+		token += 1;
+
+		if (!IsExpressionStarter(token->kind))
+		{
+			Error(module, token->location, "Expected expression after '['\n");
+		}
+
+		CheckScope(token, indent, module);
+		array->left = ParseExpression(token, indent+1, module);
+
+		if (token->kind != TOKEN_DOT_DOT)
+		{
+			Error(module, token->location, "Expected '..' operator, not: \n", token);
+		}
+
+		CheckScope(token, indent, module);
+		token += 1;
+
+		if (!IsExpressionStarter(token->kind))
+		{
+			Error(module, token->location, "Array extent not specified\n");
+		}
+
+		CheckScope(token, indent+1, module);
+		array->right = ParseExpression(token, indent+1, module);
+
+		if (token->kind != TOKEN_CLOSE_BRACKET)
+		{
+			Error(module, token->location, "End of array expression missing, expected ']', not: %\n", token);
+		}
+
+		CheckScope(token, indent, module);
+		token += 1;
+
+		left = array;
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN)
 	{
 		Token* closure = token->GetClosure();
 
-		Ast_Expression_Tuple* tuple = info->stack.Allocate<Ast_Expression_Tuple>();
+		Ast_Expression_Tuple* tuple = StackAllocate<Ast_Expression_Tuple>(&module->stack);
 		ZeroMemory(tuple);
 
 		tuple->kind  = AST_EXPRESSION_TUPLE;
@@ -523,59 +580,59 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 		token += 1;
 
-		Pooled_Array<Ast_Expression*> elements = NewPooledArray<Ast_Expression*>();
+		Array_Buffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
 
 		if (closure[-1].kind == TOKEN_COMMA)
 		{
-			Error(info, token->location, "Expected expression after ','\n");
+			Error(module, token->location, "Expected expression after ','\n");
 		}
 
 		while (token < closure)
 		{
-			CheckScope(token, indent+1, info);
-			elements.Add(ParseExpression(token, indent+1, info));
+			CheckScope(token, indent+1, module);
+			elements.Add(ParseExpression(token, indent+1, module));
 
 			if (token->kind == TOKEN_COMMA)
 			{
-				CheckScope(token, indent, info);
+				CheckScope(token, indent, module);
 				token += 1;
 			}
 			else if (token < closure)
 			{
-				Error(info, token->location, "Invalid expression, unexpected token: %\n", token);
+				Error(module, token->location, "Invalid expression, unexpected token: %\n", token);
 			}
 		}
 
 		tuple->elements = elements.Lock();
 
-		CheckScope(token, indent, info);
+		CheckScope(token, indent, module);
 		token = closure+1;
 		left = tuple;
 	}
 	else if (token->kind == TOKEN_OPEN_BRACE)
 	{
-		Ast_Expression_Fixed_Array* fixed_array = info->stack.Allocate<Ast_Expression_Fixed_Array>();
+		Ast_Expression_Fixed_Array* fixed_array = StackAllocate<Ast_Expression_Fixed_Array>(&module->stack);
 		ZeroMemory(fixed_array);
 
 		fixed_array->kind = AST_EXPRESSION_FIXED_ARRAY;
 		fixed_array->span = Span(token, token->GetClosure());
 
 		Token* closure = token->GetClosure();
-		Pooled_Array<Ast_Expression*> elements = NewPooledArray<Ast_Expression*>();
+		Array_Buffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
 
 		if (token+1 == closure)
 		{
-			Error(info, token->location, "Empty arrays literals aren't allowed.\n");
+			Error(module, token->location, "Empty arrays literals aren't allowed.\n");
 		}
 
 		token += 1;
 
 		while (token < closure)
 		{
-			CheckScope(token, indent+1, info);
-			Ast_Expression* expression = ParseExpression(token, indent+1, info, false);
+			CheckScope(token, indent+1, module);
+			Ast_Expression* expression = ParseExpression(token, indent+1, module, false);
 			elements.Add(expression);
-			CheckScope(token, indent, info);
+			CheckScope(token, indent, module);
 
 			if (token->kind == TOKEN_COMMA)
 			{
@@ -583,7 +640,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 				if (token == closure)
 				{
-					Error(info, token->location, "Expected expression after ',', not: '%'\n", token);
+					Error(module, token->location, "Expected expression after ',', not: '%'\n", token);
 				}
 			}
 		}
@@ -597,10 +654,10 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 	{
 		if (token->indent != indent)
 		{
-			CheckScope(token, indent, info);
+			CheckScope(token, indent, module);
 		}
 
-		Error(info, token->location, "Invalid expression, expected term, got: %\n", token);
+		Error(module, token->location, "Invalid expression, expected term, got: %\n", token);
 	}
 
 	while (CanTakeNextOp(token, assignment_break, parent_precedence) && IsOnCorrectScope(token, indent))
@@ -608,40 +665,40 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		// @Indent does unary operators need to be treated differently? (Error check)
 		if (token->kind == TOKEN_IF)
 		{
-			Ast_Expression_Ternary* if_else = info->stack.Allocate<Ast_Expression_Ternary>();
+			Ast_Expression_Ternary* if_else = StackAllocate<Ast_Expression_Ternary>(&module->stack);
 			ZeroMemory(if_else);
 
 			if_else->kind   = AST_EXPRESSION_IF_ELSE;
 			if_else->span.begin = left->span.begin;
 			if_else->ops[0] = token++;
 			if_else->left   = left;
-			CheckScope(token, indent, info);
-			if_else->middle = ParseExpression(token, indent, info, false);
+			CheckScope(token, indent, module);
+			if_else->middle = ParseExpression(token, indent, module, false);
 
 			if (token->kind != TOKEN_ELSE)
 			{
-				Error(info, token->location, "Invalid 'if' expression, missing 'else' clause. Unexpected: %\n", token);
+				Error(module, token->location, "Invalid 'if' expression, missing 'else' clause. Unexpected: %\n", token);
 			}
 
-			CheckScope(token, indent, info);
+			CheckScope(token, indent, module);
 
 			if_else->ops[1] = token++;
-			CheckScope(token, indent, info);
-			if_else->right = ParseExpression(token, indent, info, assignment_break, GetTernaryPrecedence(TOKEN_IF));
+			CheckScope(token, indent, module);
+			if_else->right = ParseExpression(token, indent, module, assignment_break, GetTernaryPrecedence(TOKEN_IF));
 			if_else->span.end = token;
 			left = if_else;
 		}
 		else if (token->kind == TOKEN_AS)
 		{
-			Ast_Expression_As* as = info->stack.Allocate<Ast_Expression_As>();
+			Ast_Expression_As* as = StackAllocate<Ast_Expression_As>(&module->stack);
 			ZeroMemory(as);
 
-			CheckScope(token, indent, info);
+			CheckScope(token, indent, module);
 			as->op = token++;
 
 			as->kind = AST_EXPRESSION_AS;
 			as->span.begin = left->span.begin;
-			as->ast_type = ParseType(token, indent, info);
+			as->ast_type = ParseType(token, indent, module);
 			as->span.end = token;
 			as->expression = left;
 
@@ -649,15 +706,15 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		}
 		else if (token->kind == TOKEN_OPEN_PAREN)
 		{
-			Ast_Expression_Call* call = info->stack.Allocate<Ast_Expression_Call>();
+			Ast_Expression_Call* call = StackAllocate<Ast_Expression_Call>(&module->stack);
 			ZeroMemory(call);
 
 			Token* open = token;
 			Token* closure = open->GetClosure();
 			List<Ast_Expression*> arguments = null;
 
-			CheckScope(token, indent, info);
-			call->parameters = (Ast_Expression_Tuple*)ParseExpression(token, indent, info, false, GetOperatorPrecedence(token->kind));
+			CheckScope(token, indent, module);
+			call->parameters = (Ast_Expression_Tuple*)ParseExpression(token, indent, module, false, GetOperatorPrecedence(token->kind));
 
 			token = closure + 1;
 
@@ -673,7 +730,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 			Token* open = token++;
 			Token* closure = open->GetClosure();
 
-			Ast_Expression_Subscript* subscript = info->stack.Allocate<Ast_Expression_Subscript>();
+			Ast_Expression_Subscript* subscript = StackAllocate<Ast_Expression_Subscript>(&module->stack);
 			ZeroMemory(subscript);
 
 			subscript->kind  = AST_EXPRESSION_SUBSCRIPT;
@@ -684,17 +741,17 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 
 			if (token != closure)
 			{
-				CheckScope(token, indent+1, info);
-				subscript->index = ParseExpression(token, indent+1, info);
+				CheckScope(token, indent+1, module);
+				subscript->index = ParseExpression(token, indent+1, module);
 
 				if (token != closure)
 				{
-					Error(info, token->location, "Expected ']', not: %\n", token);
+					Error(module, token->location, "Expected ']', not: %\n", token);
 				}
 			}
 			else subscript->index = null;
 
-			CheckScope(token, indent, info);
+			CheckScope(token, indent, module);
 			token = closure + 1;
 
 			left = subscript;
@@ -702,7 +759,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 		else
 		{
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
-			Ast_Expression_Binary* binary = info->stack.Allocate<Ast_Expression_Binary>();
+			Ast_Expression_Binary* binary = StackAllocate<Ast_Expression_Binary>(&module->stack);
 			ZeroMemory(binary);
 
 			switch (token->kind)
@@ -716,6 +773,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 				case TOKEN_AND:              binary->kind = AST_EXPRESSION_BINARY_AND;                      break;
 				case TOKEN_OR:               binary->kind = AST_EXPRESSION_BINARY_OR;                       break;
 				case TOKEN_DOT:              binary->kind = AST_EXPRESSION_BINARY_DOT;                      break;
+				// case TOKEN_DOT_DOT:          binary->kind = AST_EXPRESSION_BINARY_RANGE;                    break;
 				case TOKEN_PLUS:             binary->kind = AST_EXPRESSION_BINARY_ADD;                      break;
 				case TOKEN_MINUS:            binary->kind = AST_EXPRESSION_BINARY_SUBTRACT;                 break;
 				case TOKEN_ASTERISK:         binary->kind = AST_EXPRESSION_BINARY_MULTIPLY;                 break;
@@ -727,14 +785,14 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 				case TOKEN_BITWISE_AND:      binary->kind = AST_EXPRESSION_BINARY_BITWISE_AND;              break;
 				case TOKEN_LEFT_SHIFT:       binary->kind = AST_EXPRESSION_BINARY_LEFT_SHIFT;               break;
 				case TOKEN_RIGHT_SHIFT:      binary->kind = AST_EXPRESSION_BINARY_RIGHT_SHIFT;              break;
-				default: Unreachable();
+				default: Assert(); Unreachable();
 			}
 
 			binary->span.begin = left->span.begin;
 			binary->op = token++;
 			binary->left  = left;
-			CheckScope(token, indent, info);
-			binary->right = ParseExpression(token, indent, info, assignment_break, GetBinaryPrecedence(binary->op->kind));
+			CheckScope(token, indent, module);
+			binary->right = ParseExpression(token, indent, module, assignment_break, GetBinaryPrecedence(binary->op->kind));
 			binary->span.end = token;
 			left = binary;
 		}
@@ -743,29 +801,56 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Parse_Info* in
 	return left;
 }
 
-static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
+static Token* GetEndOfTypeIfValid(Token* token)
+{
+	while (IsSpecifier(token->kind))
+	{
+		if (token->kind == TOKEN_OPEN_BRACKET) token = token->GetClosure();
+		token++;
+	}
+
+	if (IsPrimitive(token->kind) || token->kind == TOKEN_IDENTIFIER_FORMAL)
+	{
+		return token + 1;
+	}
+	else if (token->kind == TOKEN_OPEN_PAREN)
+	{
+		token = token->GetClosure() + 1;
+
+		if (token->kind == TOKEN_ARROW)
+		{
+			token = GetEndOfTypeIfValid(token + 1);
+		}
+
+		return token;
+	}
+
+	return null;
+}
+
+static Ast_Type ParseType(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Type type;
 
-	Pooled_Array<Ast_Specifier> specifiers = NewPooledArray<Ast_Specifier>();
+	Array_Buffer<Ast_Specifier> specifiers = CreateArrayBuffer<Ast_Specifier>();
 
 	while (IsSpecifier(token->kind))
 	{
 		Ast_Specifier specifier;
 		specifier.token = token;
 		specifier.size_expression = null;
-		CheckScope(token, indent, info);
+		CheckScope(token, indent, module);
 
 		if (token->kind == TOKEN_OPEN_BRACKET)
 		{
 			specifier.kind = AST_SPECIFIER_ARRAY;
 			Token* closure = token->GetClosure();
-			CheckScope(closure, indent, info);
+			CheckScope(closure, indent, module);
 			token += 1;
 
 			if (token != closure)
 			{
-				specifier.size_expression = ParseExpression(token, indent+1, info);
+				specifier.size_expression = ParseExpression(token, indent+1, module);
 			}
 
 			token = closure + 1;
@@ -789,22 +874,22 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 
 	if (IsPrimitive(token->kind))
 	{
-		CheckScope(token, indent, info);
+		CheckScope(token, indent, module);
 		type.basetype.kind = AST_BASETYPE_PRIMITIVE;
 		token += 1;
 	}
 	else if (token->kind == TOKEN_IDENTIFIER_FORMAL)
 	{
-		CheckScope(token, indent, info);
+		CheckScope(token, indent, module);
 		type.basetype.kind = AST_BASETYPE_USERTYPE;
 		token += 1;
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN && token->GetClosure()[1].kind == TOKEN_ARROW)
 	{
 		Token* closure = token->GetClosure();
-		CheckScope(token, indent, info);
-		CheckScope(closure, indent, info);
-		CheckScope(closure+1, indent, info);
+		CheckScope(token, indent, module);
+		CheckScope(closure, indent, module);
+		CheckScope(closure+1, indent, module);
 		type.basetype.kind = AST_BASETYPE_FUNCTION;
 		type.basetype.function.input = null;
 		type.basetype.function.output = null;
@@ -814,17 +899,17 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 
 		while (token != closure)
 		{
-			Ast_Type param = ParseType(token, indent+1, info);
+			Ast_Type param = ParseType(token, indent+1, module);
 			params.Add(param);
 
 			if (token->kind == TOKEN_COMMA)
 			{
-				CheckScope(token, indent, info);
+				CheckScope(token, indent, module);
 				token += 1;
 
 				if (token == closure)
 				{
-					Error(info, token->location, "Expected type after ','\n");
+					Error(module, token->location, "Expected type after ','\n");
 				}
 			}
 		}
@@ -837,7 +922,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 		}
 		else
 		{
-			type.basetype.function.input = info->stack.Allocate<Ast_Type>();
+			type.basetype.function.input = StackAllocate<Ast_Type>(&module->stack);
 			ZeroMemory(type.basetype.function.input);
 			type.basetype.function.input->basetype.kind = AST_BASETYPE_TUPLE;
 			type.basetype.function.input->basetype.tuple = params.ToArray();
@@ -850,16 +935,16 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 		}
 		else
 		{
-			type.basetype.function.output = info->stack.Allocate<Ast_Type>();
-			*type.basetype.function.output = ParseType(token, indent, info);
+			type.basetype.function.output = StackAllocate<Ast_Type>(&module->stack);
+			*type.basetype.function.output = ParseType(token, indent, module);
 		}
 
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN)
 	{
 		Token* closure = token->GetClosure();
-		CheckScope(token, indent, info);
-		CheckScope(closure, indent, info);
+		CheckScope(token, indent, module);
+		CheckScope(closure, indent, module);
 		type.basetype.kind = AST_BASETYPE_TUPLE;
 		type.basetype.tuple = null;
 		token += 1;
@@ -868,16 +953,16 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 
 		while (token != closure)
 		{
-			members.Add(ParseType(token, indent+1, info));
+			members.Add(ParseType(token, indent+1, module));
 
 			if (token->kind == TOKEN_COMMA)
 			{
-				CheckScope(token, indent, info);
+				CheckScope(token, indent, module);
 				token += 1;
 
 				if (token == closure)
 				{
-					Error(info, token->location, "Expected type after ','\n");
+					Error(module, token->location, "Expected type after ','\n");
 				}
 			}
 		}
@@ -888,20 +973,20 @@ static Ast_Type ParseType(Token*& token, u32 indent, Parse_Info* info)
 	}
 	else
 	{
-		Error(info, token->location, "Expected type, not: %\n", token);
+		Error(module, token->location, "Expected type, not: %\n", token);
 	}
 
 	return type;
 }
 
-static void ParseParameters(Ast_Function* function, Token* open_paren, u32 indent, Parse_Info* info)
+static void ParseParameters(Ast_Function* function, Token* open_paren, u32 indent, Ast_Module* module)
 {
 	Token* closure = open_paren->GetClosure();
 	Token* token = open_paren+1;
-	Pooled_Array<Ast_VariableDeclaration> params = NewPooledArray<Ast_VariableDeclaration>();
+	Array_Buffer<Ast_VariableDeclaration> params = CreateArrayBuffer<Ast_VariableDeclaration>();
 
-	CheckScope(open_paren, indent, info);
-	CheckScope(closure, indent, info);
+	CheckScope(open_paren, indent, module);
+	CheckScope(closure, indent, module);
 
 	while (token < closure)
 	{
@@ -913,45 +998,45 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 
 		if (token->kind == TOKEN_COMMA)
 		{
-			Error(info, token->location, "Empty parameters not allowed. (Remove redundant ',')\n");
+			Error(module, token->location, "Empty parameters not allowed. (Remove redundant ',')\n");
 		}
 
 		if (token->kind != TOKEN_IDENTIFIER_CASUAL)
 		{
 			if (token->kind == TOKEN_IDENTIFIER_FORMAL)
 			{
-				Error(info, token->location, "Parameter names must start with a lowercase letter, not: %\n", token);
+				Error(module, token->location, "Parameter names must start with a lowercase letter, not: %\n", token);
 			}
 			else
 			{
-				Error(info, token->location, "Parameter name missing, unexpected: %\n", token);
+				Error(module, token->location, "Parameter name missing, unexpected: %\n", token);
 			}
 		}
 
-		CheckScope(token, indent+1, info);
+		CheckScope(token, indent+1, module);
 		param.name = token++;
 
 		if (token->kind != TOKEN_COLON)
 		{
-			Error(info, token->location, "Parameter type missing.\n");
+			Error(module, token->location, "Parameter type missing.\n");
 		}
 
-		CheckScope(token, indent+1, info);
+		CheckScope(token, indent+1, module);
 		token += 1;
 
-		param.explicit_type = info->stack.Allocate<Ast_Type>();
-		*param.explicit_type = ParseType(token, indent+2, info);
+		param.explicit_type = StackAllocate<Ast_Type>(&module->stack);
+		*param.explicit_type = ParseType(token, indent+2, module);
 
 		params.Add(param);
 
 		if (token->kind != TOKEN_COMMA && token != closure)
 		{
-			Error(info, token->location, "Expected ',' or ')', not: %\n", token);
+			Error(module, token->location, "Expected ',' or ')', not: %\n", token);
 		}
 
 		if (token->kind == TOKEN_COMMA)
 		{
-			CheckScope(token, indent, info);
+			CheckScope(token, indent, module);
 			token += 1;
 		}
 	}
@@ -959,11 +1044,11 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 	function->parameters = params.Lock();
 }
 
-static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* info)
+static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_BranchBlock branch_block;
 	ZeroMemory(&branch_block);
-	Pooled_Array<Ast_Branch> branches = NewPooledArray<Ast_Branch>();
+	Array_Buffer<Ast_Branch> branches = CreateArrayBuffer<Ast_Branch>();
 
 	do
 	{
@@ -992,40 +1077,46 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 			case TOKEN_IF:
 			{
 				branch.kind = AST_BRANCH_IF;
-				CheckScope(token, indent, info);
+				CheckScope(token, indent, module);
 				branch.token = token;
 				token += 1;
-				branch.condition = ParseExpression(token, indent+1, info, false);
+				branch.condition = ParseExpression(token, indent+1, module, false);
 			} break;
 
 			case TOKEN_WHILE:
 			{
 				branch.kind = AST_BRANCH_WHILE;
-				CheckScope(token, indent, info);
+				CheckScope(token, indent, module);
 				branch.token = token;
 				token += 1;
-				branch.condition = ParseExpression(token, indent+1, info, false);
+				branch.condition = ParseExpression(token, indent+1, module, false);
 			} break;
 
 			case TOKEN_FOR:
 			{
-				CheckScope(token, indent, info);
+				CheckScope(token, indent, module);
 				branch.token = token;
 				token += 1;
 
+				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
+				{
+					Error(module, token->location, "Variable names must start with a lowercase letter.\n");
+				}
+
 				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_IN)
 				{
-					Error(info, token->location, "Iterator names must start with a lowercase letter.\n");
+					Error(module, token->location, "Iterator names must start with a lowercase letter.\n");
 				}
+
+				CheckScope(token, indent+1, module);
 
 				if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_IN)
 				{
-					branch.kind = AST_BRANCH_FOR_IN;
+					branch.kind = AST_BRANCH_FOR_RANGE;
 
-					CheckScope(token, indent+1, info);
-					CheckScope(token+1, indent, info);
+					CheckScope(token+1, indent, module);
 
-					Ast_VariableDeclaration* iterator = info->stack.Allocate<Ast_VariableDeclaration>();
+					Ast_VariableDeclaration* iterator = StackAllocate<Ast_VariableDeclaration>(&module->stack);
 					ZeroMemory(iterator);
 					iterator->name = token;
 					iterator->is_iterator = true;
@@ -1034,82 +1125,171 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Parse_Info* i
 
 					token += 2;
 
-					branch.range = ParseExpression(token, indent+1, info, false);
+					CheckScope(token, indent+1, module);
+					branch.range = ParseExpression(token, indent+1, module, false);
+
+					if (token->kind == TOKEN_COMMA)
+					{
+						CheckScope(token, indent, module);
+						token += 1;
+
+						CheckScope(token, indent+1, module);
+						branch.stride = ParseExpression(token, indent+1, module, false);
+					}
 
 					if (token->kind == TOKEN_WHERE)
 					{
-						CheckScope(token, indent, info);
+						CheckScope(token, indent, module);
 						token += 1;
-						branch.kind = AST_BRANCH_FOR_IN_WHERE;
-						branch.condition = ParseExpression(token, indent+1, info, false);
+
+						CheckScope(token, indent, module);
+						branch.filter = ParseExpression(token, indent+1, module, false);
+					}
+				}
+				else if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON)
+				{
+					Token* end = null;
+
+					if (token[2].kind == TOKEN_EQUAL || ((end = GetEndOfTypeIfValid(token+2)) && (end->kind == TOKEN_COMMA || end->kind == TOKEN_EQUAL)))
+					{
+						branch.kind = AST_BRANCH_FOR_VERBOSE;
+
+						Ast_VariableDeclaration* variable = StackAllocate<Ast_VariableDeclaration>(&module->stack);
+						ZeroMemory(variable);
+
+						variable->name = token;
+						CheckScope(token, indent+1, module);
+						token += 1;
+
+						CheckScope(token, indent, module);
+						token += 1;
+
+						if (end)
+						{
+							CheckScope(token, indent+1, module);
+							variable->explicit_type = StackAllocate<Ast_Type>(&module->stack);
+							*variable->explicit_type = ParseType(token, indent, module);
+						}
+
+						branch.variable = variable;
+
+						if (token->kind == TOKEN_EQUAL)
+						{
+							CheckScope(token, indent, module);
+							token++;
+
+							CheckScope(token, indent+1, module);
+							variable->assignment = ParseExpression(token, indent+1, module, false);
+						}
+
+						if (token->kind != TOKEN_COMMA)
+						{
+							Error(module, token->location, "Expected ',' and loop condition, not: %\n", token);
+						}
+
+						CheckScope(token, indent, module);
+						token++;
+
+						if (token->kind == TOKEN_COLON)
+						{
+							Error(module, token->location, "For loop missing condition expression.\n");
+						}
+
+						CheckScope(token, indent+1, module);
+						branch.condition = ParseExpression(token, indent+1, module, false);
+
+						if (token->kind == TOKEN_COMMA)
+						{
+							CheckScope(token, indent, module);
+							token += 1;
+
+							if (token->kind == TOKEN_COLON)
+							{
+								Error(module, token->location, "For loop stride missing\n");
+							}
+
+							CheckScope(token, indent+1, module);
+							branch.stride = ParseExpression(token, indent+1, module, false);
+						}
+					}
+					else
+					{
+						CheckScope(token, indent+1, module);
+						branch.count = ParseExpression(token, indent+1, module, false);
+						branch.kind = AST_BRANCH_FOR_COUNT;
 					}
 				}
 				else
 				{
-					branch.range = ParseExpression(token, indent+1, info, false);
-					branch.kind = AST_BRANCH_FOR;
+					CheckScope(token, indent+1, module);
+					branch.count = ParseExpression(token, indent+1, module, false);
+					branch.kind = AST_BRANCH_FOR_COUNT;
 				}
 			} break;
 
 			case TOKEN_COLON: branch.kind = AST_BRANCH_NAKED; break;
 
-			default: Error(info, token->location, "Expected 'if', 'while', 'for' or ':' after %, not: %\n", clause_token, token);
+			default: Error(module, token->location, "Expected 'if', 'while', 'for' or ':' after %, not: %\n", clause_token, token);
 		}
 
 		if (token->kind != TOKEN_COLON)
 		{
-			Error(info, token->location, "Expected ':' after branch, not: %\n", token);
+			Error(module, token->location, "Expected ':' after branch, not: %\n", token);
 		}
 
-		CheckScope(token, indent, info);
-
+		CheckScope(token, indent, module);
 		token += 1;
 
-		branch.code = ParseCode(token, indent+1, info);
+		branch.code = ParseCode(token, indent+1, module);
 		branches.Add(branch);
 	} while ((token->kind == TOKEN_ELSE || token->kind == TOKEN_THEN) && IsOnCorrectScope(token, indent));
 
 	branch_block.branches = branches.Lock();
 
-	Ast_Branch* else_branch = null;
-	Ast_Branch* then_branch = null;
+	Ast_Branch_Index else_branch_index = AST_BRANCH_INDEX_NONE;
+	Ast_Branch_Index then_branch_index = AST_BRANCH_INDEX_NONE;
 
-	for (Ast_Branch* branch = branch_block.branches.End()-1; branch >= branch_block.branches.Begin(); branch--)
+	for (Ast_Branch_Index branch_index = branch_block.branches.count-1; branch_index != AST_BRANCH_INDEX_NONE; branch_index--)
 	{
-		if (branch->kind != AST_BRANCH_NAKED)
+		Ast_Branch* branch = &branch_block.branches[branch_index];
+
+		if (branch->kind == AST_BRANCH_NAKED)
 		{
-			branch->else_branch = else_branch;
-			branch->then_branch = then_branch;
-			if (else_branch) else_branch->user_count++;
-			if (then_branch) then_branch->user_count++;
+			branch->else_branch_index = AST_BRANCH_INDEX_NONE;
+			branch->then_branch_index = AST_BRANCH_INDEX_NONE;
+		}
+		else
+		{
+			branch->else_branch_index = else_branch_index;
+			branch->then_branch_index = then_branch_index;
 		}
 
 		if (branch->clause == AST_BRANCH_CLAUSE_ELSE)
 		{
-			else_branch = branch;
+			else_branch_index = branch_index;
 		}
 		else if (branch->clause == AST_BRANCH_CLAUSE_THEN)
 		{
-			then_branch = branch;
+			then_branch_index = branch_index;
 		}
 	}
 
 	return branch_block;
 }
 
-static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
+static Ast_Statement ParseStatement(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Statement statement;
 	ZeroMemory(&statement);
 
 	if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
 	{
-		Error(info, token->location, "Variable names must start with a lowercase letter.\n");
+		Error(module, token->location, "Variable names must start with a lowercase letter.\n");
 	}
 
 	if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON)
 	{
-		CheckScope(token+1, indent, info);
+		CheckScope(token+1, indent, module);
 
 		statement.kind = AST_STATEMENT_VARIABLE_DECLARATION;
 		statement.variable_declaration.name = token;
@@ -1123,24 +1303,24 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 
 		if (token->kind != TOKEN_EQUAL)
 		{
-			CheckScope(token, indent+1, info);
-			statement.variable_declaration.explicit_type = info->stack.Allocate<Ast_Type>();
-			*statement.variable_declaration.explicit_type = ParseType(token, indent+1, info);
+			CheckScope(token, indent+1, module);
+			statement.variable_declaration.explicit_type = StackAllocate<Ast_Type>(&module->stack);
+			*statement.variable_declaration.explicit_type = ParseType(token, indent+1, module);
 		}
 
 		if (token->kind == TOKEN_EQUAL)
 		{
-			CheckScope(token, indent+1, info);
+			CheckScope(token, indent+1, module);
 			token += 1;
-			statement.variable_declaration.assignment = ParseExpression(token, indent+1, info);
+			statement.variable_declaration.assignment = ParseExpression(token, indent+1, module);
 		}
 
-		SkipSemiColon(token, indent, info);
+		SkipSemiColon(token, indent, module);
 		return statement;
 	}
 	else if (IsExpressionStarter(token->kind))
 	{
-		Ast_Expression* expression = ParseExpression(token, indent+1, info, true);
+		Ast_Expression* expression = ParseExpression(token, indent+1, module, true);
 
 		if (IsAssignment(token->kind))
 		{
@@ -1151,13 +1331,13 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 			else if (token->kind == TOKEN_DIVIDE_EQUAL)      statement.kind = AST_STATEMENT_ASSIGNMENT_DIVIDE;
 			else if (token->kind == TOKEN_EXPONENTIAL_EQUAL) statement.kind = AST_STATEMENT_ASSIGNMENT_POWER;
 
-			CheckScope(token, indent+1, info);
+			CheckScope(token, indent+1, module);
 			token += 1;
-			CheckScope(token, indent+1, info);
+			CheckScope(token, indent+1, module);
 
 			statement.assignment.left  = expression;
 			statement.assignment.token = token;
-			statement.assignment.right = ParseExpression(token, indent+1, info, false);
+			statement.assignment.right = ParseExpression(token, indent+1, module, false);
 		}
 		else
 		{
@@ -1167,15 +1347,15 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 
 		if (token->kind != TOKEN_SEMICOLON && IsOnCorrectScope(token, indent+1))
 		{
-			Error(info, token->location, "Invalid expression-statement, unexpected token: %, expected assignment operator or ';'.\n", token);
+			Error(module, token->location, "Invalid expression-statement, unexpected token: %, expected assignment operator or ';'.\n", token);
 		}
 
-		SkipSemiColon(token, indent, info);
+		SkipSemiColon(token, indent, module);
 		return statement;
 	}
 	else if (token->kind == TOKEN_IF || token->kind == TOKEN_FOR || token->kind == TOKEN_WHILE)
 	{
-		Ast_BranchBlock branch_block = ParseBranchBlock(token, indent, info);
+		Ast_BranchBlock branch_block = ParseBranchBlock(token, indent, module);
 		statement.kind = AST_STATEMENT_BRANCH_BLOCK;
 		statement.branch_block = branch_block;
 		return statement;
@@ -1187,10 +1367,10 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 
 		if (!IsOnCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
 		{
-			Error(info, statement.increment.token->location, "Expected expression after % keyword\n", statement.increment.token);
+			Error(module, statement.increment.token->location, "Expected expression after % keyword\n", statement.increment.token);
 		}
 
-		statement.increment.expression = ParseExpression(token, indent+1, info);
+		statement.increment.expression = ParseExpression(token, indent+1, module);
 
 		return statement;
 	}
@@ -1201,13 +1381,13 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 
 		if (token->kind != TOKEN_COLON)
 		{
-			Error(info, token->location, "Invalid 'defer' statement, Expected ':', not: %\n", token);
+			Error(module, token->location, "Invalid 'defer' statement, Expected ':', not: %\n", token);
 		}
 
-		CheckScope(token, indent, info);
+		CheckScope(token, indent, module);
 		token += 1;
 
-		Ast_Code code = ParseCode(token, indent+1, info);
+		Ast_Code code = ParseCode(token, indent+1, module);
 		statement.defer.code = code;
 
 		return statement;
@@ -1226,7 +1406,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 
 		if (IsOnCorrectScope(token, indent+1))
 		{
-			statement.ret.expression = ParseExpression(token, indent+1, info, false);
+			statement.ret.expression = ParseExpression(token, indent+1, module, false);
 		}
 
 		return statement;
@@ -1235,40 +1415,40 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Parse_Info* info)
 	{
 		statement.kind = AST_STATEMENT_CLAIM;
 		statement.claim.token = token++;
-		statement.claim.expression = ParseExpression(token, indent+1, info, false);
+		statement.claim.expression = ParseExpression(token, indent+1, module, false);
 
 		return statement;
 	}
 	else if (token->kind == TOKEN_SEMICOLON)
 	{
-		Error(info, token->location, "Expected statement before ';'\n");
+		Error(module, token->location, "Expected statement before ';'\n");
 	}
 	else
 	{
-		Error(info, token->location, "Invalid statement starting with %\n", token);
+		Error(module, token->location, "Invalid statement starting with %\n", token);
 	}
 }
 
-static Ast_Attribute ParseAttribute(Token*& token, u32 indent, Parse_Info* info)
+static Ast_Attribute ParseAttribute(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Attribute attribute;
 	Token* closure = token->GetClosure();
-	CheckScope(token, indent, info);
-	CheckScope(closure, indent, info);
-	attribute.expression = ParseExpression(token, indent+1, info);
+	CheckScope(token, indent, module);
+	CheckScope(closure, indent, module);
+	attribute.expression = ParseExpression(token, indent+1, module);
 	token = closure+1;
 	return attribute;
 }
 
-static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
+static Ast_Code ParseCode(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Code code;
 	ZeroMemory(&code);
 
-	Pooled_Array<Ast_Statement> statements = NewPooledArray<Ast_Statement>();
-	Pooled_Array<Ast_Struct>    structs    = NewPooledArray<Ast_Struct>();
-	Pooled_Array<Ast_Enum>      enums      = NewPooledArray<Ast_Enum>();
-	Pooled_Array<Ast_Function>  functions  = NewPooledArray<Ast_Function>();
+	Array_Buffer<Ast_Statement> statements = CreateArrayBuffer<Ast_Statement>();
+	Array_Buffer<Ast_Struct>    structs    = CreateArrayBuffer<Ast_Struct>();
+	Array_Buffer<Ast_Enum>      enums      = CreateArrayBuffer<Ast_Enum>();
+	Array_Buffer<Ast_Function>  functions  = CreateArrayBuffer<Ast_Function>();
 
 	while (IsOnCorrectScope(token, indent))
 	{
@@ -1278,19 +1458,19 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 
 		if (token->kind == TOKEN_OPEN_BRACKET)
 		{
-			attribute = ParseAttribute(token, indent, info);
+			attribute = ParseAttribute(token, indent, module);
 			has_attribute = true;
 		}
 
 		if (token->kind == TOKEN_STRUCT)
 		{
-			Ast_Struct structure = ParseStruct(token, indent, info);
+			Ast_Struct structure = ParseStruct(token, indent, module);
 			structure.attribute = attribute;
 			structs.Add(structure);
 		}
 		else if (token->kind == TOKEN_ENUM)
 		{
-			Ast_Enum enumeration = ParseEnum(token, indent, info);
+			Ast_Enum enumeration = ParseEnum(token, indent, module);
 			enumeration.attribute = attribute;
 			enums.Add(enumeration);
 		}
@@ -1299,22 +1479,22 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 		{
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 			{
-				Error(info, token->location, "Function names must start with an uppercase letter.\n", token);
+				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
 			}
 
-			Ast_Function function = ParseFunction(token, indent, info);
+			Ast_Function function = ParseFunction(token, indent, module);
 			function.attribute = attribute;
 			function.is_global = false;
 			functions.Add(function);
 		}
 		else
 		{
-			Ast_Statement statement = ParseStatement(token, indent, info);
+			Ast_Statement statement = ParseStatement(token, indent, module);
 			statements.Add(statement);
 
 			if (token->kind != TOKEN_SEMICOLON && !token->newline)
 			{
-				Error(info, token->location, "Expected ';' at the end of statement. not: %\n", token);
+				Error(module, token->location, "Expected ';' at the end of statement. not: %\n", token);
 			}
 
 			if (token->kind == TOKEN_SEMICOLON)
@@ -1325,7 +1505,7 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 				}
 				else if (token->newline && token->indent > indent)
 				{
-					Error(info, token->location, "';' on wrong indentation.\n");
+					Error(module, token->location, "';' on wrong indentation.\n");
 				}
 			}
 		}
@@ -1344,43 +1524,43 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Parse_Info* info)
 	return code;
 }
 
-static Ast_Function ParseFunction(Token*& token, u32 indent, Parse_Info* info)
+static Ast_Function ParseFunction(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Function function;
 	ZeroMemory(&function);
-	function.name = token->info.string;
+	function.ir_index = IR_NONE;
+	function.name = token->string;
 	function.name_token = token++;
-	ParseParameters(&function, token, indent, info);
+	ParseParameters(&function, token, indent, module);
 	token = token->GetClosure()+1;
 
 	if (token->kind != TOKEN_ARROW && token->kind != TOKEN_COLON)
 	{
-		Error(info, token->location, "Expected '->' or ':', not %\n", token);
+		Error(module, token->location, "Expected '->' or ':', not %\n", token);
 	}
 
 	if (token->kind == TOKEN_ARROW)
 	{
-		CheckScope(token, indent+1, info);
+		CheckScope(token, indent+1, module);
 		token += 1;
-		function.does_have_return_type_appendage = true;
-		function.ast_return_type = info->stack.Allocate<Ast_Type>();
-		*function.ast_return_type = ParseType(token, indent, info);
+		function.ast_return_type = StackAllocate<Ast_Type>(&module->stack);
+		*function.ast_return_type = ParseType(token, indent, module);
 	}
 
 	if (token->kind != TOKEN_COLON)
 	{
-		Error(info, token->location, "Expected ':', not %\n", token);
+		Error(module, token->location, "Expected ':', not %\n", token);
 	}
 
-	CheckScope(token, indent, info);
+	CheckScope(token, indent, module);
 
 	token += 1;
-	function.code = ParseCode(token, indent+1, info);
+	function.code = ParseCode(token, indent+1, module);
 
 	return function;
 }
 
-static Ast_Import ParseImport(Token*& token, Parse_Info* info)
+static Ast_Import ParseImport(Token*& token, Ast_Module* module)
 {
 	Ast_Import import;
 	import.token = token;
@@ -1388,34 +1568,36 @@ static Ast_Import ParseImport(Token*& token, Parse_Info* info)
 
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 	{
-		Error(info, token->location, "Expected identifier after import token, instead got: %\n", token);
+		Error(module, token->location, "Expected identifier after import token, instead got: %\n", token);
 	}
 
-	CheckScope(token, 1, info);
+	CheckScope(token, 1, module);
 	import.module = token;
 	token += 1;
 
 	if (token->kind == TOKEN_SEMICOLON)
 	{
-		CheckScope(token, 1, info);
+		CheckScope(token, 1, module);
 		token += 1;
 	}
 	else if (IsOnCorrectScope(token, 1))
 	{
-		Error(info, token->location, "Unexpected token after import statement: %\n", token);
+		Error(module, token->location, "Unexpected token after import statement: %\n", token);
 	}
 
-	CheckScope(token, 0, info);
+	CheckScope(token, 0, module);
 
 	return import;
 }
 
-static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
+static void ParseGlobalScope(Ast_Module* module)
 {
-	Pooled_Array<Ast_Import>    imports    = NewPooledArray<Ast_Import>();
-	Pooled_Array<Ast_Struct>    structs    = NewPooledArray<Ast_Struct>();
-	Pooled_Array<Ast_Enum>      enums      = NewPooledArray<Ast_Enum>();
-	Pooled_Array<Ast_Function>  functions  = NewPooledArray<Ast_Function>();
+	Token* token = &module->tokens[0];
+
+	Array_Buffer<Ast_Import>    imports    = CreateArrayBuffer<Ast_Import>();
+	Array_Buffer<Ast_Struct>    structs    = CreateArrayBuffer<Ast_Struct>();
+	Array_Buffer<Ast_Enum>      enums      = CreateArrayBuffer<Ast_Enum>();
+	Array_Buffer<Ast_Function>  functions  = CreateArrayBuffer<Ast_Function>();
 
 	while (token->kind != TOKEN_EOF)
 	{
@@ -1425,24 +1607,24 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 
 		if (token->kind == TOKEN_OPEN_BRACKET)
 		{
-			attribute = ParseAttribute(token, 0, info);
+			attribute = ParseAttribute(token, 0, module);
 			has_attribute = true;
 		}
 
 		if (token->kind == TOKEN_IMPORT)
 		{
-			Ast_Import import = ParseImport(token, info);
+			Ast_Import import = ParseImport(token, module);
 			imports.Add(import);
 		}
 		else if (token->kind == TOKEN_STRUCT)
 		{
-			Ast_Struct structure = ParseStruct(token, 0, info);
+			Ast_Struct structure = ParseStruct(token, 0, module);
 			structure.attribute = attribute;
 			structs.Add(structure);
 		}
 		else if (token->kind == TOKEN_ENUM)
 		{
-			Ast_Enum enumeration = ParseEnum(token, 0, info);
+			Ast_Enum enumeration = ParseEnum(token, 0, module);
 			enumeration.attribute = attribute;
 			enums.Add(enumeration);
 		}
@@ -1450,37 +1632,39 @@ static void ParseGlobalScope(Ast_Root* root, Token* token, Parse_Info* info)
 		{
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 			{
-				Error(info, token->location, "Function names must start with an uppercase letter.\n", token);
+				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
 			}
 
-			Ast_Function function = ParseFunction(token, 0, info);
+			Ast_Function function = ParseFunction(token, 0, module);
 			function.attribute = attribute;
 			function.is_global = true;
 			functions.Add(function);
 		}
 		else
 		{
-			Error(info, token->location, "Unexpected token in global scope: %\n", token);
+			Error(module, token->location, "Unexpected token in global scope: %\n", token);
 		}
 	}
 
-	root->imports = imports.Lock();
-	root->scope.functions = functions.Lock();
-	root->scope.structs = structs.Lock();
-	root->scope.enums = enums.Lock();
+	module->imports = imports.Lock();
+	module->scope.functions = functions.Lock();
+	module->scope.structs = structs.Lock();
+	module->scope.enums = enums.Lock();
 }
 
-Parse_Info ParseFile(String file_path)
+Ast_Module* ParseFile(String file_path)
 {
-	Parse_Info info;
-	ZeroMemory(&info);
-	info.stack = NewStackAllocator();
-	LexicalParse(file_path, &info);
-	info.ast_root = info.stack.Allocate<Ast_Root>();
-	ZeroMemory(info.ast_root);
-	InitIntrinsicFunctions(&info);
-	ParseGlobalScope(info.ast_root, info.tokens, &info);
-	SemanticParse(&info);
-	return info;
+	Stack stack = CreateStack();
+	Ast_Module* module = StackAllocate<Ast_Module>(&stack);
+	ZeroMemory(module);
+
+	module->stack = stack;
+	module->file_path = file_path;
+
+	LexicalParse(module);
+	ParseGlobalScope(module);
+	SemanticParse(module);
+
+	return module;
 }
 

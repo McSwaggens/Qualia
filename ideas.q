@@ -39,6 +39,27 @@ b : Alpha.Bravo
 b = Alpha.Bravo.Delta
 b = Alpha.Charlie.Foxtrot // Error: Cannot cast Alpha.Charlie to Alpha.Bravo
 
+enum Omega:
+	Epsilon:
+		Theta
+		Delta
+	Sigma:
+		Psi
+		Chi
+
+X(o : Omega.Epsilon)   => 1
+X(o : Omega.Sigma)     => 2
+X(o : Omega.Sigma.Chi) => 3
+
+Y(a : Omega, b : Omega) -> int:
+	return X(a) + X(b)
+
+c : Omega
+c is Omega.Sigma
+// What is the value of c?
+c is Omega.Sigma
+c is Omega.Sigma.Psi
+
 MallNinja(a) // MallNinja(Alpha)
 MallNinja(b) // MallNinja(Alpha.Bravo)
 MallNinja(b) // MallNinja(Alpha.Bravo)
@@ -46,6 +67,18 @@ MallNinja(b) // MallNinja(Alpha.Bravo)
 MallNinja(alpha   : Alpha)
 MallNinja(beta    : Alpha.Bravo)
 MallNinja(charlie : Alpha.Charlie)
+
+struct Foo:
+	a : int
+	b : int
+	bar : Bar
+
+struct Bar:
+	c : int
+	d : int
+
+F(p : *Bar):
+	foo : *Foo = p as *Foo.bar
 
 
 // Conditional polymorphism
@@ -198,17 +231,8 @@ GetSequenceCode(a : int, b : int, c : int) => match:
 
 [Qualia.UseForExponentiation]
 Power(a: int, b: int) -> int:
-	if b = 0: return 1
-
-	x, y, z, w := 1
-
-	for b AND 3:
-		x *= a
-
-	for b >> 2:
-		x, y, z, w *= a
-
-	return x * y * z * w
+	c := 1
+	for b: c *= a
 
 (x:[N]T) op (y:T) = { x[0] op y, x[1] op y, ..  x[N-1] op y }
 
@@ -224,7 +248,6 @@ SumBackwards(nums : []int, from : int, to : int) -> int:
 Foo(a : int, b : int = a match: 0, 1 => 42; 2, 3 => 69, c : int):
 
 Foo(a : int, b : int, c : int):
-		
 
 // Struct member visability based on scope
 // difficulty: no idea
@@ -381,6 +404,22 @@ FooBar():
 	DoAlphaStuff(&alpha)
 	DoBetaStuff(&beta)
 
+// Optionals:
+struct Foo:
+	bar : int
+	fiz : int
+
+F(a : *Foo, b : *Foo) -> int:
+	return a?.bar ? b?.bar ? 0
+
+F(a : *int, b : *int) -> int:
+	a ?= b
+	a = a ? b
+
+	k : ?int = a ? b
+	j : int = k
+	n : int = a ? b ? 0
+		
 // Relation Table:
 A < C
 B > C

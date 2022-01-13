@@ -131,7 +131,8 @@ static inline void Write(OutputBuffer* buffer, bool b)
 	{
 		buffer->Write("true", 4);
 	}
-	else {
+	else
+	{
 		buffer->Write("false", 5);
 	}
 }

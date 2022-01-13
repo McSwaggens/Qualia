@@ -3,6 +3,8 @@
 #include "memory.h"
 #include "assert.h"
 
+// @Fixme @Threading: The entire type system is written as implied single thread, needs to be fixed.
+
 static consteval Type NewPrimitiveType(Type_Kind kind, u64 size)
 {
 	Type type;
@@ -10,26 +12,11 @@ static consteval Type NewPrimitiveType(Type_Kind kind, u64 size)
 	type.size = size;
 	type.length = 0;
 	type.specifiers = null;
-	type.fixed_arrays = null;
-	type.tuple_extensions = null;
-	type.function_extensions = null;
+	type.extensions = null;
 	return type;
 }
 
-static consteval Type NewEmptyTupleType()
-{
-	Type type;
-	type.kind = TYPE_BASETYPE_TUPLE;
-	type.size = 0;
-	type.length = 0;
-	type.specifiers = null;
-	type.fixed_arrays = null;
-	type.tuple_extensions = null;
-	type.function_extensions = null;
-	return type;
-}
-
-Type empty_tuple  = NewEmptyTupleType();
+Type empty_tuple  = NewPrimitiveType(TYPE_BASETYPE_TUPLE,   0);
 Type type_byte    = NewPrimitiveType(TYPE_BASETYPE_BYTE,    1);
 Type type_bool    = NewPrimitiveType(TYPE_BASETYPE_BOOL,    1);
 Type type_int8    = NewPrimitiveType(TYPE_BASETYPE_INT8,    1);
@@ -44,18 +31,18 @@ Type type_float16 = NewPrimitiveType(TYPE_BASETYPE_FLOAT16, 2);
 Type type_float32 = NewPrimitiveType(TYPE_BASETYPE_FLOAT32, 4);
 Type type_float64 = NewPrimitiveType(TYPE_BASETYPE_FLOAT64, 8);
 
-Stack_Allocator type_allocator;
+static Stack type_stack;
 
-void InitTypeSystem()
+static void InitTypeSystem()
 {
-	type_allocator = NewStackAllocator();
+	type_stack = CreateStack();
 }
 
-void InitSpecifiers(Type* type)
+static void InitSpecifiers(Type* type)
 {
 	if (type->specifiers) return;
 
-	type->specifiers = type_allocator.Allocate<Type>(3);
+	type->specifiers = StackAllocate<Type>(&type_stack, 3);
 	ZeroMemory(type->specifiers, 3);
 
 	type->specifiers[0].kind = TYPE_SPECIFIER_POINTER;
@@ -71,103 +58,147 @@ void InitSpecifiers(Type* type)
 	type->specifiers[2].size = 16; // @FixMe
 }
 
-Type* GetPointer(Type* type)
+static Type* GetPointer(Type* type)
 {
 	InitSpecifiers(type);
 	return type->specifiers + 0;
 }
 
-Type* GetOptional(Type* type)
+static Type* GetOptional(Type* type)
 {
 	InitSpecifiers(type);
 	return type->specifiers + 1;
 }
 
-Type* GetDynamicArray(Type* type)
+static Type* GetDynamicArray(Type* type)
 {
 	InitSpecifiers(type);
 	return type->specifiers + 2;
 }
 
-Type* GetFixedArray(Type* type, u64 length)
+static Type* GetFunctionType(Type* input, Type* output)
 {
-	for (u32 i = 0; i < type->fixed_arrays.count; i++)
+	for (u32 i = 0; i < input->extensions.count; i++)
 	{
-		if (type->fixed_arrays[i]->length == length)
+		Type_Extension extension = input->extensions[i];
+		if (extension.output == output && extension.kind == TYPE_BASETYPE_FUNCTION) // @Optimization: Bundle the output type with the pointer, this is cache-miss-city.
 		{
-			return type->fixed_arrays[i];
+			return extension.type;
 		}
 	}
 
-	Type* new_type = type_allocator.Allocate<Type>();
-	ZeroMemory(new_type);
-	new_type->kind = TYPE_SPECIFIER_FIXED_ARRAY;
-	new_type->subtype = type;
-	new_type->length = length;
-	new_type->size = type->size * length;
-	type->fixed_arrays.Add(new_type);
+	Type* type = StackAllocate<Type>(&type_stack);
+	ZeroMemory(type);
 
-	return new_type;
+	type->kind = TYPE_BASETYPE_FUNCTION;
+	type->input = input;
+	type->output = output;
+	type->size = 0; // @Note: (X)->Y does not have a size, *(X)->Y does.
+
+	Type_Extension extension;
+	ZeroMemory(&extension);
+	extension.kind = TYPE_BASETYPE_FUNCTION;
+	extension.output = type;
+	input->extensions.Add(extension);
+
+	return type;
 }
 
-Type* GetTuple(Array<Type*> types)
+static Type* GetTuple(Array<Type*> elements)
 {
-	if (types.count == 0)
+	if (elements.count == 0)
 	{
 		return &empty_tuple;
 	}
 
-	if (types.count == 1)
+	if (elements.count == 1)
 	{
-		return types[0];
+		return elements[0];
 	}
 
-	Type* first = types[0];
+	Type* first = elements[0];
 
-	for (u32 i = 0; i < first->tuple_extensions.count; i++)
+	for (u32 i = 0; i < first->extensions.count; i++)
 	{
-		Type* type = first->tuple_extensions[i];
-		bool fail = false;
+		Type_Extension extension = first->extensions[i];
 
-		if (type->tuple.count != types.count) continue;
-
-		for (u32 j = 0; j < type->tuple.count; j++)
+		if (extension.kind == TYPE_BASETYPE_TUPLE && extension.length == elements.count)
 		{
-			if (type->tuple[j] != types[j])
+			bool fail = false;
+			for (u32 j = 1; j < extension.type->tuple.count; j++)
 			{
-				fail = true;
-				break;
+				if (extension.type->tuple[j] != elements[j])
+				{
+					fail = true;
+					break;
+				}
+			}
+
+			if (!fail)
+			{
+				return extension.type;
 			}
 		}
-
-		if (!fail)
-		{
-			return type;
-		}
 	}
 
-	Type* type = type_allocator.Allocate<Type>();
-	Type** tuple_members = type_allocator.Allocate<Type*>(types.count);
+	Type* type = StackAllocate<Type>(&type_stack);
+	Type** tuple_members = StackAllocate<Type*>(&type_stack, elements.count);
 	ZeroMemory(type);
 	type->kind = TYPE_BASETYPE_TUPLE;
 
-	u32 recursive_count = types.count;
+	u32 recursive_count = elements.count;
 
-	for (u32 i = 0; i < types.count; i++)
+	for (u32 i = 0; i < elements.count; i++)
 	{
-		tuple_members[i] = types[i];
-		type->size += types[i]->size;
+		tuple_members[i] = elements[i];
+		type->size += elements[i]->size;
 
-		if (types[i]->kind == TYPE_BASETYPE_TUPLE)
+		if (elements[i]->kind == TYPE_BASETYPE_TUPLE)
 		{
-			recursive_count += types[i]->tuple.count - 1;
+			recursive_count += elements[i]->recursive_count - 1;
 		}
 	}
 
-	type->tuple = Array(tuple_members, types.count);
+	type->tuple = Array(tuple_members, elements.count);
 	type->recursive_count = recursive_count;
-	first->tuple_extensions.Add(type);
+
+	// Print("Recursive count of % is %\n", type, type->recursive_count);
+
+	Type_Extension extension;
+	ZeroMemory(&extension);
+	extension.kind = TYPE_BASETYPE_TUPLE;
+	extension.type = type;
+	extension.length = elements.count;
+	first->extensions.Add(extension);
+
 	return type;
+}
+
+static Type* GetFixedArray(Type* base, u64 length)
+{
+	for (u32 i = 0; i < base->extensions.count; i++)
+	{
+		if (base->extensions[i].kind == TYPE_SPECIFIER_FIXED_ARRAY && base->extensions[i].length == length)
+		{
+			return base->extensions[i].type;
+		}
+	}
+
+	Type* new_type = StackAllocate<Type>(&type_stack);
+	ZeroMemory(new_type);
+	new_type->kind = TYPE_SPECIFIER_FIXED_ARRAY;
+	new_type->subtype = base;
+	new_type->length = length;
+	new_type->size = base->size * length;
+
+	Type_Extension extension;
+	ZeroMemory(&extension);
+	extension.kind = TYPE_SPECIFIER_FIXED_ARRAY;
+	extension.length = length;
+	extension.type = new_type;
+	base->extensions.Add(extension);
+
+	return new_type;
 }
 
 // () + A = A
@@ -175,7 +206,7 @@ Type* GetTuple(Array<Type*> types)
 // A + B = (A, B)
 // (A, B) + C = ((A, B), C)
 // A + (B, C) = (A, B, C)
-Type* MergeTypeRight(Type* a, Type* b)
+static Type* MergeTypeRight(Type* a, Type* b)
 {
 	if (a == &empty_tuple) return b;
 	if (b == &empty_tuple) return a;
@@ -197,30 +228,7 @@ Type* MergeTypeRight(Type* a, Type* b)
 	}
 }
 
-Type* GetFunctionType(Type* input, Type* output)
-{
-	for (u32 i = 0; i < input->function_extensions.count; i++)
-	{
-		Type* extension = input->function_extensions[i];
-		if (extension->output == output)
-		{
-			return extension;
-		}
-	}
-
-	Type* function_type = type_allocator.Allocate<Type>();
-	ZeroMemory(function_type);
-
-	function_type->kind = TYPE_BASETYPE_FUNCTION;
-	function_type->input = input;
-	function_type->output = output;
-	function_type->size = 0;
-	input->function_extensions.Add(function_type);
-
-	return function_type;
-}
-
-bool IsConvertableTo(Type* from, Type* to)
+static bool CanImplicitCast(Type* from, Type* to)
 {
 	if (from == to) return true;
 
@@ -248,7 +256,7 @@ bool IsConvertableTo(Type* from, Type* to)
 			return IsInteger(to)
 				|| IsFloat(to)
 				|| to->kind == TYPE_BASETYPE_BOOL
-				|| (to->kind == TYPE_BASETYPE_ENUM && IsConvertableTo(from, to->enumeration->underlying_type));
+				|| (to->kind == TYPE_BASETYPE_ENUM && CanImplicitCast(from, to->enumeration->underlying_type));
 
 		case TYPE_BASETYPE_FLOAT16:
 		case TYPE_BASETYPE_FLOAT32:
@@ -261,14 +269,14 @@ bool IsConvertableTo(Type* from, Type* to)
 			return false;
 
 		case TYPE_BASETYPE_ENUM:
-			return IsConvertableTo(from->enumeration->underlying_type, to);
+			return CanImplicitCast(from->enumeration->underlying_type, to);
 
 		case TYPE_BASETYPE_TUPLE:
-			if (to->kind == TYPE_BASETYPE_TUPLE && to->tuple.count != from->tuple.count)
+			if (to->kind == TYPE_BASETYPE_TUPLE && to->tuple.count == from->tuple.count)
 			{
 				for (u32 i = 0; i < to->tuple.count; i++)
 				{
-					if (!IsConvertableTo(from->tuple[i], to->tuple[i]))
+					if (!CanImplicitCast(from->tuple[i], to->tuple[i]))
 					{
 						return false;
 					}
@@ -289,7 +297,7 @@ bool IsConvertableTo(Type* from, Type* to)
 
 		case TYPE_SPECIFIER_OPTIONAL:
 			return to->kind == TYPE_BASETYPE_BOOL
-				|| IsConvertableTo(from, to->subtype);
+				|| CanImplicitCast(from, to->subtype);
 
 		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
 			return false;
@@ -297,10 +305,26 @@ bool IsConvertableTo(Type* from, Type* to)
 		case TYPE_SPECIFIER_FIXED_ARRAY:
 			return (to->kind == TYPE_SPECIFIER_FIXED_ARRAY
 				&& from->length == to->length
-				&& IsConvertableTo(from->subtype, to->subtype));
-				// || (from->length == 1 && IsConvertableTo(from->subtype, to->subtype));
+				&& CanImplicitCast(from->subtype, to->subtype));
+				// || (from->length == 1 && CanImplicitCast(from->subtype, to->subtype));
 	}
 
 	return false;
+}
+
+static bool CanExplicitCast(Type* from, Type* to)
+{
+	return CanImplicitCast(from, to);
+}
+
+static inline bool IsDataType(Type* type)
+{
+	return type != &empty_tuple && type->kind != TYPE_BASETYPE_FUNCTION;
+}
+
+static bool CanForceCast(Type* from, Type* to)
+{
+	return from == to
+		|| from->size == to->size && IsDataType(from) && IsDataType(to);
 }
 

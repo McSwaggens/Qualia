@@ -5,6 +5,8 @@
 #include "util.h"
 #include "string.h"
 
+#define StaticAssert(x) static_assert(x)
+
 struct InternalSourceLocation
 {
 	s32 line;

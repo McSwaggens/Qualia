@@ -1,6 +1,5 @@
 #pragma once
 
-#include "int.h"
 #include "string.h"
 #include "list.h"
 #include "token.h"
@@ -28,6 +27,12 @@ struct Ast_Return;
 struct Ast_Break;
 struct Ast_Attribute;
 struct StackFrame;
+
+using Ast_ControlFlow_Flags = u8;
+const Ast_ControlFlow_Flags AST_CONTAINS_RETURN  = (1<<0);
+const Ast_ControlFlow_Flags AST_CONTAINS_BREAK   = (1<<1);
+const Ast_ControlFlow_Flags AST_ALL_PATHS_RETURN = (1<<2);
+const Ast_ControlFlow_Flags AST_ALL_PATHS_BREAK  = (1<<3);
 
 void Write(OutputBuffer* buffer, Ast_Expression* expression);
 void Write(OutputBuffer* buffer, Ast_Type* type);
@@ -61,7 +66,7 @@ enum Ast_Specifier_Kind
 struct Ast_Specifier
 {
 	Ast_Specifier_Kind kind;
-	Token* token; // @Optimization: s[n].token = s[n-1].token+1
+	Token* token;
 	Ast_Expression* size_expression;
 };
 
@@ -92,7 +97,7 @@ struct Ast_BaseType
 	};
 };
 
-struct Ast_Type
+struct Ast_Type // Change to 'Ast_Type_Description'?
 {
 	Array<Ast_Specifier> specifiers;
 	Ast_BaseType basetype;
@@ -113,7 +118,7 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_TERMINAL_ENUM_MEMBER,
 	AST_EXPRESSION_TERMINAL_ARRAY_LENGTH,
 	AST_EXPRESSION_TERMINAL_ARRAY_DATA,
-	AST_EXPRESSION_FIXED_ARRAY,
+	AST_EXPRESSION_IMPLICIT_CAST,
 	AST_EXPRESSION_UNARY_BITWISE_NOT,
 	AST_EXPRESSION_UNARY_NOT,
 	AST_EXPRESSION_UNARY_MINUS,
@@ -140,12 +145,14 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_BINARY_RIGHT_SHIFT,
 	AST_EXPRESSION_BINARY_AND,
 	AST_EXPRESSION_BINARY_OR,
+	// AST_EXPRESSION_BINARY_RANGE,
 	AST_EXPRESSION_CALL,
 	AST_EXPRESSION_DOT_CALL,
-	AST_EXPRESSION_IMPLICIT_CAST,
 	AST_EXPRESSION_SUBSCRIPT,
 	AST_EXPRESSION_LAMBDA,
 	AST_EXPRESSION_TUPLE,
+	AST_EXPRESSION_DYNAMIC_ARRAY,
+	AST_EXPRESSION_FIXED_ARRAY,
 	AST_EXPRESSION_AS,
 	AST_EXPRESSION_IF_ELSE,
 };
@@ -198,6 +205,12 @@ struct Ast_Expression_Dot_Call : Ast_Expression
 	Ast_Expression_Tuple* parameters;
 };
 
+struct Ast_Expression_Dynamic_Array : Ast_Expression
+{
+	Ast_Expression* left;
+	Ast_Expression* right;
+};
+
 struct Ast_Expression_Tuple : Ast_Expression
 {
 	Array<Ast_Expression*> elements;
@@ -224,6 +237,8 @@ struct Ast_Expression_Literal : Ast_Expression
 	{
 		u8 value_byte;
 		bool value_bool;
+
+		char* value_pointer;
 
 		s8  value_int8;
 		s16 value_int16;
@@ -310,33 +325,38 @@ struct Ast_Code
 	List<Ast_Defer*> defers;
 	Ast_Scope scope;
 	u64 frame_size;
-	bool vertical_has_return;
-	bool vertical_has_break;
-	bool all_paths_return;
-	bool all_paths_break;
+	Ast_ControlFlow_Flags control_flow_flags;
+	// @FixMe: Should be using flags here not bools.
 	bool does_return;
 	bool does_break;
+	bool all_paths_return;
+	bool all_paths_break;
 	bool is_inside_loop;
 	bool has_defer_that_returns;
 };
 
 enum Ast_Statement_Kind 
 {
-	AST_STATEMENT_BRANCH_BLOCK,
-	AST_STATEMENT_DEFER,
-	AST_STATEMENT_CLAIM,
-	AST_STATEMENT_RETURN,
-	AST_STATEMENT_BREAK,
-	AST_STATEMENT_INCREMENT,
-	AST_STATEMENT_DECREMENT,
 	AST_STATEMENT_EXPRESSION,
 	AST_STATEMENT_VARIABLE_DECLARATION,
+
 	AST_STATEMENT_ASSIGNMENT,
 	AST_STATEMENT_ASSIGNMENT_ADD,
 	AST_STATEMENT_ASSIGNMENT_SUBTRACT,
 	AST_STATEMENT_ASSIGNMENT_MULTIPLY,
 	AST_STATEMENT_ASSIGNMENT_DIVIDE,
 	AST_STATEMENT_ASSIGNMENT_POWER,
+
+	AST_STATEMENT_INCREMENT,
+	AST_STATEMENT_DECREMENT,
+
+	AST_STATEMENT_RETURN,
+	AST_STATEMENT_BREAK,
+
+	AST_STATEMENT_CLAIM,
+
+	AST_STATEMENT_BRANCH_BLOCK,
+	AST_STATEMENT_DEFER,
 };
 
 enum Ast_Branch_Clause_Kind : u8
@@ -349,33 +369,67 @@ enum Ast_Branch_Clause_Kind : u8
 enum Ast_Branch_Kind : u8
 {
 	AST_BRANCH_NAKED = 0,
+
+	// if bool:
 	AST_BRANCH_IF,
+
+	// while bool:
 	AST_BRANCH_WHILE,
-	AST_BRANCH_FOR,
-	AST_BRANCH_FOR_IN,
-	AST_BRANCH_FOR_IN_WHERE,
+
+	// for int:
+	AST_BRANCH_FOR_COUNT,
+
+	// for it in []T:
+	// for it in []T where bool:
+	// for it in []T, int:
+	// for it in []T, int where bool:
+	AST_BRANCH_FOR_RANGE,
+
+	// for vardecl, bool:
+	// for vardecl, bool, int:
+	AST_BRANCH_FOR_VERBOSE,
 };
+
+using Ast_Branch_Index = u16;
+const Ast_Branch_Index AST_BRANCH_INDEX_NONE = -1;
 
 struct Ast_Branch
 {
 	Ast_Branch_Kind kind;
 	Ast_Branch_Clause_Kind clause;
-	u16 user_count;
+
 	Token* token;
 
-	Ast_VariableDeclaration* iterator;
-	Ast_Expression* range;
-	Ast_Expression* condition;
+	union
+	{
+		struct
+		{
+			Ast_VariableDeclaration* iterator;
+			Ast_Expression* range;
+			Ast_Expression* filter;
+		};
 
-	Ast_Branch* else_branch;
-	Ast_Branch* then_branch;
-	IrBlock* initial_condition_block;
+		struct
+		{
+			Ast_VariableDeclaration* variable;
+			Ast_Expression* condition;
+		};
+
+		Ast_Expression* count;
+	};
+
+	Ast_Expression* stride;
+
+	Ast_Branch_Index else_branch_index;
+	Ast_Branch_Index then_branch_index;
+
 	Ast_Code code;
 };
 
 struct Ast_BranchBlock
 {
 	Array<Ast_Branch> branches;
+	Ast_ControlFlow_Flags control_flow_flags;
 };
 
 struct Ast_Defer
@@ -390,7 +444,7 @@ struct Ast_Return
 	Token* token;
 	Ast_Expression* expression;
 	// Ast_Defer* defer;
-	// Prevent return statement if a prior defer in defer chain contains a return statement.
+	// @Todo: Prevent return statement if a prior defer in defer chain contains a return statement.
 };
 
 struct Ast_Break
@@ -417,16 +471,16 @@ struct Ast_Increment // Nudge?
 struct Ast_VariableDeclaration
 {
 	Token* name;
-	u64 offset;
-	IrValue address;
-	IrValue current_value;
-	Ast_Type* explicit_type;
 	Type* type;
+	Ast_Type* explicit_type;
 	Ast_Expression* assignment;
 	Ast_Attribute attribute;
+	IrLogicIndex stack;
+	u64 offset;
 	bool is_parameter;
 	bool is_pure;
 	bool is_global;
+	bool is_constant;
 	bool is_iterator;
 	bool can_constantly_evaluate;
 };
@@ -480,9 +534,8 @@ struct Ast_Function
 	List<Ast_Return*> returns; // @Todo: Infer return type.
 	Ast_Type* ast_return_type;
 	Ast_Attribute attribute;
-	IrFunction* ir;
+	IrFunctionInfoIndex ir_index;
 	bool is_pure;
-	bool does_have_return_type_appendage; // Why is this here again? Just use ast_return_type != null?
 	bool is_global;
 	// @Todo: Implement 'inline' keyword.
 };
@@ -530,20 +583,15 @@ struct Ast_Enum
 	Ast_Attribute attribute;
 };
 
-struct Ast_Root
+struct Ast_Module
 {
-	Array<Ast_Import> imports;
-	Ast_Scope scope;
-};
-
-struct Parse_Info
-{
-	Stack_Allocator stack;
+	Stack stack;
 	List<Token> tokens;
 	List<Span<char>> lines;
 	Span<char> code;
-	Ast_Root* ast_root;
 	String file_path;
+	Array<Ast_Import> imports;
+	Ast_Scope scope;
 };
 
 struct MemoryBlock
@@ -562,10 +610,10 @@ struct Interpreter
 
 extern Array<Intrinsic_Function> intrinsic_functions;
 
-void LexicalParse(String file_path, Parse_Info* info);
-void InitIntrinsicFunctions(Parse_Info* info);
-Parse_Info ParseFile(String file_path);
-void SemanticParse(Parse_Info* info);
+void LexicalParse(String file_path, Ast_Module* module);
+void InitIntrinsicFunctions(Ast_Module* module);
+Ast_Module* ParseFile(String file_path);
+void SemanticParse(Ast_Module* module);
 void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter);
 void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter);
 void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter);
@@ -576,8 +624,9 @@ void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value)
 u64 CalculateStackFrameSize(Ast_Function* function);
 u64 CalculateStackFrameSize(Ast_Code* code, u64 offset);
 MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev = null);
-Interpreter* CreateInterpreter(Parse_Info* info);
-void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Parse_Info* info);
-void ScanScope(Ast_Scope* scope, Parse_Info* info);
-void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Parse_Info* info);
-void ScanFunction(Ast_Function* function, Ast_Scope* scope, Parse_Info* info);
+Interpreter* CreateInterpreter(Ast_Module* module);
+void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* module);
+void ScanScope(Ast_Scope* scope, Ast_Module* module);
+void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Module* module);
+void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* module);
+

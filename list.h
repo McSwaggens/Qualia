@@ -17,8 +17,7 @@ struct List
 	constexpr List(Null) : data(null), count(0), capacity(0) { }
 	constexpr operator Span<T>() { return Span<T>(data, data + count); }
 	constexpr operator T*() { return data; }
-	constexpr operator const T*() const { return data; }
-	constexpr operator bool() const { return static_cast<bool>(data); }
+	constexpr operator bool() { return static_cast<bool>(data); }
 	constexpr T& operator[](u32 n) { return data[n]; }
 	constexpr T  operator[](u32 n) const { return data[n]; }
 
@@ -26,6 +25,34 @@ struct List
 	constexpr T* End() { return data + count; }
 
 	constexpr T& Last() { return data[count-1]; }
+
+	T& Force(u32 n)
+	{
+		if (capacity <= n)
+		{
+			u32 new_capacity = NextPow2(n+1);
+			ReAllocate(data, capacity, new_capacity);
+			ZeroMemory(data+count, new_capacity - capacity);
+			capacity = new_capacity;
+			count = n;
+		}
+		else if (count < n)
+		{
+			count = n;
+		}
+
+		return data[n];
+	}
+
+	T* LinearFind(T value)
+	{
+		for (u32 i = 0; i < count; i++)
+		{
+			if (Compare(data+i, value)) return data + i;
+		}
+
+		return null;
+	}
 
 	void Add(T item)
 	{
@@ -91,9 +118,9 @@ struct List
 		}
 	}
 
-	void Pop()
+	T Pop()
 	{
-		count--;
+		return data[--count];
 	}
 
 	void Remove(T item)
@@ -188,7 +215,6 @@ static inline List<T> CopyList(List<T> src, u32 padding = 0)
 	return list;
 }
 
-
 template<typename T>
 static inline void AppendList(List<T>& target, const List<T> other)
 {
@@ -203,21 +229,14 @@ static inline void AppendList(List<T>& target, const List<T> other)
 }
 
 template<typename T>
-static inline void Free(List<T> list)
+static inline void FreeList(List<T> list)
 {
 	DeAllocate(list.data, list.capacity);
 }
 
 template<typename T>
-static constexpr T* begin(List<T> list)
+static inline void Free(List<T> list)
 {
-	return list.data;
+	FreeList(list);
 }
-
-template<typename T>
-static constexpr T* end(List<T> list)
-{
-	return list.data + list.count;
-}
-
 

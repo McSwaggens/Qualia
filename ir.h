@@ -5,185 +5,207 @@
 #include "list.h"
 
 struct Ast_Function;
-struct Ast_Code;
-struct Ast_VariableDeclaration;
-struct Ast_Root;
+struct Ast_Module;
 
-struct IrBlock;
-struct IrInstruction;
-struct IrFunction;
-struct IrGlobal;
-
-enum IrValue_Kind : u8
+enum IrLogicKind  : u8
 {
-	IR_VALUE_NONE = 0,
-	IR_VALUE_INSTRUCTION,
-	IR_VALUE_TUPLE,
-	IR_VALUE_CONSTANT,
-	IR_VALUE_FUNCTION,
-	IR_VALUE_LARGE_CONSTANT,
-	IR_VALUE_GLOBAL,
-	IR_VALUE_BLOCK,
+	LOGOS_NOP = 0,
+
+	LOGOS_CONSTANT,
+	LOGOS_BLOCK,
+	LOGOS_FUNCTION,
+
+	LOGOS_STACK,
+	LOGOS_PARAMETER,
+	LOGOS_MEMBER,
+	LOGOS_INDEX,
+
+	LOGOS_PHI,
+	LOGOS_SELECT,
+
+	LOGOS_BRANCH,
+	LOGOS_JUMP,
+	LOGOS_RETURN,
+
+	LOGOS_CALL,
+	LOGOS_COPY,
+	LOGOS_LOAD,
+	LOGOS_STORE,
+
+	LOGOS_ADD,
+	LOGOS_SUBTRACT,
+	LOGOS_MULTIPLY,
+	LOGOS_DIVIDE,
+	LOGOS_MODULO,
+	LOGOS_EXPONENTIAL,
+
+	LOGOS_BITWISE_OR,
+	LOGOS_BITWISE_AND,
+	LOGOS_BITWISE_XOR,
+	LOGOS_BITWISE_LEFT_SHIFT,
+	LOGOS_BITWISE_RIGHT_SHIFT,
+
+	LOGOS_BITWISE_NOT,
+	LOGOS_NOT,
+	LOGOS_POSITIVE,
+
+	LOGOS_SIGN_EXTEND,
+	LOGOS_ZERO_EXTEND,
+
+	LOGOS_NARROW,
+
+	LOGOS_INT_TO_FLOAT,
+	LOGOS_FLOAT_TO_INT,
+
+	LOGOS_FLOAT_CONVERT,
+
+	LOGOS_COMPARE_EQUAL,
+	LOGOS_COMPARE_NOT_EQUAL,
+
+	LOGOS_SIGNED_COMPARE_LESS,
+	LOGOS_SIGNED_COMPARE_LESS_OR_EQUAL,
+	LOGOS_SIGNED_COMPARE_GREATER,
+	LOGOS_SIGNED_COMPARE_GREATER_OR_EQUAL,
+
+	LOGOS_UNSIGNED_COMPARE_LESS,
+	LOGOS_UNSIGNED_COMPARE_LESS_OR_EQUAL,
+	LOGOS_UNSIGNED_COMPARE_GREATER,
+	LOGOS_UNSIGNED_COMPARE_GREATER_OR_EQUAL,
+
+	LOGOS_FLOAT_COMPARE_LESS,
+	LOGOS_FLOAT_COMPARE_LESS_OR_EQUAL,
+	LOGOS_FLOAT_COMPARE_GREATER,
+	LOGOS_FLOAT_COMPARE_GREATER_OR_EQUAL,
+
+	LOGOS_AND,
+	LOGOS_OR,
 };
 
-struct IrValue
+String ToString(IrLogicKind  opcode)
 {
-	IrValue_Kind kind;
-	Type* type;
+	switch (opcode)
+	{
+		case LOGOS_NOP:                      return "nop";
+		case LOGOS_CONSTANT:                 return "constant";
+		case LOGOS_BLOCK:                    return "block";
+		case LOGOS_FUNCTION:                 return "function";
+		case LOGOS_PHI:                      return "phi";
+		case LOGOS_STACK:                    return "stack";
+		case LOGOS_PARAMETER:                return "param";
+		case LOGOS_MEMBER:                   return "member";
+		case LOGOS_INDEX:                    return "index";
+		case LOGOS_SELECT:                   return "select";
+		case LOGOS_LOAD:                     return "load";
+		case LOGOS_STORE:                    return "store";
+		case LOGOS_COPY:                     return "copy";
+		case LOGOS_CALL:                     return "call";
+		case LOGOS_BRANCH:                   return "branch";
+		case LOGOS_JUMP:                     return "jump";
+		case LOGOS_RETURN:                   return "return";
+		case LOGOS_ADD:                      return "add";
+		case LOGOS_SUBTRACT:                 return "subtract";
+		case LOGOS_MULTIPLY:                 return "multiply";
+		case LOGOS_DIVIDE:                   return "divide";
+		case LOGOS_MODULO:                   return "modulo";
+		case LOGOS_EXPONENTIAL:              return "exponential";
+		case LOGOS_NOT:                      return "not";
+		case LOGOS_POSITIVE:                 return "pos";
+		case LOGOS_SIGN_EXTEND:              return "sign_extend";
+		case LOGOS_ZERO_EXTEND:              return "zero_extend";
+		case LOGOS_NARROW:                   return "narrow";
+		case LOGOS_INT_TO_FLOAT:             return "to_float";
+		case LOGOS_FLOAT_TO_INT:             return "to_int";
+		case LOGOS_FLOAT_CONVERT:            return "float_convert";
+		case LOGOS_BITWISE_NOT:              return "NOT";
+		case LOGOS_BITWISE_OR:               return "OR";
+		case LOGOS_BITWISE_AND:              return "AND";
+		case LOGOS_BITWISE_XOR:              return "XOR";
+		case LOGOS_BITWISE_LEFT_SHIFT:       return "left_shift";
+		case LOGOS_BITWISE_RIGHT_SHIFT:      return "right_shift";
+		case LOGOS_COMPARE_EQUAL:                     return "compare_equal";
+		case LOGOS_COMPARE_NOT_EQUAL:                 return "compare_not_equal";
+		case LOGOS_SIGNED_COMPARE_LESS:               return "signed_compare_less";
+		case LOGOS_SIGNED_COMPARE_LESS_OR_EQUAL:      return "signed_compare_less_or_equal";
+		case LOGOS_SIGNED_COMPARE_GREATER:            return "signed_compare_greater";
+		case LOGOS_SIGNED_COMPARE_GREATER_OR_EQUAL:   return "signed_compare_greater_or_equal";
+		case LOGOS_UNSIGNED_COMPARE_LESS:             return "unsigned_compare_less";
+		case LOGOS_UNSIGNED_COMPARE_LESS_OR_EQUAL:    return "unsigned_compare_less_or_equal";
+		case LOGOS_UNSIGNED_COMPARE_GREATER:          return "unsigned_compare_greater";
+		case LOGOS_UNSIGNED_COMPARE_GREATER_OR_EQUAL: return "unsigned_compare_greater_or_equal";
+		case LOGOS_FLOAT_COMPARE_LESS:                return "float_compare_less";
+		case LOGOS_FLOAT_COMPARE_LESS_OR_EQUAL:       return "float_compare_less_or_equal";
+		case LOGOS_FLOAT_COMPARE_GREATER:             return "float_compare_greater";
+		case LOGOS_FLOAT_COMPARE_GREATER_OR_EQUAL:    return "float_compare_greater_or_equal";
+		case LOGOS_AND:                      return "and";
+		case LOGOS_OR:                       return "or";
+	}
+}
+
+using IrIndex = u16;
+
+using IrLogicIndex        = IrIndex;
+using IrBlockInfoIndex    = IrIndex;
+using IrFunctionInfoIndex = IrIndex;
+
+const IrIndex IR_NONE = -1;
+
+struct IrBlockInfo
+{
+	List<IrLogicIndex> logic;
+	IrLogicIndex branch;
+	IrLogicIndex representation;
+	IrBlockInfoIndex next;
+};
+
+struct IrLogic
+{
+	IrLogicKind kind;
 
 	union
 	{
-		IrInstruction* instruction;
-		IrBlock* block;
-		IrFunction* function;
-		Array<IrValue> tuple; // @Todo: Reduce size by getting the size of the tuple from type?
-
-		char data[8];
-
-		bool value_bool;
-
-		u64 value_pointer;
-
-		u8  value_byte;
-
-		u8  value_uint8;
-		u16 value_uint16;
-		u32 value_uint32;
-		u64 value_uint64;
-
-		s8  value_int8;
-		s16 value_int16;
-		s32 value_int32;
-		s64 value_int64;
-
-		f32 value_float32;
-		f64 value_float64;
+		IrBlockInfoIndex block;
+		IrLogicIndex next_logic;
 	};
-};
 
-enum IrInstruction_Kind : u8
-{
-	IR_INSTRUCTION_NOP = 0,
-
-	IR_INSTRUCTION_STACK_ALLOCATE,
-	IR_INSTRUCTION_PARAMETER,
-	IR_INSTRUCTION_MEMBER,
-	IR_INSTRUCTION_ELEMENT,
-
-	IR_INSTRUCTION_PHI,
-	IR_INSTRUCTION_SELECT,
-
-	IR_INSTRUCTION_BRANCH,
-	IR_INSTRUCTION_JUMP,
-	IR_INSTRUCTION_RETURN,
-
-	IR_INSTRUCTION_CALL,
-	IR_INSTRUCTION_COPY,
-	IR_INSTRUCTION_LOAD,
-	IR_INSTRUCTION_STORE,
-
-	IR_INSTRUCTION_ADD,
-	IR_INSTRUCTION_SUBTRACT,
-	IR_INSTRUCTION_MULTIPLY,
-	IR_INSTRUCTION_DIVIDE,
-	IR_INSTRUCTION_MODULO,
-	IR_INSTRUCTION_EXPONENTIAL,
-
-	IR_INSTRUCTION_BITWISE_OR,
-	IR_INSTRUCTION_BITWISE_AND,
-	IR_INSTRUCTION_BITWISE_XOR,
-	IR_INSTRUCTION_BITWISE_LEFT_SHIFT,
-	IR_INSTRUCTION_BITWISE_RIGHT_SHIFT,
-
-	IR_INSTRUCTION_BITWISE_NOT,
-	IR_INSTRUCTION_NOT,
-	IR_INSTRUCTION_POSITIVE,
-
-	IR_INSTRUCTION_SIGN_EXTEND,
-	IR_INSTRUCTION_ZERO_EXTEND,
-
-	IR_INSTRUCTION_NARROW,
-
-	IR_INSTRUCTION_INT_TO_FLOAT,
-	IR_INSTRUCTION_FLOAT_TO_INT,
-
-	IR_INSTRUCTION_FLOAT_CONVERT,
-
-	IR_INSTRUCTION_COMPARE_EQUAL,
-	IR_INSTRUCTION_COMPARE_NOT_EQUAL,
-	IR_INSTRUCTION_COMPARE_LESS,
-	IR_INSTRUCTION_COMPARE_LESS_OR_EQUAL,
-	IR_INSTRUCTION_COMPARE_GREATER,
-	IR_INSTRUCTION_COMPARE_GREATER_OR_EQUAL,
-
-	IR_INSTRUCTION_AND,
-	IR_INSTRUCTION_OR,
-};
-
-struct IrPhi
-{
-	IrBlock* block;
-	IrValue value;
-};
-
-struct IrInstruction
-{
-	IrInstruction_Kind kind;
-	u16 id;
 	Type* type;
-	List<IrInstruction*> users;
+	IrIndex operands[3];
+	List<IrLogicIndex> users;
 
 	union
 	{
-		IrInstruction* next;
-		List<IrPhi> phis;
+		bool constant_bool;
 
-		struct
-		{
-			IrValue a;
-			IrValue b;
-			IrValue c;
-		};
+		s8  constant_int8;
+		s16 constant_int16;
+		s32 constant_int32;
+		s64 constant_int64;
+
+		f32 constant_float32;
+		f64 constant_float64;
 	};
 };
 
-#define IR_INSTRUCTION_BUCKET_COUNT 64
-
-struct IrInstruction_Bucket
+struct IrFunctionInfo
 {
-	IrInstruction instructions[IR_INSTRUCTION_BUCKET_COUNT];
-};
-
-struct IrBlock
-{
-	u16 id;
-	IrFunction* function;
-	List<IrInstruction_Bucket*> buckets;
-	IrInstruction* head;
-	IrInstruction* control;
-	List<IrInstruction*> users;
-};
-
-struct IrGlobal
-{
-	u16 id;
-};
-
-struct IrFunction
-{
-	u16 register_id_counter;
-	u16 block_id_counter;
+	IrFunctionInfoIndex id;
+	IrBlockInfoIndex free_block;
+	IrLogicIndex free_logic;
 	Ast_Function* function;
-	List<IrBlock*> blocks;
-	List<IrInstruction*> users;
+	List<IrBlockInfo> blocks;
+	List<IrLogicIndex> constants; // @Todo: Store constants in array for quick search.
+	List<IrLogic> logic;
+
+	IrLogicIndex bool_cache[2];    // false, true
+	IrLogicIndex int_cache[3];     // -1, 0, 1
+	IrLogicIndex float32_cache[3]; // -1f, 0f, 1f
+	IrLogicIndex float64_cache[3]; // -1f, 0f, 1f
 };
 
-void Write(OutputBuffer* buffer, IrInstruction instruction);
-void Write(OutputBuffer* buffer, IrInstruction_Kind kind); // Can't put this in print.h because C++ is a terrible language.
-void Write(OutputBuffer* buffer, IrBlock* block);
-void Write(OutputBuffer* buffer, IrFunction* function);
-void Write(OutputBuffer* buffer, List<IrBlock*> blocks);
-void Write(OutputBuffer* buffer, List<IrBlock> blocks);
+static IrBlockInfo* GetBlockInfo(IrLogicIndex block, IrFunctionInfo* function)
+{
+	return &function->blocks[function->logic[block].block];
+}
 
-void ConvertToIR(Ast_Root* root);
+void Write(OutputBuffer* buffer, IrIndex id);
+void GenerateIR(Ast_Module* module);
 

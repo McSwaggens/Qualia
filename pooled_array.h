@@ -8,47 +8,49 @@
 #define POOL_SIZE 1024
 #define BUCKET_SIZE (4096 * 1024)
 
-struct Pool_Allocation
+struct Array_Buffer_Entry
 {
 	void* data;
 	u64 size;
 };
 
-Pool_Allocation ExpandArray(char* p, u64 size);
-void ReleaseArray(char* p, u64 free_size);
-void InitArrayPool();
+static Array_Buffer_Entry GetArrayBufferEntry(u64 current_size);
+static void ReleaseArrayBuffer(void* data, u64 size);
+static void InitArrayBufferPool();
 
 template<typename T>
-struct Pooled_Array
+struct Array_Buffer
 {
 	T* data;
+	u64 count;
+	u64 capacity;
 	u64 size;
-	u32 count;
-	u32 cap;
 
 	void Add(T value)
 	{
-		if (count >= cap)
+		if (count+1 >= capacity) COLD
 		{
-			Pool_Allocation alloc = ExpandArray((char*)data, size);
-			data = (T*)alloc.data;
-			size = alloc.size;
-			cap = size / sizeof(T);
+			Array_Buffer_Entry entry = GetArrayBufferEntry(size);
+
+			if (count) COLD
+			{
+				CopyMemory(data, (T*)entry.data, count);
+				ReleaseArrayBuffer(data, size);
+			}
+
+			data = (T*)entry.data;
+			size = entry.size;
+			capacity = size / sizeof(T);
 		}
 
 		data[count++] = value;
-	}
-
-	bool IsEmpty()
-	{
-		return !count;
 	}
 
 	Array<T> Lock()
 	{
 		if (data)
 		{
-			ReleaseArray((char*)(data + count), size - count * sizeof(T));
+			ReleaseArrayBuffer(data + count, size - count * sizeof(T));
 		}
 
 		return Array(data, count);
@@ -56,7 +58,7 @@ struct Pooled_Array
 
 	void Release()
 	{
-		ReleaseArray((char*)data, size);
+		ReleaseArrayBuffer((void*)data, size);
 	}
 
 	void Reset()
@@ -66,12 +68,12 @@ struct Pooled_Array
 };
 
 template<typename T>
-Pooled_Array<T> NewPooledArray()
+Array_Buffer<T> CreateArrayBuffer()
 {
-	Pooled_Array<T> result;
+	Array_Buffer<T> result;
 	result.data = null;
 	result.count = 0;
-	result.cap = 0;
+	result.capacity = 0;
 	result.size = 0;
 	return result;
 }

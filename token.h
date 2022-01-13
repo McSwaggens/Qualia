@@ -6,7 +6,7 @@
 #include "span.h"
 
 
-enum Token_Kind
+enum Token_Kind : u8
 {
 	TOKEN_EOF = 0,
 	TOKEN_IDENTIFIER_FORMAL,
@@ -237,35 +237,34 @@ struct IntegerInfo
 	u64 value;
 };
 
-
 struct FloatInfo
 {
 	u16 explicit_bytes;
 	f64 value;
 };
 
-
-union TokenInfo
-{
-	Span<char> span;
-	String string;
-	IntegerInfo integer;
-	FloatInfo floating_point;
-	u64 next;
-};
-
-
 struct Token
 {
+	// SOA tokens?
+
 	Token_Kind kind;
-	TokenInfo info;
-	SourceLocation location;
-	u8 indent;
+	u16 indent;
 	bool newline;
 
-	constexpr Token* GetClosure()
+	union
 	{
-		return this + info.next;
+		Span<char> span;
+		String string;
+		IntegerInfo integer;
+		FloatInfo floating_point;
+		u64 next;
+	};
+
+	SourceLocation location;
+
+	Token* GetClosure()
+	{
+		return this + next;
 	}
 };
 
@@ -274,5 +273,4 @@ void Write(struct OutputBuffer* buffer, SourceLocation location);
 void Write(struct OutputBuffer* buffer, Token_Kind kind);
 void Write(struct OutputBuffer* buffer, Token& token);
 void Write(struct OutputBuffer* buffer, Token* token);
-
 

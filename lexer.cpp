@@ -7,21 +7,21 @@
 #include "span.h"
 #include "string.h"
 
-void LexicalParse(String file_path, Parse_Info* info)
+void LexicalParse(Ast_Module* module)
 {
-	Span<char> code = LoadFile(file_path, 16);
+	Span<char> code = LoadFile(module->file_path, 16);
 	char* cursor = code;
-	List<Token> tokens = CreateList<Token>(1024);
+	List<Token> tokens = CreateList<Token>(4096);
 	List<Span<char>> lines = CreateList<Span<char>>(1024);
-	u32 line = 0;
-	u32 indent = 0;
-	u32 prev_region_index = -1;
+	u64 line = 0;
+	u64 indent = 0;
+	u64 prev_region_index = -1;
 	char* line_start = code;
 
 	while (cursor < code.end)
 	{
-		u32 old_line = line;
-		u32 old_indent = indent;
+		u64 old_line = line;
+		u64 old_indent = indent;
 
 		while (IsWhiteSpace(*cursor) || *cursor == '\n' || *cursor == '\r' || (cursor[0] == '/' && cursor[1] == '/'))
 		{
@@ -122,7 +122,7 @@ void LexicalParse(String file_path, Parse_Info* info)
 					token.kind = TOKEN_IDENTIFIER_CASUAL;
 				}
 
-				token.info.string = String(start, size);
+				token.string = String(start, size);
 			}
 		}
 		else if (IsDigit(cursor[0]) || (cursor[0] == '.' && IsDigit(cursor[1])))
@@ -245,8 +245,8 @@ void LexicalParse(String file_path, Parse_Info* info)
 			if (is_float)
 			{
 				token.kind = TOKEN_FLOAT_LITERAL;
-				token.info.floating_point.value = float_value;
-				token.info.floating_point.explicit_bytes = 0;
+				token.floating_point.value = float_value;
+				token.floating_point.explicit_bytes = 0;
 
 				if (cursor[0] == 'f')
 				{
@@ -255,21 +255,21 @@ void LexicalParse(String file_path, Parse_Info* info)
 					if (cursor[0] == '1' && cursor[1] == '6')
 					{
 						cursor += 2;
-						token.info.floating_point.explicit_bytes = 2;
+						token.floating_point.explicit_bytes = 2;
 						Print("16bit floats aren't implemented.\n");
 						Fail();
 					}
 					else if (cursor[0] == '3' && cursor[1] == '2')
 					{
 						cursor += 2;
-						token.info.floating_point.explicit_bytes = 4;
-						token.info.floating_point.value = (f32)token.info.floating_point.value;
+						token.floating_point.explicit_bytes = 4;
+						token.floating_point.value = (f32)token.floating_point.value;
 					}
 					else if (cursor[0] == '6' && cursor[1] == '4')
 					{
 						cursor += 2;
-						token.info.floating_point.explicit_bytes = 8;
-						token.info.floating_point.value = (f64)token.info.floating_point.value;
+						token.floating_point.explicit_bytes = 8;
+						token.floating_point.value = (f64)token.floating_point.value;
 					}
 
 					// @Todo: Check if the value actually fits inside the explicit type.
@@ -284,16 +284,16 @@ void LexicalParse(String file_path, Parse_Info* info)
 			else
 			{
 				token.kind = TOKEN_INTEGER_LITERAL;
-				token.info.integer.value = value;
-				token.info.integer.is_unsigned = false;
+				token.integer.value = value;
+				token.integer.is_unsigned = false;
 
-				s32 min_bytes = value <= u8_max ? 1 : value <= u16_max ? 2 : value <= u32_max ? 4 : 8;
+				s32 min_bytes = value <= U8_MAX ? 1 : value <= U16_MAX ? 2 : value <= U32_MAX ? 4 : 8;
 
 				s32 explicit_bytes = 0;
 				if (cursor[0] == 'u' || cursor[0] == 's')
 				{
 					char* end_of_digits = cursor;
-					token.info.integer.is_unsigned = *cursor++ == 'u';
+					token.integer.is_unsigned = *cursor++ == 'u';
 
 					if (cursor[0] == '8')
 					{
@@ -334,7 +334,7 @@ void LexicalParse(String file_path, Parse_Info* info)
 					Fail();
 				}
 
-				token.info.integer.explicit_bytes = explicit_bytes;
+				token.integer.explicit_bytes = explicit_bytes;
 			}
 
 			if (IsLetter(*cursor) || IsDigit(*cursor) || *cursor == '_')
@@ -348,7 +348,7 @@ void LexicalParse(String file_path, Parse_Info* info)
 			token.kind = TOKEN_STRING_LITERAL;
 
 			char* start = ++cursor;
-			u32 escapes = 0;
+			u64 escapes = 0;
 
 			for (; cursor <= code.end && *cursor != '"'; cursor++)
 			{
@@ -375,11 +375,11 @@ void LexicalParse(String file_path, Parse_Info* info)
 
 			if (escapes)
 			{
-				u32 length = end - start - escapes;
-				token.info.string = String(info->stack.Allocate<char>(length), length);
+				u64 length = end - start - escapes;
+				token.string = String(StackAllocate<char>(&module->stack, length), length);
 
 				char* c = start;
-				char* s = token.info.string.data;
+				char* s = token.string.data;
 
 				while (c < end)
 				{
@@ -417,28 +417,28 @@ void LexicalParse(String file_path, Parse_Info* info)
 			}
 			else
 			{
-				token.info.string = String(start, end - start);
+				token.string = String(start, end - start);
 			}
 		}
 		else if (*cursor == '(')
 		{
 			cursor += 1;
 			token.kind = TOKEN_OPEN_PAREN;
-			token.info.next = prev_region_index;
+			token.next = prev_region_index;
 			prev_region_index = tokens.count;
 		}
 		else if (*cursor == '{')
 		{
 			cursor += 1;
 			token.kind = TOKEN_OPEN_BRACE;
-			token.info.next = prev_region_index;
+			token.next = prev_region_index;
 			prev_region_index = tokens.count;
 		}
 		else if (*cursor == '[')
 		{
 			cursor += 1;
 			token.kind = TOKEN_OPEN_BRACKET;
-			token.info.next = prev_region_index;
+			token.next = prev_region_index;
 			prev_region_index = tokens.count;
 		}
 		else if (*cursor == ')')
@@ -448,20 +448,20 @@ void LexicalParse(String file_path, Parse_Info* info)
 
 			if (prev_region_index == -1)
 			{
-				Print("%:%: error: Unmatched closing parenthesis %\n", file_path, token.location, token);
+				Print("%:%: error: Unmatched closing parenthesis %\n", module->file_path, token.location, token);
 				Fail();
 			}
 
-			Token& open = tokens[prev_region_index];
-			if (open.kind != TOKEN_OPEN_PAREN)
+			Token* open = &tokens[prev_region_index];
+			if (open->kind != TOKEN_OPEN_PAREN)
 			{
-				Print("%:%: error: Missmatch between % and %\n", file_path, token.location, open, token);
+				Print("%:%: error: Missmatch between % and %\n", module->file_path, token.location, open, token);
 				Fail();
 			}
 
 			u64 offset = tokens.count - prev_region_index;
-			prev_region_index = open.info.next;
-			open.info.next = offset;
+			prev_region_index = open->next;
+			open->next = offset;
 		}
 		else if (*cursor == '}')
 		{
@@ -470,20 +470,20 @@ void LexicalParse(String file_path, Parse_Info* info)
 
 			if (prev_region_index == -1)
 			{
-				Print("%:%: error: Unmatched closing brace: %\n", file_path, token.location, token);
+				Print("%:%: error: Unmatched closing brace: %\n", module->file_path, token.location, token);
 				Fail();
 			}
 
-			Token& open = tokens[prev_region_index];
-			if (open.kind != TOKEN_OPEN_BRACE)
+			Token* open = &tokens[prev_region_index];
+			if (open->kind != TOKEN_OPEN_BRACE)
 			{
-				Print("%:%: error: Missmatch between % and %\n", file_path, token.location, open, token);
+				Print("%:%: error: Missmatch between % and %\n", module->file_path, token.location, open, token);
 				Fail();
 			}
 
 			u64 offset = tokens.count - prev_region_index;
-			prev_region_index = open.info.next;
-			open.info.next = offset;
+			prev_region_index = open->next;
+			open->next = offset;
 		}
 		else if (*cursor == ']')
 		{
@@ -492,20 +492,20 @@ void LexicalParse(String file_path, Parse_Info* info)
 
 			if (prev_region_index == -1)
 			{
-				Print("%:%: error: Unmatched closing bracket %\n", file_path, token.location, token);
+				Print("%:%: error: Unmatched closing bracket %\n", module->file_path, token.location, token);
 				Fail();
 			}
 
-			Token& open = tokens[prev_region_index];
-			if (open.kind != TOKEN_OPEN_BRACKET)
+			Token* open = &tokens[prev_region_index];
+			if (open->kind != TOKEN_OPEN_BRACKET)
 			{
-				Print("%:%: error: Missmatch between % and %\n", file_path, token.location, open, token);
+				Print("%:%: error: Missmatch between % and %\n", module->file_path, token.location, open, token);
 				Fail();
 			}
 
 			u64 offset = tokens.count - prev_region_index;
-			prev_region_index = open.info.next;
-			open.info.next = offset;
+			prev_region_index = open->next;
+			open->next = offset;
 		}
 		else if (*cursor == '=' && cursor[1] == '>') cursor += 2, token.kind = TOKEN_FAT_ARROW;
 		else if (*cursor == '!' && cursor[1] == '=') cursor += 2, token.kind = TOKEN_NOT_EQUAL;
@@ -553,10 +553,11 @@ void LexicalParse(String file_path, Parse_Info* info)
 		tokens.Add(token);
 	}
 
+	lines.Add(Span(line_start, cursor));
+
 	Token token;
 	token.kind = TOKEN_EOF;
 	token.location.line = line;
-	// token.location.offset = cursor - line_start;
 	token.location.offset = 0;
 	token.indent = 0;
 	token.newline = true;
@@ -567,16 +568,15 @@ void LexicalParse(String file_path, Parse_Info* info)
 	{
 		while (prev_region_index != -1)
 		{
-			Token& token = tokens[prev_region_index];
-			Print("%:%: error: % not closed.\n", file_path, token.location, token);
-			prev_region_index = token.info.next;
+			Token* token = &tokens[prev_region_index];
+			Print("%:%: error: % not closed.\n", module->file_path, token->location, token);
+			prev_region_index = token->next;
 		}
 
 		Fail();
 	}
 
-	info->file_path = file_path;
-	info->tokens = tokens;
-	info->code = code;
-	info->lines = lines;
+	module->tokens = tokens;
+	module->code = code;
+	module->lines = lines;
 }

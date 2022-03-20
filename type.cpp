@@ -1,11 +1,9 @@
 #include "type.h"
-#include "parser.h"
 #include "memory.h"
-#include "assert.h"
 
 // @Fixme @Threading: The entire type system is written as implied single thread, needs to be fixed.
 
-static consteval Type NewPrimitiveType(Type_Kind kind, u64 size)
+static consteval Type NewPrimitiveType(Type_Kind kind, uint64 size)
 {
 	Type type;
 	type.kind = kind;
@@ -35,7 +33,7 @@ static Stack type_stack;
 
 static void InitTypeSystem()
 {
-	type_stack = CreateStack();
+	type_stack = CreateStack(1 << 21);
 }
 
 static void InitSpecifiers(Type* type)
@@ -78,7 +76,7 @@ static Type* GetDynamicArray(Type* type)
 
 static Type* GetFunctionType(Type* input, Type* output)
 {
-	for (u32 i = 0; i < input->extensions.count; i++)
+	for (uint32 i = 0; i < input->extensions.count; i++)
 	{
 		Type_Extension extension = input->extensions[i];
 		if (extension.output == output && extension.kind == TYPE_BASETYPE_FUNCTION) // @Optimization: Bundle the output type with the pointer, this is cache-miss-city.
@@ -118,14 +116,14 @@ static Type* GetTuple(Array<Type*> elements)
 
 	Type* first = elements[0];
 
-	for (u32 i = 0; i < first->extensions.count; i++)
+	for (uint32 i = 0; i < first->extensions.count; i++)
 	{
 		Type_Extension extension = first->extensions[i];
 
 		if (extension.kind == TYPE_BASETYPE_TUPLE && extension.length == elements.count)
 		{
 			bool fail = false;
-			for (u32 j = 1; j < extension.type->tuple.count; j++)
+			for (uint32 j = 1; j < extension.type->tuple.count; j++)
 			{
 				if (extension.type->tuple[j] != elements[j])
 				{
@@ -146,9 +144,9 @@ static Type* GetTuple(Array<Type*> elements)
 	ZeroMemory(type);
 	type->kind = TYPE_BASETYPE_TUPLE;
 
-	u32 recursive_count = elements.count;
+	uint32 recursive_count = elements.count;
 
-	for (u32 i = 0; i < elements.count; i++)
+	for (uint32 i = 0; i < elements.count; i++)
 	{
 		tuple_members[i] = elements[i];
 		type->size += elements[i]->size;
@@ -174,9 +172,9 @@ static Type* GetTuple(Array<Type*> elements)
 	return type;
 }
 
-static Type* GetFixedArray(Type* base, u64 length)
+static Type* GetFixedArray(Type* base, uint64 length)
 {
-	for (u32 i = 0; i < base->extensions.count; i++)
+	for (uint32 i = 0; i < base->extensions.count; i++)
 	{
 		if (base->extensions[i].kind == TYPE_SPECIFIER_FIXED_ARRAY && base->extensions[i].length == length)
 		{
@@ -208,34 +206,36 @@ static Type* GetFixedArray(Type* base, u64 length)
 // A + (B, C) = (A, B, C)
 static Type* MergeTypeRight(Type* a, Type* b)
 {
-	if (a == &empty_tuple) return b;
-	if (b == &empty_tuple) return a;
+	if (a == &empty_tuple) COLD
+		return b;
 
-	if (b->kind == TYPE_BASETYPE_TUPLE)
-	{
-		u32 count = 1 + b->tuple.count;
-		Type* types[count];
-		types[0] = a;
-		CopyMemory(types+1, b->tuple.data, b->tuple.count);
-		return GetTuple(Array(types, count));
-	}
-	else
+	if (b == &empty_tuple) COLD
+		return a;
+
+	if (b->kind != TYPE_BASETYPE_TUPLE)
 	{
 		Type* types[2];
 		types[0] = a;
 		types[1] = b;
 		return GetTuple(Array(types, 2));
 	}
+
+	uint32 count = 1 + b->tuple.count;
+	Type* types[count];
+
+	types[0] = a;
+	CopyMemory(types+1, b->tuple.elements, b->tuple.count);
+
+	return GetTuple(Array(types, count));
 }
 
 static bool CanImplicitCast(Type* from, Type* to)
 {
-	if (from == to) return true;
+	if (from == to)
+		return true;
 
 	if (IsFixedByteArray(from) || IsFixedByteArray(to) || to->kind == TYPE_BASETYPE_BYTE)
-	{
 		return from->size == to->size;
-	}
 
 	switch (from->kind)
 	{
@@ -243,8 +243,6 @@ static bool CanImplicitCast(Type* from, Type* to)
 			return to->size == 1;
 
 		case TYPE_BASETYPE_BOOL:
-			return IsInteger(to);
-
 		case TYPE_BASETYPE_UINT8:
 		case TYPE_BASETYPE_INT8:
 		case TYPE_BASETYPE_UINT16:
@@ -274,7 +272,7 @@ static bool CanImplicitCast(Type* from, Type* to)
 		case TYPE_BASETYPE_TUPLE:
 			if (to->kind == TYPE_BASETYPE_TUPLE && to->tuple.count == from->tuple.count)
 			{
-				for (u32 i = 0; i < to->tuple.count; i++)
+				for (uint32 i = 0; i < to->tuple.count; i++)
 				{
 					if (!CanImplicitCast(from->tuple[i], to->tuple[i]))
 					{
@@ -315,6 +313,48 @@ static bool CanImplicitCast(Type* from, Type* to)
 static bool CanExplicitCast(Type* from, Type* to)
 {
 	return CanImplicitCast(from, to);
+}
+
+static Type* GetDominantType(Type* a, Type* b)
+{
+	if (a == b) return a;
+
+	if (IsInteger(a) && IsInteger(b))
+	{
+		return GetOptimalInteger(a, b);
+	}
+
+	uint32 precedence_a = GetTypePrecedence(a);
+	uint32 precedence_b = GetTypePrecedence(b);
+
+	bool ab = CanImplicitCast(a, b);
+	bool ba = CanImplicitCast(b, a);
+
+	if (ab && ba) return precedence_a >= precedence_b ? a : b;
+
+	if (ab) return a;
+	if (ba) return b;
+
+	return null;
+}
+
+static Type* GetOptimalInteger(Type* a, Type* b)
+{
+	if (a == b) return a;
+
+	if (IsSignedInteger(a) != IsSignedInteger(b))
+	{
+		if (IsSignedInteger(a))
+		{
+			b = GetPrimitiveTypeFromKind(GetSignedVersionOf(b->kind));
+		}
+		else
+		{
+			a = GetPrimitiveTypeFromKind(GetSignedVersionOf(a->kind));
+		}
+	}
+
+	return a->size >= b->size ? a : b;
 }
 
 static inline bool IsDataType(Type* type)

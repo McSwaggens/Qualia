@@ -4,261 +4,347 @@
 #include "parser.h"
 #include "ir.h"
 
-void Write(OutputBuffer* buffer, u8  n)
-{
-	Write(buffer, (u64)n);
-}
+static void GenericWrite(OutputBuffer* buffer, char c) { BufferWriteByte(buffer, c); }
 
-void Write(OutputBuffer* buffer, u16 n)
-{
-	Write(buffer, (u64)n);
-}
-
-void Write(OutputBuffer* buffer, u32 n)
-{
-	Write(buffer, (u64)n);
-}
+static void GenericWrite(OutputBuffer* buffer, int8  n)  { GenericWrite(buffer, (int64)n); }
+static void GenericWrite(OutputBuffer* buffer, int16 n)  { GenericWrite(buffer, (int64)n); }
+static void GenericWrite(OutputBuffer* buffer, int32 n)  { GenericWrite(buffer, (int64)n); }
+static void GenericWrite(OutputBuffer* buffer, uint8  n) { GenericWrite(buffer, (uint64)n); }
+static void GenericWrite(OutputBuffer* buffer, uint16 n) { GenericWrite(buffer, (uint64)n); }
+static void GenericWrite(OutputBuffer* buffer, uint32 n) { GenericWrite(buffer, (uint64)n); }
+static void GenericWrite(OutputBuffer* buffer, unsigned long int n) { GenericWrite(buffer, (uint64)n); }
 
 // 3 5 10 20
-void Write(OutputBuffer* buffer, u64 n)
+// Lut for n < 256?
+static void GenericWrite(OutputBuffer* buffer, uint64 n)
 {
-	constexpr int max = 20; // ceil(log10(pow(2, sizeof(n)*8-1)))
+	const int max = 20; // ceil(log10(pow(2, sizeof(n)*8-1)))
 	char digits[max];
 	int count = 0;
+
 	do
 	{
 		digits[max - count - 1] = '0' + n % 10;
 	} while (++count < max && (n /= 10));
-	buffer->Write(digits + (max - count), count);
+
+	BufferWriteData(buffer, digits + (max - count), count);
 }
 
-void Write(OutputBuffer* buffer, s8  n)
+static void GenericWrite(OutputBuffer* buffer, int64 n)
 {
-	if (n < 0) buffer->Write('-');
-	Write(buffer, (u64)Abs(n));
+	if (n < 0) { BufferWriteByte(buffer, '-'); n = -n; }
+	GenericWrite(buffer, (uint64)n);
 }
 
-void Write(OutputBuffer* buffer, s16 n)
-{
-	if (n < 0) buffer->Write('-');
-	Write(buffer, (u64)Abs(n));
-}
+static void GenericWrite(OutputBuffer* buffer, void* p) { GenericWrite(buffer, Hex((uint64)p)); }
 
-void Write(OutputBuffer* buffer, s32 n)
+static void GenericWriteHex(OutputBuffer* buffer, uint64 n)
 {
-	if (n < 0) buffer->Write('-');
-	Write(buffer, (u64)Abs(n));
-}
+	const uint8 length_table[65] = {
+		16, 16, 16, 16,
+		15, 15, 15, 15,
+		14, 14, 14, 14,
+		13, 13, 13, 13,
+		12, 12, 12, 12,
+		11, 11, 11, 11,
+		10, 10, 10, 10,
+		9,  9,  9,  9,
+		8,  8,  8,  8,
+		7,  7,  7,  7,
+		6,  6,  6,  6,
+		5,  5,  5,  5,
+		4,  4,  4,  4,
+		3,  3,  3,  3,
+		2,  2,  2,  2,
+		1,  1,  1,  1, 1
+	};
 
-void Write(OutputBuffer* buffer, s64 n)
-{
-	if (n < 0) buffer->Write('-');
-	Write(buffer, (u64)Abs(n));
-}
+	char character_buffer[17];
 
-void Write(OutputBuffer* buffer, f32 f)
-{
-	Write(buffer, (f64)f);
-}
+	uint64 digits = length_table[CountLeadingZeroes64(n)];
+	uint64 k = digits << 2;
 
-void Write(OutputBuffer* buffer, f64 f)
-{
-	// @FixMe: This really isn't that great, but it's good enough for now.
-	Write(buffer, (s64)f);
-	Write(buffer, '.');
-	Write(buffer, (s64)Abs((f-(s64)f) * Pow(10, 9)));
-}
-
-void Write(OutputBuffer* buffer, Token_Kind kind)
-{
-	Write(buffer, ToString(kind));
-}
-
-void Write(OutputBuffer* buffer, Token& token)
-{
-	if (token.kind == TOKEN_IDENTIFIER_CASUAL || token.kind == TOKEN_IDENTIFIER_FORMAL)
+	for (uint64 i = 0; i < digits; i++)
 	{
-		Write(buffer, token.string);
+		k -= 4;
+		character_buffer[i] = "0123456789ABCDEF"[(n >> k) & 0xF];
 	}
-	else if (token.kind == TOKEN_STRING_LITERAL)
-	{
-		buffer->Write('"');
-		Write(buffer, token.span);
-		buffer->Write('"');
-	}
-	else if (token.kind == TOKEN_INTEGER_LITERAL)
-	{
-		Write(buffer, token.integer.value);
-	}
-	else if (token.kind == TOKEN_FLOAT_LITERAL)
-	{
-		Write(buffer, token.floating_point.value);
-	}
-	else
-	{
-		Write(buffer, token.kind);
-	}
+
+	character_buffer[digits] = 'h';
+	BufferWriteData(buffer, character_buffer, digits+1);
 }
 
-void Write(OutputBuffer* buffer, Token* token)
+static void GenericWriteBin(OutputBuffer* buffer, uint64 n)
 {
-	if (!token) Write(buffer, "null");
-	else Write(buffer, *token);
-}
-
-void Write(OutputBuffer* buffer, Span<Token> span)
-{
-	for (u64 i = 0; i < span.Length(); i++)
+	if (!n)
 	{
-		if (i != 0) Write(buffer, " ");
-		Write(buffer, span[i]);
-	}
-}
-
-void Write(OutputBuffer* buffer, SourceLocation loc)
-{
-	Write(buffer, loc.line + 1);
-	buffer->Write(':');
-	Write(buffer, loc.offset + 1);
-}
-
-void Write(OutputBuffer* buffer, Type* type)
-{
-	if (!type)
-	{
-		Write(buffer, "null");
+		BufferWriteString(buffer, "0b");
 		return;
 	}
 
-	// Assert(type);
+	const uint32 table[16] = {
+		0x30303030,
+		0x31303030,
+		0x30313030,
+		0x31313030,
+		0x30303130,
+		0x31303130,
+		0x30313130,
+		0x31313130,
+		0x30303031,
+		0x31303031,
+		0x30313031,
+		0x31313031,
+		0x30303131,
+		0x31303131,
+		0x30313131,
+		0x31313131,
+	};
+
+	char character_buffer[65];
+	int64 lz = CountLeadingZeroes64(n);
+
+	for (int64 i = 0; i < 16; i++)
+	{
+		((uint32*)character_buffer)[i] = table[(n >> (60-(i*4))) & 0x0f];
+	}
+
+	character_buffer[64] = 'b';
+	BufferWriteData(buffer, character_buffer+lz, 65-lz);
+}
+
+static void GenericWrite(OutputBuffer* buffer, IntFormat format)
+{
+	switch (format.base)
+	{
+		case BASE_DECIMAL: GenericWrite(buffer,    format.value); break;
+		case BASE_HEX:     GenericWriteHex(buffer, format.value); break;
+		case BASE_BINARY:  GenericWriteBin(buffer, format.value); break;
+	}
+}
+
+static void GenericWrite(OutputBuffer* buffer, String str)
+{
+	if (!str.data) COLD
+	{
+		BufferWriteString(buffer, "<null-string>");
+	}
+
+	BufferWriteData(buffer, str.data, str.length);
+}
+
+static void GenericWrite(OutputBuffer* buffer, float32 f)
+{
+	GenericWrite(buffer, (float64)f);
+}
+
+static void GenericWrite(OutputBuffer* buffer, float64 f)
+{
+	// @FixMe: This really isn't that great, but it's good enough for now.
+	GenericWrite(buffer, (int64)f);
+	BufferWriteByte(buffer, '.');
+	GenericWrite(buffer, (int64)Abs((f-(int64)f) * Pow(10, 9)));
+}
+
+static void GenericWrite(OutputBuffer* buffer, Token_Kind kind)
+{
+	GenericWrite(buffer, ToString(kind));
+}
+
+static void GenericWrite(OutputBuffer* buffer, Token* token)
+{
+	if (!token)
+	{
+		BufferWriteString(buffer, "null");
+		return;
+	}
+
+	GenericWrite(buffer, *token);
+}
+
+static void GenericWrite(OutputBuffer* buffer, Token token)
+{
+	switch (token.kind)
+	{
+		case TOKEN_IDENTIFIER_CONSTANT:
+		case TOKEN_IDENTIFIER_GENERIC:
+		case TOKEN_IDENTIFIER_CASUAL:
+		case TOKEN_IDENTIFIER_FORMAL:
+		{
+			GenericWrite(buffer, token.identifier_string);
+		} break;
+
+		case TOKEN_LITERAL_STRING:
+		{
+			BufferWriteByte(buffer, '"');
+			GenericWrite(buffer, token.literal_string);
+			BufferWriteByte(buffer, '"');
+		} break;
+
+		case TOKEN_LITERAL_INT:
+		case TOKEN_LITERAL_INT8:
+		case TOKEN_LITERAL_INT16:
+		case TOKEN_LITERAL_INT32:
+		case TOKEN_LITERAL_INT64:
+		case TOKEN_LITERAL_UINT:
+		case TOKEN_LITERAL_UINT8:
+		case TOKEN_LITERAL_UINT16:
+		case TOKEN_LITERAL_UINT32:
+		case TOKEN_LITERAL_UINT64:
+		{
+			GenericWrite(buffer, token.literal_int);
+		} break;
+
+		case TOKEN_LITERAL_FLOAT:
+		case TOKEN_LITERAL_FLOAT16:
+		case TOKEN_LITERAL_FLOAT32:
+		case TOKEN_LITERAL_FLOAT64:
+		{
+			GenericWrite(buffer, token.literal_float);
+		} break;
+
+		default:
+		{
+			GenericWrite(buffer, token.kind);
+		} break;
+	}
+}
+
+static void GenericWrite(OutputBuffer* buffer, Type* type)
+{
+	if (!type)
+	{
+		BufferWriteString(buffer, "null");
+		return;
+	}
 
 	switch (type->kind)
 	{
 		case TYPE_SPECIFIER_POINTER:
-			Write(buffer, "*");
-			Write(buffer, type->subtype);
+			BufferWriteString(buffer, "*");
+			GenericWrite(buffer, type->subtype);
 			break;
 
 		case TYPE_SPECIFIER_OPTIONAL:
-			Write(buffer, "?");
-			Write(buffer, type->subtype);
+			BufferWriteString(buffer, "?");
+			GenericWrite(buffer, type->subtype);
 			break;
 
 		case TYPE_SPECIFIER_FIXED_ARRAY:
-			Write(buffer, '[');
-			Write(buffer, type->length);
-			Write(buffer, ']');
-			Write(buffer, type->subtype);
+			BufferWriteByte(buffer, '[');
+			GenericWrite(buffer, type->length);
+			BufferWriteByte(buffer, ']');
+			GenericWrite(buffer, type->subtype);
 			break;
 
 		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
-			Write(buffer, "[]");
-			Write(buffer, type->subtype);
+			BufferWriteString(buffer, "[]");
+			GenericWrite(buffer, type->subtype);
 			break;
 
-		case TYPE_BASETYPE_BYTE:    Write(buffer, TOKEN_BYTE);    break;
-		case TYPE_BASETYPE_BOOL:    Write(buffer, TOKEN_BOOL);    break; 
-		case TYPE_BASETYPE_INT8:    Write(buffer, TOKEN_INT8);    break; 
-		case TYPE_BASETYPE_INT16:   Write(buffer, TOKEN_INT16);   break; 
-		case TYPE_BASETYPE_INT32:   Write(buffer, TOKEN_INT32);   break; 
-		case TYPE_BASETYPE_INT64:   Write(buffer, TOKEN_INT64);   break; 
-		case TYPE_BASETYPE_UINT8:   Write(buffer, TOKEN_UINT8);   break; 
-		case TYPE_BASETYPE_UINT16:  Write(buffer, TOKEN_UINT16);  break; 
-		case TYPE_BASETYPE_UINT32:  Write(buffer, TOKEN_UINT32);  break; 
-		case TYPE_BASETYPE_UINT64:  Write(buffer, TOKEN_UINT64);  break; 
-		case TYPE_BASETYPE_FLOAT16: Write(buffer, TOKEN_FLOAT16); break; 
-		case TYPE_BASETYPE_FLOAT32: Write(buffer, TOKEN_FLOAT32); break; 
-		case TYPE_BASETYPE_FLOAT64: Write(buffer, TOKEN_FLOAT64); break; 
+		case TYPE_BASETYPE_BYTE:    GenericWrite(buffer, TOKEN_BYTE);    break;
+		case TYPE_BASETYPE_BOOL:    GenericWrite(buffer, TOKEN_BOOL);    break; 
+		case TYPE_BASETYPE_INT8:    GenericWrite(buffer, TOKEN_INT8);    break; 
+		case TYPE_BASETYPE_INT16:   GenericWrite(buffer, TOKEN_INT16);   break; 
+		case TYPE_BASETYPE_INT32:   GenericWrite(buffer, TOKEN_INT32);   break; 
+		case TYPE_BASETYPE_INT64:   GenericWrite(buffer, TOKEN_INT64);   break; 
+		case TYPE_BASETYPE_UINT8:   GenericWrite(buffer, TOKEN_UINT8);   break; 
+		case TYPE_BASETYPE_UINT16:  GenericWrite(buffer, TOKEN_UINT16);  break; 
+		case TYPE_BASETYPE_UINT32:  GenericWrite(buffer, TOKEN_UINT32);  break; 
+		case TYPE_BASETYPE_UINT64:  GenericWrite(buffer, TOKEN_UINT64);  break; 
+		case TYPE_BASETYPE_FLOAT16: GenericWrite(buffer, TOKEN_FLOAT16); break; 
+		case TYPE_BASETYPE_FLOAT32: GenericWrite(buffer, TOKEN_FLOAT32); break; 
+		case TYPE_BASETYPE_FLOAT64: GenericWrite(buffer, TOKEN_FLOAT64); break; 
 
 		case TYPE_BASETYPE_FUNCTION:
-			Write(buffer, type->input);
-			Write(buffer, " -> ");
-			Write(buffer, type->output);
+			GenericWrite(buffer, type->input);
+			BufferWriteString(buffer, " -> ");
+			GenericWrite(buffer, type->output);
 			break;
 
 		case TYPE_BASETYPE_TUPLE:
-			Write(buffer, '(');
-			for (u32 i = 0; i < type->tuple.count; i++)
+			BufferWriteByte(buffer, '(');
+			for (uint32 i = 0; i < type->tuple.count; i++)
 			{
-				if (i) Write(buffer, ", ");
-				Write(buffer, type->tuple[i]);
+				if (i) BufferWriteString(buffer, ", ");
+				GenericWrite(buffer, type->tuple[i]);
 			}
-			Write(buffer, ')');
+			BufferWriteByte(buffer, ')');
 			break;
 
 		case TYPE_BASETYPE_STRUCT:
-			Write(buffer, type->structure->name);
+			GenericWrite(buffer, type->structure->name);
 			break;
 
 		case TYPE_BASETYPE_ENUM:
-			Write(buffer, type->enumeration->name);
+			GenericWrite(buffer, type->enumeration->name);
 			break;
 
 	}
 }
 
-void Write(OutputBuffer* buffer, Ast_Type* type)
+static void GenericWrite(OutputBuffer* buffer, Ast_Type& type)
+{
+	GenericWrite(buffer, &type);
+}
+
+static void GenericWrite(OutputBuffer* buffer, Ast_Type* type)
 {
 	if (!type)
 	{
-		Write(buffer, "null");
+		BufferWriteString(buffer, "null");
 		return;
 	}
 
-	Write(buffer, *type);
-}
-
-void Write(OutputBuffer* buffer, Ast_Type type)
-{
-	for (Ast_Specifier* specifier = type.specifiers; specifier < type.specifiers.End(); specifier++)
+	for (Ast_Specifier* specifier = type->specifiers; specifier < type->specifiers.End(); specifier++)
 	{
 		switch (specifier->kind)
 		{
-			case AST_SPECIFIER_POINTER:   Write(buffer, "*"); break;
-			case AST_SPECIFIER_OPTIONAL:  Write(buffer, "?"); break;
+			case AST_SPECIFIER_POINTER:   BufferWriteString(buffer, "*"); break;
+			case AST_SPECIFIER_OPTIONAL:  BufferWriteString(buffer, "?"); break;
 			case AST_SPECIFIER_ARRAY:
 			{
-				Write(buffer, "[");
-				Write(buffer, specifier->size_expression);
-				Write(buffer, "]");
+				BufferWriteString(buffer, "[");
+				GenericWrite(buffer, specifier->size_expression);
+				BufferWriteString(buffer, "]");
 			} break;
 		}
 	}
 
-	switch (type.basetype.kind)
+	switch (type->basetype.kind)
 	{
-		case AST_BASETYPE_PRIMITIVE: Write(buffer, type.basetype.token); break;
-		case AST_BASETYPE_USERTYPE:  Write(buffer, type.basetype.token); break;
+		case AST_BASETYPE_PRIMITIVE: GenericWrite(buffer, type->basetype.token); break;
+		case AST_BASETYPE_USERTYPE:  GenericWrite(buffer, type->basetype.token); break;
 
 		case AST_BASETYPE_TUPLE:
 		{
-			Write(buffer, "(");
+			BufferWriteString(buffer, "(");
 
-			for (Ast_Type* t = type.basetype.tuple; t < type.basetype.tuple.End(); t++)
+			for (Ast_Type* t = type->basetype.tuple; t < type->basetype.tuple.End(); t++)
 			{
-				if (t != type.basetype.tuple) Write(buffer, ", ");
-				Write(buffer, t);
+				if (t != type->basetype.tuple) BufferWriteString(buffer, ", ");
+				GenericWrite(buffer, t);
 			}
 
-			Write(buffer, ")");
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_BASETYPE_FUNCTION:
 		{
-			Write(buffer, "(");
-			Write(buffer, type.basetype.function.input);
-			Write(buffer, ") -> (");
-			Write(buffer, type.basetype.function.output);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(");
+			GenericWrite(buffer, type->basetype.function.input);
+			BufferWriteString(buffer, ") -> (");
+			GenericWrite(buffer, type->basetype.function.output);
+			BufferWriteString(buffer, ")");
 		} break;
 	}
 }
 
-void Write(OutputBuffer* buffer, Ast_Expression* expression)
+static void GenericWrite(OutputBuffer* buffer, Ast_Expression* expression)
 {
 	if (!expression)
 	{
-		Write(buffer, "null");
+		BufferWriteString(buffer, "null");
 		return;
 	}
 
@@ -267,92 +353,93 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 		case AST_EXPRESSION_TERMINAL_VARIABLE:
 		{
 			Ast_Expression_Variable* variable = (Ast_Expression_Variable*)expression;
-			Write(buffer, "(Variable: ");
-			Write(buffer, variable->token);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(Variable: ");
+			GenericWrite(buffer, variable->token);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_FUNCTION:
 		{
 			Ast_Expression_Function* function = (Ast_Expression_Function*)expression;
-			Write(buffer, "(Function: ");
-			Write(buffer, function->token);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(Function: ");
+			GenericWrite(buffer, function->token);
+			BufferWriteString(buffer, ")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION:
+		case AST_EXPRESSION_TERMINAL_INTRINSIC:
 		{
-			Ast_Expression_Intrinsic_Function* function = (Ast_Expression_Intrinsic_Function*)expression;
-			Write(buffer, "(Intrinsic Function: ");
-			Write(buffer, function->token);
-			Write(buffer, ")");
+			Ast_Expression_Intrinsic* intrinsic = (Ast_Expression_Intrinsic*)expression;
+			BufferWriteString(buffer, "(Intrinsic: ");
+			GenericWrite(buffer, intrinsic->token);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_STRUCT:
 		{
 			Ast_Expression_Struct* structure = (Ast_Expression_Struct*)expression;
-			Write(buffer, "(Struct: ");
-			Write(buffer, structure->token);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(Struct: ");
+			GenericWrite(buffer, structure->token);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_ENUM:
 		{
 			Ast_Expression_Enum* enumeration = (Ast_Expression_Enum*)expression;
-			Write(buffer, "(Enum: ");
-			Write(buffer, enumeration->token);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(Enum: ");
+			GenericWrite(buffer, enumeration->token);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER:
 		{
 			Ast_Expression_Struct_Member* member = (Ast_Expression_Struct_Member*)expression;
-			Write(buffer, "(Struct_Member: ");
-			Write(buffer, member->token);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(Struct_Member: ");
+			GenericWrite(buffer, member->token);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER:
 		{
 			Ast_Expression_Enum_Member* member = (Ast_Expression_Enum_Member*)expression;
-			Write(buffer, "(Enum_Member: ");
-			Write(buffer, member->token);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(Enum_Member: ");
+			GenericWrite(buffer, member->token);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_DYNAMIC_ARRAY:
 		{
 			Ast_Expression_Dynamic_Array* array = (Ast_Expression_Dynamic_Array*)expression;
-			Write(buffer, "[ ");
-			Write(buffer, array->left);
-			Write(buffer, " .. ");
-			Write(buffer, array->right);
-			Write(buffer, " ]");
+			BufferWriteString(buffer, "[ ");
+			GenericWrite(buffer, array->left);
+			BufferWriteString(buffer, " .. ");
+			GenericWrite(buffer, array->right);
+			BufferWriteString(buffer, " ]");
 		}
 		case AST_EXPRESSION_FIXED_ARRAY:
 		{
 			Ast_Expression_Fixed_Array* fixed_array = (Ast_Expression_Fixed_Array*)expression;
 
-			Write(buffer, "{ ");
+			BufferWriteString(buffer, "{ ");
 
-			for (u32 i = 0; i < fixed_array->elements.count; i++)
+			for (uint32 i = 0; i < fixed_array->elements.count; i++)
 			{
-				if (!i) Write(buffer, ", ");
+				if (!i) BufferWriteString(buffer, ", ");
 
-				Write(buffer, fixed_array->elements[i]);
+				GenericWrite(buffer, fixed_array->elements[i]);
 			}
 
-			Write(buffer, " }");
+			BufferWriteString(buffer, " }");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_NAME:
 		case AST_EXPRESSION_TERMINAL_LITERAL:
 		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
-		case AST_EXPRESSION_TERMINAL_ARRAY_DATA:
+		case AST_EXPRESSION_TERMINAL_ARRAY_BEGIN:
+		case AST_EXPRESSION_TERMINAL_ARRAY_END:
 		case AST_EXPRESSION_TERMINAL_ARRAY_LENGTH:
 		{
 			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
-			Write(buffer, literal->token);
+			GenericWrite(buffer, literal->token);
 		} break;
 
 		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
@@ -377,13 +464,13 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 		case AST_EXPRESSION_BINARY_OR:
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
-			Write(buffer, "(");
-			Write(buffer, binary->left);
-			Write(buffer, " ");
-			Write(buffer, binary->op);
-			Write(buffer, " ");
-			Write(buffer, binary->right);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(");
+			GenericWrite(buffer, binary->left);
+			BufferWriteString(buffer, " ");
+			GenericWrite(buffer, binary->op);
+			BufferWriteString(buffer, " ");
+			GenericWrite(buffer, binary->right);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_UNARY_REFERENCE_OF:
@@ -394,228 +481,324 @@ void Write(OutputBuffer* buffer, Ast_Expression* expression)
 		case AST_EXPRESSION_UNARY_NOT:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			Write(buffer, "(");
-			Write(buffer, unary->op);
-			Write(buffer, " ");
-			Write(buffer, unary->subexpression);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(");
+			GenericWrite(buffer, unary->op);
+			BufferWriteString(buffer, " ");
+			GenericWrite(buffer, unary->subexpression);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_SUBSCRIPT:
 		{
 			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
-			Write(buffer, subscript->array);
-			Write(buffer, "[");
-			Write(buffer, subscript->index);
-			Write(buffer, "]");
+			GenericWrite(buffer, subscript->array);
+			BufferWriteString(buffer, "[");
+			GenericWrite(buffer, subscript->index);
+			BufferWriteString(buffer, "]");
 		} break;
 
 		case AST_EXPRESSION_DOT_CALL:
 		case AST_EXPRESSION_CALL:
 		{
 			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
-			Write(buffer, call->function);
+			GenericWrite(buffer, call->function);
 			if (call->parameters->kind != AST_EXPRESSION_TUPLE)
 			{
-				Write(buffer, "(");
-				Write(buffer, call->parameters);
-				Write(buffer, ")");
+				BufferWriteString(buffer, "(");
+				GenericWrite(buffer, call->parameters);
+				BufferWriteString(buffer, ")");
 			}
 			else
 			{
-				Write(buffer, call->parameters);
+				GenericWrite(buffer, call->parameters);
 			}
 		} break;
 
 		case AST_EXPRESSION_TUPLE:
 		{
 			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
-			Write(buffer, "(");
-			for (u32 i = 0; i < tuple->elements.count; i++)
+			BufferWriteString(buffer, "(");
+			for (uint32 i = 0; i < tuple->elements.count; i++)
 			{
-				if (i) Write(buffer, ", ");
-				Write(buffer, tuple->elements[i]);
+				if (i) BufferWriteString(buffer, ", ");
+				GenericWrite(buffer, tuple->elements[i]);
 			}
-			Write(buffer, ")");
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_IF_ELSE:
 		{
 			Ast_Expression_Ternary* ternary = (Ast_Expression_Ternary*)expression;
-			Write(buffer, "(");
-			Write(buffer, ternary->left);
-			Write(buffer, " if ");
-			Write(buffer, ternary->middle);
-			Write(buffer, " else ");
-			Write(buffer, ternary->right);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(");
+			GenericWrite(buffer, ternary->left);
+			BufferWriteString(buffer, " if ");
+			GenericWrite(buffer, ternary->middle);
+			BufferWriteString(buffer, " else ");
+			GenericWrite(buffer, ternary->right);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_AS:
 		{
 			Ast_Expression_As* as = (Ast_Expression_As*)expression;
 
-			Write(buffer, "(");
-			Write(buffer, as->expression);
-			Write(buffer, " as ");
-			Write(buffer, as->type);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(");
+			GenericWrite(buffer, as->expression);
+			BufferWriteString(buffer, " as ");
+			GenericWrite(buffer, as->type);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_IMPLICIT_CAST:
 		{
 			Ast_Expression_Implicit_Cast* cast = (Ast_Expression_Implicit_Cast*)expression;
-			Write(buffer, "(Implicit_Cast: ");
-			Write(buffer, cast->type);
-			Write(buffer, ", ");
-			Write(buffer, cast->subexpression);
-			Write(buffer, ")");
+			BufferWriteString(buffer, "(Implicit_Cast: ");
+			GenericWrite(buffer, cast->type);
+			BufferWriteString(buffer, ", ");
+			GenericWrite(buffer, cast->subexpression);
+			BufferWriteString(buffer, ")");
 		} break;
 
 		case AST_EXPRESSION_LAMBDA:
 		{
-			Write(buffer, "(LAMBDA)");
+			BufferWriteString(buffer, "(LAMBDA)");
 		} break;
 	}
 }
 
-void Write(OutputBuffer* buffer, IrLogicKind kind)
+static void GenericWriteName(OutputBuffer* buffer, IrInstructionID id)
 {
-	Write(buffer, ToString(kind));
+	BufferWriteString(buffer, "%");
+	GenericWrite(buffer, id);
 }
 
-void Write(OutputBuffer* buffer, IrLogicIndex index, IrFunctionInfo* function)
+static void GenericWrite(OutputBuffer* buffer, IrBlockID id)
 {
-	if (index == IR_NONE)
+	BufferWriteString(buffer, "B");
+	GenericWrite(buffer, id.index);
+}
+
+static void GenericWrite(OutputBuffer* buffer, IrInstructionKind kind)
+{
+	GenericWrite(buffer, ToString(kind));
+}
+
+static void GenericWrite(OutputBuffer* buffer, IrValue value)
+{
+	if (!IsValid(value))
 	{
-		Write(buffer, "IR_NONE");
+		BufferWriteString(buffer, "IR_NONE");
 		return;
 	}
 
-	IrLogic* logic = &function->logic[index];
-
-	if (logic->kind == LOGOS_CONSTANT)
+	if (value.kind == IR_VALUE_INSTRUCTION)
 	{
-		if (IsInteger(logic->type))
-		{
-			Write(buffer, logic->constant_int64);
-		}
-		else if (logic->type == &type_bool)
-		{
-			Write(buffer, logic->constant_bool);
-		}
-		else if (logic->type == &type_float32)
-		{
-			Write(buffer, logic->constant_float32);
-		}
-		else if (logic->type == &type_float64)
-		{
-			Write(buffer, logic->constant_float32);
-		}
-		else if (IsPointer(logic->type))
-		{
-			Write(buffer, logic->constant_int64);
-		}
-		else
-		{
-			Assert();
-		}
+		GenericWriteName(buffer, value.instruction);
 	}
-	else if (logic->kind == LOGOS_BLOCK)
+	else if (value.kind == IR_VALUE_CONSTANT_INT)
 	{
-		IrBlockInfo* block = GetBlockInfo(logic->block, function);
-
-		Write(buffer, "block");
-		Write(buffer, logic->block);
+		GenericWrite(buffer, value.constant_int);
 	}
-	else
+	else if (value.kind == IR_VALUE_CONSTANT_FLOAT32)
 	{
-		Write(buffer, "i");
-		Write(buffer, index);
+		GenericWrite(buffer, value.constant_float32);
+	}
+	else if (value.kind == IR_VALUE_CONSTANT_FLOAT64)
+	{
+		GenericWrite(buffer, value.constant_float64);
 	}
 }
 
-void Write(OutputBuffer* buffer, IrFunctionInfo* function)
+static void GenericWrite(OutputBuffer* buffer, IrFunction* function, IrInstructionID id)
 {
-	Write(buffer, function->function->name);
-	Write(buffer, " ");
-	Write(buffer, function->function->type->input);
-	Write(buffer, " -> ");
-	Write(buffer, function->function->type->output);
-	Write(buffer, ":\n");
-
-	for (IrBlockInfoIndex block_index = 0; block_index < function->blocks.count; block_index++)
+	if (id == IR_NONE)
 	{
-		IrBlockInfo* block = &function->blocks[block_index];
+		BufferWriteString(buffer, "IR_NONE\n");
+		return;
+	}
 
-		if (block_index)
+	IrInstruction* instruction = GetInstruction(function, id);
+
+	BufferWriteString(buffer, "\t");
+
+	IrValue iv = GetValue(id);
+
+	IrValue op0 = instruction->operands[0];
+	IrValue op1 = instruction->operands[1];
+	IrValue op2 = instruction->operands[2];
+
+	switch (instruction->kind)
+	{
+		case IR_NOP:          Print(buffer, "nop", iv); break;
+		case IR_STACK:        Print(buffer, "% = stack",              iv); break;
+		case IR_PARAMETER:    Print(buffer, "% = param %",            iv, op0); break;
+		case IR_NOT:          Print(buffer, "% = not %",              iv, op0); break;
+		case IR_SIGN_EXTEND:  Print(buffer, "% = sign extend %",      iv, op0); break;
+		case IR_ZERO_EXTEND:  Print(buffer, "% = zero extend %",      iv, op0); break;
+		case IR_TRUNCATE:     Print(buffer, "% = truncate %",         iv, op0); break;
+		case IR_INT_TO_FLOAT: Print(buffer, "% = int_to_float %",     iv, op0); break;
+		case IR_FLOAT_TO_INT: Print(buffer, "% = float_to_int %",     iv, op0); break;
+		case IR_FLOAT_CAST:   Print(buffer, "% = float_cast %",       iv, op0); break;
+		case IR_LOAD:         Print(buffer, "% = load %",             iv, op0); break;
+		case IR_BRANCH:       Print(buffer, "branch %",               op0); break;
+		case IR_CALL:         Print(buffer, "% = call %",             iv, op0); break;
+		case IR_INT_ADD:              Print(buffer, "% = add %, %",  iv, op0, op1); break;
+		case IR_INT_SUBTRACT:         Print(buffer, "% = sub %, %",  iv, op0, op1); break;
+		case IR_INT_MULTIPLY:         Print(buffer, "% = mul %, %",  iv, op0, op1); break;
+		case IR_SIGNED_DIVIDE:        Print(buffer, "% = sdiv %, %", iv, op0, op1); break;
+		case IR_UNSIGNED_DIVIDE:      Print(buffer, "% = udiv %, %", iv, op0, op1); break;
+		case IR_SIGNED_MODULO:        Print(buffer, "% = smod %, %",  iv, op0, op1); break;
+		case IR_UNSIGNED_MODULO:      Print(buffer, "% = umod %, %",  iv, op0, op1); break;
+		case IR_SIGNED_LEFT_SHIFT:    Print(buffer, "% = sls %, %", iv, op0, op1); break;
+		case IR_SIGNED_RIGHT_SHIFT:   Print(buffer, "% = srs %, %", iv, op0, op1); break;
+		case IR_UNSIGNED_LEFT_SHIFT:  Print(buffer, "% = uls %, %", iv, op0, op1); break;
+		case IR_UNSIGNED_RIGHT_SHIFT: Print(buffer, "% = urs %, %", iv, op0, op1); break;
+		case IR_FLOAT_ADD:            Print(buffer, "% = fadd %, %", iv, op0, op1); break;
+		case IR_FLOAT_SUBTRACT:       Print(buffer, "% = fsub %, %", iv, op0, op1); break;
+		case IR_FLOAT_MULTIPLY:       Print(buffer, "% = fmul %, %", iv, op0, op1); break;
+		case IR_FLOAT_DIVIDE:         Print(buffer, "% = fdiv %, %",  iv, op0, op1); break;
+		case IR_OR:                   Print(buffer, "% = or %, %",    iv, op0, op1); break;
+		case IR_AND:                  Print(buffer, "% = and %, %",   iv, op0, op1); break;
+		case IR_XOR:                  Print(buffer, "% = xor %, %",   iv, op0, op1); break;
+		case IR_COMPARE_EQUAL:                     Print(buffer, "% = cmp % = %",   iv, op0, op1); break;
+		case IR_COMPARE_NOT_EQUAL:                 Print(buffer, "% = cmp % != %",  iv, op0, op1); break;
+		case IR_SIGNED_COMPARE_LESS:               Print(buffer, "% = scmp % < %",  iv, op0, op1); break;
+		case IR_SIGNED_COMPARE_LESS_OR_EQUAL:      Print(buffer, "% = scmp % <= %", iv, op0, op1); break;
+		case IR_SIGNED_COMPARE_GREATER:            Print(buffer, "% = scmp % > %",  iv, op0, op1); break;
+		case IR_SIGNED_COMPARE_GREATER_OR_EQUAL:   Print(buffer, "% = scmp % >= %", iv, op0, op1); break;
+		case IR_UNSIGNED_COMPARE_LESS:             Print(buffer, "% = ucmp % < %",  iv, op0, op1); break;
+		case IR_UNSIGNED_COMPARE_LESS_OR_EQUAL:    Print(buffer, "% = ucmp % <= %", iv, op0, op1); break;
+		case IR_UNSIGNED_COMPARE_GREATER:          Print(buffer, "% = ucmp % > %",  iv, op0, op1); break;
+		case IR_UNSIGNED_COMPARE_GREATER_OR_EQUAL: Print(buffer, "% = ucmp % >= %", iv, op0, op1); break;
+		case IR_FLOAT_COMPARE_LESS:             Print(buffer, "% = fcmp % < %",  iv, op0, op1); break;
+		case IR_FLOAT_COMPARE_LESS_OR_EQUAL:    Print(buffer, "% = fcmp % <= %", iv, op0, op1); break;
+		case IR_FLOAT_COMPARE_GREATER:          Print(buffer, "% = fcmp % > %",  iv, op0, op1); break;
+		case IR_FLOAT_COMPARE_GREATER_OR_EQUAL: Print(buffer, "% = fcmp % >= %", iv, op0, op1); break;
+		case IR_MEMBER: Print(buffer, "% = member %, %",        iv, op0, op1); break;
+		case IR_INDEX:  Print(buffer, "% = index %[%]",         iv, op0, op1); break;
+		case IR_COPY:   Print(buffer, "copy %, %",              op0, op1); break;
+		case IR_STORE:  Print(buffer, "store %, %",             op0, op1); break;
+		case IR_SELECT: Print(buffer, "% = select %, % else %", iv, op0, op1, op2); break;
+		case IR_RETURN:
 		{
-			Write(buffer, "\n");
+			if (IsValid(op0)) Print(buffer, "return %", op0);
+			else              Print(buffer, "return");
+		} break;
+
+		case IR_PHI:
+		{
+			Print(buffer, "% = phi ", iv);
+			for (uint32 i = 0; i < instruction->phi_entries.count; i++)
+			{
+				IrPhiEntry* entry = &instruction->phi_entries[i];
+				if (i) BufferWriteString(buffer, ", ");
+				Print(buffer, "[%: %]", entry->block, entry->value);
+			}
+		} break;
+
+		case IR_TUPLE:
+		{
+			BufferWriteString(buffer, "(");
+			for (uint32 i = 0; i < instruction->tuple.count; i++)
+			{
+				if (i) BufferWriteString(buffer, ", ");
+				GenericWrite(buffer, instruction->tuple[i]);
+			}
+			BufferWriteString(buffer, ")");
+		} break;
+	}
+
+	bool verbose = false;
+
+	if (verbose)
+	{
+		if (instruction->type)
+		{
+			BufferWriteString(buffer, " :: ");
+			GenericWrite(buffer, instruction->type);
 		}
 
-		Write(buffer, "block");
-		Write(buffer, block_index);
-
-		bool verbose = false;
-
-		if (verbose)
+		if (instruction->users.count)
 		{
-			Write(buffer, "(i");
-			Write(buffer, block->representation);
-			Write(buffer, ")");
+			BufferWriteString(buffer, " :: { ");
+
+			for (uint32 j = 0; j < instruction->users.count; j++)
+			{
+				if (j) BufferWriteString(buffer, ", ");
+				GenericWrite(buffer, function, instruction->users[j]);
+			}
+
+			BufferWriteString(buffer, " }");
+		}
+	}
+
+	BufferWriteString(buffer, "\n");
+}
+
+static void GenericWrite(OutputBuffer* buffer, IrFunction* function)
+{
+	Ast_Function* ast = function->function;
+	Print(buffer, "% % -> %:\n", ast->name, ast->type->input, ast->type->output);
+
+	for (uint32 b = 0; b < function->blocks.count; b++)
+	{
+		IrBlock* block = &function->blocks[b];
+
+		if (block->kind == IR_BLOCK_FREE)
+		{
+			continue;
 		}
 
-		Write(buffer, ":\n");
+		GenericWrite(buffer, IrBlockID { b });
+		BufferWriteString(buffer, ":\n");
 
-		for (u32 i = 0; i < block->logic.count; i++)
+		for (uint32 i = 0; i < block->phis.count; i++)
 		{
-			IrLogicIndex logic_index = block->logic[i];
-			IrLogic* logic = &function->logic[logic_index];
+			IrInstructionID id = block->phis[i];
+			GenericWrite(buffer, function, id);
+		}
 
-			if (!verbose)
+		for (uint32 i = 0; i < block->instructions.count; i++)
+		{
+			IrInstructionID id = block->instructions[i];
+			IrInstruction* instruction = &function->instructions[id];
+
+			if (!IsControlFlowInstruction(instruction->kind) && instruction->kind != IR_PHI)
 			{
-				if (logic->kind == LOGOS_CONSTANT) continue;
-				if (logic->kind == LOGOS_BLOCK) continue;
-				if (logic->kind == LOGOS_FUNCTION) continue;
+				GenericWrite(buffer, function, id);
 			}
+		}
 
-			Write(buffer, "\ti");
-			Write(buffer, logic_index);
-			Write(buffer, " = ");
-
-			Write(buffer, logic->kind);
-
-			Write(buffer, "(");
-			bool o0 = logic->operands[0] != IR_NONE;
-			bool o1 = logic->operands[1] != IR_NONE;
-			bool o2 = logic->operands[2] != IR_NONE;
-			if (o0 || o1) {                      Write(buffer, logic->operands[0], function); }
-			if (o1 || o2) { Write(buffer, ", "); Write(buffer, logic->operands[1], function); }
-			if (o2)       { Write(buffer, ", "); Write(buffer, logic->operands[2], function); }
-			Write(buffer, ")");
-
-			if (logic->type)
+		if (block->kind == IR_BLOCK_JUMP)
+		{
+			BufferWriteString(buffer, "\tjump ");
+			GenericWrite(buffer, block->jump);
+			BufferWriteString(buffer, "\n");
+		}
+		else if (block->kind == IR_BLOCK_BRANCH)
+		{
+			BufferWriteString(buffer, "\tbranch ");
+			GenericWrite(buffer, GetInstruction(function, block->branch.branch_instruction)->operands[0]);
+			BufferWriteString(buffer, ", ");
+			GenericWrite(buffer, block->branch.true_branch);
+			BufferWriteString(buffer, " else ");
+			GenericWrite(buffer, block->branch.false_branch);
+			BufferWriteString(buffer, "\n");
+		}
+		else if (block->kind == IR_BLOCK_RETURN)
+		{
+			if (block->return_instruction != IR_NONE)
 			{
-				Write(buffer, " :: ");
-				Write(buffer, logic->type);
+				GenericWrite(buffer, function, block->return_instruction);
 			}
-
-			if (logic->users.count)
+			else
 			{
-
-				Write(buffer, " :: {");
-
-				for (u32 j = 0; j < logic->users.count; j++)
-				{
-					if (j) Write(buffer, ",");
-					Write(buffer, " i");
-					Write(buffer, logic->users[j]);
-				}
-
-				Write(buffer, " }");
+				BufferWriteString(buffer, "\tNO RETURN INSTRUCTION IN RETURN BLOCK REEEEEEEEEEEEEE\n");
 			}
-
-			Write(buffer, "\n");
+		}
+		else if (block->kind == IR_BLOCK_UNSPECIFIED)
+		{
+			BufferWriteString(buffer, "\tUNSPECIFIED REEEEEEEEEEEEEEEEEEEEEEEEE\n");
 		}
 	}
 }

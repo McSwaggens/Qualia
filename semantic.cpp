@@ -2,89 +2,31 @@
 #include "memory.h"
 #include "print.h"
 #include "assert.h"
-#include "util.h"
-
-template<typename ...Args>
-[[noreturn]]
-static void Error(Ast_Module* module, SourceLocation where, String format, Args&&... message_args);
-
-template<typename ...Args>
-[[noreturn]]
-static void Error(Ast_Module* module, Span<Token> where, String format, Args&&... message_args)
-{
-	u32 margin = 2;
-	u32 start = where[0].location.line;
-	SourceLocation loc_begin = where.Begin()->location;
-	SourceLocation loc_end = (where.End()-1)->location; // @Bug: What if begin = end. Is this invalid input? IDK
-	u32 number_of_lines = loc_end.line - loc_begin.line + margin + 1;
-
-	Print("%:%:%: error: ", module->file_path, (loc_begin.line+1), (loc_begin.offset+1));
-	Print(format, message_args...);
-
-	// @Todo: Coloring/Highlighting
-
-	for (u32 line = start; line < start + number_of_lines && line < module->lines.count; line++)
-	{
-		Print("%\n", String(module->lines[line], module->lines[line].Length()));
-	}
-
-	Fail();
-}
+#include "general.h"
+#include "error.h"
 
 static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module);
 
-MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev)
-{
-	u64 size = 0x1000;
-	u64 header_size = sizeof(MemoryBlock);
-
-	if (prev)
-	{
-		size = prev->size * 2;
-	}
-
-	if (size - header_size <= min_size)
-	{
-		size = NextPow2(min_size + header_size);
-	}
-
-	MemoryBlock* block = (MemoryBlock*)GetPage(size);
-	block->size = size - header_size;
-	block->head = block->data;
-	block->prev = prev;
-	block->next = null;
-
-	if (prev)
-	{
-		MemoryBlock* pn = prev->next;
-		prev->next = block;
-		pn->prev = block;
-		block->next = pn;
-	}
-
-	return block;
-}
-
-u64 CalculateStackFrameSize(Ast_Function* function)
+static uint64 CalculateStackFrameSize(Ast_Function* function)
 {
 	return CalculateStackFrameSize(&function->code, 0);
 }
 
 // @Note: This doesn't calculate the minimum memory needed to represent the stackframe which would be ideal for producing optimized binaries.
 //        Another function needs to created for that.
-u64 CalculateStackFrameSize(Ast_Code* code, u64 offset)
+static uint64 CalculateStackFrameSize(Ast_Code* code, uint64 offset)
 {
-	u64 initial_offset = offset;
+	uint64 initial_offset = offset;
 
-	for (u32 i = 0; i < code->scope.variables.count; i++)
+	for (uint32 i = 0; i < code->scope.variables.count; i++)
 	{
-		Ast_VariableDeclaration* variable = code->scope.variables[i];
+		Ast_Variable* variable = code->scope.variables[i];
 		variable->offset = offset;
 		offset += variable->type->size;
 		// Print("Variable %:\n\tsize = %\n\toffset = %\n", variable->name, variable->type->size, variable->offset);
 	}
 
-	for (u32 i = 0; i < code->statements.count; i++)
+	for (uint32 i = 0; i < code->statements.count; i++)
 	{
 		Ast_Statement* statement = &code->statements[i];
 
@@ -110,21 +52,22 @@ static Type* GetBaseType(Token* token, Ast_Scope* scope)
 {
 	if (token->kind == TOKEN_IDENTIFIER_FORMAL)
 	{
+		String name = token->identifier_string;
 		while (scope)
 		{
-			for (Ast_Struct* s = scope->structs; s < scope->structs.End(); s++)
+			for (Ast_Struct* ast_struct = scope->structs; ast_struct < scope->structs.End(); ast_struct++)
 			{
-				if (CompareStrings(token->string, s->name->string))
+				if (CompareString(name, ast_struct->name))
 				{
-					return &s->type;
+					return &ast_struct->type;
 				}
 			}
 
-			for (Ast_Enum* e = scope->enums; e < scope->enums.End(); e++)
+			for (Ast_Enum* ast_enum = scope->enums; ast_enum < scope->enums.End(); ast_enum++)
 			{
-				if (CompareStrings(token->string, e->name->string))
+				if (CompareString(name, ast_enum->name))
 				{
-					return &e->type;
+					return &ast_enum->type;
 				}
 			}
 
@@ -143,7 +86,7 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Ast_Module* mo
 	}
 	else if (basetype.kind == AST_BASETYPE_TUPLE)
 	{
-		u32 tuple_count = basetype.tuple.count;
+		uint32 tuple_count = basetype.tuple.count;
 
 		if (!tuple_count)
 		{
@@ -152,7 +95,7 @@ static Type* GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Ast_Module* mo
 
 		Type* types[tuple_count];
 
-		for (u32 i = 0; i < tuple_count; i++)
+		for (uint32 i = 0; i < tuple_count; i++)
 		{
 			types[i] = GetType(&basetype.tuple[i], scope, module);
 		}
@@ -201,9 +144,9 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module)
 				else
 				{
 					ScanExpression(specifier->size_expression, scope, module);
-					Assert(specifier->size_expression->kind == AST_EXPRESSION_TERMINAL_LITERAL); // @RemoveMe @Todo: Need to be removed.
+					Assert(specifier->size_expression->kind == AST_EXPRESSION_TERMINAL_LITERAL); // @RemoveMe @Todo: Need to interpret size_expression
 
-					if (!specifier->size_expression->can_constantly_evaluate)
+					if (!(specifier->size_expression->flags & AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE))
 					{
 						Error(module, specifier->size_expression->span, "Fixed array size must be constantly evaluatable.\n");
 					}
@@ -214,7 +157,7 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module)
 					}
 
 					Ast_Expression_Literal* literal = (Ast_Expression_Literal*)specifier->size_expression;
-					s64 length = literal->token->integer.value;
+					uint64 length = literal->token->literal_int;
 
 					if (length <= 0) // Shouldn't we just enforce uint?
 					{
@@ -230,16 +173,59 @@ static Type* GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module)
 	return type;
 }
 
-static Ast_VariableDeclaration* GetVariable(Token* token, Ast_Scope* scope)
+static void Intrinsic_SystemCall(uint64* input, uint64* output)
+{
+}
+
+static const String intrinsic_name_lut[INTRINSIC_COUNT] = {
+	[INTRINSIC_SYSTEM_CALL] = "SystemCall",
+};
+
+static Type* intrinsic_type_lut[INTRINSIC_COUNT];
+
+static inline Type* GetIntrinsicType(IntrinsicID intrinsic)
+{
+	return intrinsic_type_lut[intrinsic];
+}
+
+static void InitIntrinsics()
+{
+	intrinsic_type_lut[INTRINSIC_SYSTEM_CALL] = GetFunctionType(
+		GetTuple(Array<Type*>((Type*[7]){
+			&type_int64, // rax
+			&type_int64, // rdi
+			&type_int64, // rsi
+			&type_int64, // rdx
+			&type_int64, // r10
+			&type_int64, // r8
+			&type_int64, // r9
+		}, 7)),
+		&type_int64
+	);
+}
+
+static IntrinsicID FindIntrinsic(String name, Type* input_type)
+{
+	for (uint64 id = 0; id < INTRINSIC_COUNT; id++)
+	{
+		if (CompareString(name, intrinsic_name_lut[id]) && CanImplicitCast(input_type, intrinsic_type_lut[id]->input))
+		{
+			return (IntrinsicID)id;
+		}
+	}
+
+	return INTRINSIC_INVALID;
+}
+
+static Ast_Function* FindFunction(Ast_Scope* scope, String name, Type* input_type)
 {
 	while (scope)
 	{
-		for (u32 i = 0; i < scope->variables.count; i++)
+		for (Ast_Function* function = scope->functions; function < scope->functions.End(); function++)
 		{
-			Ast_VariableDeclaration* variable = scope->variables[i];
-			if (CompareStrings(token->string, variable->name->string))
+			if (CompareString(name, function->name) && CanImplicitCast(input_type, function->type->input))
 			{
-				return variable;
+				return function;
 			}
 		}
 
@@ -249,70 +235,16 @@ static Ast_VariableDeclaration* GetVariable(Token* token, Ast_Scope* scope)
 	return null;
 }
 
-Intrinsic_Function intrinsic_functions_array[1];
-Array<Intrinsic_Function> intrinsic_functions = Array<Intrinsic_Function>(intrinsic_functions_array, 1);
-
-void Intrinsic_SystemCall(u64* input, u64* output)
-{
-	*output = SystemCall(input[0], input[1], input[2], input[3], input[4], input[5], input[6]);
-}
-
-Intrinsic_Function MakeIntrinsicFunction(String name, Type* input, Type* output, Intrinsic_Function_Type interpreter_call)
-{
-	Intrinsic_Function intrinsic;
-	ZeroMemory(&intrinsic);
-	intrinsic.name = name;
-	intrinsic.function = interpreter_call;
-	intrinsic.input = input;
-	intrinsic.output = output;
-	intrinsic.type = GetFunctionType(input, output);
-
-	return intrinsic;
-}
-
-void InitIntrinsicFunctions()
-{
-	intrinsic_functions[0] = MakeIntrinsicFunction(
-		"SystemCall",
-
-		GetTuple({
-			&type_uint64, // rax
-			&type_uint64, // rdi
-			&type_uint64, // rsi
-			&type_uint64, // rdx
-			&type_uint64, // r10
-			&type_uint64, // r8
-			&type_uint64, // r9
-		}),
-
-		&type_uint64,
-
-		(Intrinsic_Function_Type)&Intrinsic_SystemCall
-	);
-}
-
-static Intrinsic_Function* FindIntrinsicFunction(String name, Type* input_type)
-{
-	for (Intrinsic_Function* intrinsic = intrinsic_functions; intrinsic < intrinsic_functions.End(); intrinsic++)
-	{
-		if (CompareStrings(name, intrinsic->name) && CanImplicitCast(input_type, intrinsic->input))
-		{
-			return intrinsic;
-		}
-	}
-
-	return null;
-}
-
-static Ast_Function* FindFunction(String name, Type* input_type, Ast_Scope* scope)
+static Ast_Variable* FindVariable(Ast_Scope* scope, String name)
 {
 	while (scope)
 	{
-		for (Ast_Function* function = scope->functions; function < scope->functions.End(); function++)
+		for (uint32 i = 0; i < scope->variables.count; i++)
 		{
-			if (CompareStrings(name, function->name) && CanImplicitCast(input_type, function->type->input))
+			Ast_Variable* variable = scope->variables[i];
+			if (CompareString(name, variable->name))
 			{
-				return function;
+				return variable;
 			}
 		}
 
@@ -326,7 +258,7 @@ static Ast_Struct_Member* FindStructMember(Ast_Struct* ast_struct, String name)
 {
 	for (Ast_Struct_Member* member = ast_struct->members; member < ast_struct->members.End(); member++)
 	{
-		if (CompareStrings(name, member->name->string))
+		if (CompareString(name, member->name))
 		{
 			return member;
 		}
@@ -339,23 +271,13 @@ static Ast_Enum_Member* FindEnumMember(Ast_Enum* ast_enum, String name)
 {
 	for (Ast_Enum_Member* member = ast_enum->members; member < ast_enum->members.End(); member++)
 	{
-		if (CompareStrings(name, member->name->string))
+		if (CompareString(name, member->name))
 		{
 			return member;
 		}
 	}
 
 	return null;
-}
-
-static Type* GetArithmeticType(Type* type)
-{
-	Assert(IsConvertableToArithmeticType(type));
-	if (IsArithmetic(type)) return type;
-	if (type->kind == TYPE_BASETYPE_BOOL) return &type_int8;
-	if (type->kind == TYPE_BASETYPE_ENUM) return type->enumeration->underlying_type;
-	Assert();
-	Unreachable();
 }
 
 static Ast_Expression* ImplicitCast(Ast_Expression* expression, Type* type, Ast_Module* module)
@@ -367,21 +289,28 @@ static Ast_Expression* ImplicitCast(Ast_Expression* expression, Type* type, Ast_
 	cast->span = expression->span;
 	cast->subexpression = expression;
 	cast->type = type;
-	cast->is_referential_value = false;
-	cast->is_pure = expression->is_pure;
-	cast->can_constantly_evaluate = expression->can_constantly_evaluate;
-
+	cast->flags = expression->flags & (AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | AST_EXPRESSION_FLAG_PURE);
 	return cast;
 }
 
-static Ast_Expression* TryImplicitCastToArithmeticType(Ast_Expression* expression, Ast_Module* module)
+static bool IsEffectiveInteger(Type* type)
 {
-	if (IsArithmetic(expression->type)) return expression;
-	if (IsConvertableToArithmeticType(expression->type)) return ImplicitCast(expression, GetArithmeticType(expression->type), module);
-	return expression;
+	return IsInteger(type) || type->kind == TYPE_BASETYPE_BOOL || type->kind == TYPE_BASETYPE_ENUM;
 }
 
-void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* module)
+static Type* GetEffectiveType(Type* type)
+{
+	if (type->kind == TYPE_BASETYPE_BOOL) return &type_uint8;
+	if (type->kind == TYPE_BASETYPE_ENUM) return type->enumeration->underlying_type;
+	return type;
+}
+
+static Ast_Expression* ImplicitCastToEffectiveType(Ast_Expression* expression, Ast_Module* module)
+{
+	return ImplicitCast(expression, GetEffectiveType(expression->type), module);
+}
+
+static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* module)
 {
 	switch (expression->kind)
 	{
@@ -391,7 +320,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 
 			if (terminal->token->kind == TOKEN_IDENTIFIER_CASUAL)
 			{
-				Ast_VariableDeclaration* variable = GetVariable(terminal->token, scope);
+				Ast_Variable* variable = FindVariable(scope, terminal->token->identifier_string);
 
 				if (!variable)
 				{
@@ -401,11 +330,19 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 				Ast_Expression_Variable* variable_expression = (Ast_Expression_Variable*)expression;
 				variable_expression->variable = variable;
 
-				expression->kind = AST_EXPRESSION_TERMINAL_VARIABLE;
-				expression->type = variable->type;
-				expression->is_referential_value = true;
-				expression->is_pure = variable->is_pure;
-				expression->can_constantly_evaluate = variable->can_constantly_evaluate;
+				variable_expression->kind = AST_EXPRESSION_TERMINAL_VARIABLE;
+				variable_expression->type = variable->type;
+
+				variable_expression->flags = AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_REFERENTIAL;
+
+				if (variable->flags & AST_VARIABLE_FLAG_CONSTANT)
+				{
+					variable_expression->flags = AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
+				}
+				else if (variable->flags & AST_VARIABLE_FLAG_GLOBAL)
+				{
+					variable_expression->flags = AST_EXPRESSION_FLAG_REFERENTIAL;
+				}
 			}
 			else if (terminal->token->kind == TOKEN_IDENTIFIER_FORMAL)
 			{
@@ -420,7 +357,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 
 				if (type->kind == TYPE_BASETYPE_STRUCT)
 				{
-					expression->kind = AST_EXPRESSION_TERMINAL_STRUCT;
+					expression->kind = AST_EXPRESSION_TERMINAL_STRUCT; // @FixMe
 					Ast_Expression_Struct* struct_terminal = (Ast_Expression_Struct*)expression;
 					struct_terminal->structure = type->structure;
 				}
@@ -432,7 +369,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 				}
 				else if (IsPrimitive(type))
 				{
-					expression->kind = AST_EXPRESSION_TERMINAL_PRIMITIVE;
+					expression->kind = AST_EXPRESSION_TERMINAL_PRIMITIVE; // @FixMe
 				}
 			}
 			else
@@ -445,31 +382,22 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 		case AST_EXPRESSION_FIXED_ARRAY:
 		{
 			Ast_Expression_Fixed_Array* fixed_array = (Ast_Expression_Fixed_Array*)expression;
-			fixed_array->is_pure = true;
-			fixed_array->can_constantly_evaluate = true;
-			fixed_array->is_referential_value = false;
 			Type* subtype;
 
-			for (u32 i = 0; i < fixed_array->elements.count; i++)
+			Ast_Expression_Flags flags = AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
+
+			for (uint32 i = 0; i < fixed_array->elements.count; i++)
 			{
 				Ast_Expression* element = fixed_array->elements[i];
 				ScanExpression(element, scope, module);
 
-				if (!element->is_pure)
-				{
-					fixed_array->is_pure = false;
-				}
-
-				if (!element->can_constantly_evaluate)
-				{
-					fixed_array->can_constantly_evaluate = false;
-				}
+				flags &= element->flags;
 
 				if (i)
 				{
 					if (!CanImplicitCast(element->type, subtype))
 					{
-						Error(module, element->span, "Expected expression of type %, not: %\n", subtype, element->type); // @FixMe
+						Error(module, element->span, "Cannot implicitly cast type '%' to '%'\n", subtype, element->type); // @FixMe
 					}
 
 					fixed_array->elements[i] = ImplicitCast(element, subtype, module);
@@ -480,17 +408,18 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 					fixed_array->type = GetFixedArray(subtype, fixed_array->elements.count);
 				}
 			}
+
+			fixed_array->flags = flags;
 		} break;
 
 		case AST_EXPRESSION_DYNAMIC_ARRAY:
 		{
 			Ast_Expression_Dynamic_Array* array = (Ast_Expression_Dynamic_Array*)expression;
-			array->is_pure = array->left->is_pure && array->right->is_pure;
-			array->can_constantly_evaluate = array->left->can_constantly_evaluate && array->right->can_constantly_evaluate;
-			array->is_referential_value = false;
 
 			ScanExpression(array->left, scope, module);
 			ScanExpression(array->right, scope, module);
+
+			array->flags = (array->left->flags & array->right->flags) & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 			if (!IsPointer(array->left->type))
 			{
@@ -506,13 +435,13 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 
 				array->right = ImplicitCast(array->right, array->left->type, module);
 			}
-			else if (CanImplicitCast(array->right->type, &type_int64))
+			else if (CanImplicitCast(array->right->type, &type_uint64))
 			{
-				array->right = ImplicitCast(array->right, &type_int64, module);
+				array->right = ImplicitCast(array->right, &type_uint64, module);
 			}
 			else
 			{
-				Error(module, array->right->span, "Array end must be a % or an int, not: %\n", array->left->type, array->right->type);
+				Error(module, array->right->span, "Array end must be a % or an uint, not: %\n", array->left->type, array->right->type);
 			}
 
 			array->type = GetDynamicArray(array->left->type->subtype);
@@ -521,92 +450,79 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 		case AST_EXPRESSION_TERMINAL_LITERAL:
 		{
 			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
-			literal->is_referential_value = false;
-			literal->can_constantly_evaluate = true;
-			literal->is_pure = true;
+			literal->flags = AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
-			if (literal->token->kind == TOKEN_INTEGER_LITERAL)
+			switch (literal->token->kind)
 			{
-				if (literal->token->integer.is_unsigned)
-				{
-					switch (literal->token->integer.explicit_bytes)
-					{
-						case 0: literal->type = &type_uint64; break;
-						case 1: literal->type = &type_uint8;  break;
-						case 2: literal->type = &type_uint16; break;
-						case 4: literal->type = &type_uint32; break;
-						case 8: literal->type = &type_uint64; break;
-						default: Unreachable();
-					}
-				}
-				else
-				{
-					switch (literal->token->integer.explicit_bytes)
-					{
-						case 0: literal->type = &type_int64; break;
-						case 1: literal->type = &type_int8;  break;
-						case 2: literal->type = &type_int16; break;
-						case 4: literal->type = &type_int32; break;
-						case 8: literal->type = &type_int64; break;
-						default: Unreachable();
-					}
-				}
+				case TOKEN_LITERAL_INT:    literal->type = &type_int64;  literal->value_int = literal->token->literal_int; break;
+				case TOKEN_LITERAL_INT8:   literal->type = &type_int8;   literal->value_int = literal->token->literal_int; break;
+				case TOKEN_LITERAL_INT16:  literal->type = &type_int16;  literal->value_int = literal->token->literal_int; break;
+				case TOKEN_LITERAL_INT32:  literal->type = &type_int32;  literal->value_int = literal->token->literal_int; break;
+				case TOKEN_LITERAL_INT64:  literal->type = &type_int64;  literal->value_int = literal->token->literal_int; break;
+				case TOKEN_LITERAL_UINT:   literal->type = &type_uint64; literal->value_int = literal->token->literal_int; break;
+				case TOKEN_LITERAL_UINT8:  literal->type = &type_uint8;  literal->value_int = literal->token->literal_int; break;
+				case TOKEN_LITERAL_UINT16: literal->type = &type_uint16; literal->value_int = literal->token->literal_int; break;
+				case TOKEN_LITERAL_UINT32: literal->type = &type_uint32; literal->value_int = literal->token->literal_int; break;
+				case TOKEN_LITERAL_UINT64: literal->type = &type_uint64; literal->value_int = literal->token->literal_int; break;
 
-				literal->value_uint64 = literal->token->integer.value;
-			}
-			else if (literal->token->kind == TOKEN_FLOAT_LITERAL)
-			{
-				if (literal->token->floating_point.explicit_bytes == 0)
+				case TOKEN_LITERAL_FLOAT:
 				{
 					literal->type = &type_float32; // @Fixme?
-					literal->value_float32 = literal->token->floating_point.value;
-				}
-				else if (literal->token->floating_point.explicit_bytes == 2)
+					literal->value_f32 = literal->token->literal_float;
+				} break;
+
+				case TOKEN_LITERAL_FLOAT16:
 				{
 					literal->type = &type_float16;
+					literal->value_f32 = literal->token->literal_float; // @Bug
 					Assert();
-				}
-				else if (literal->token->floating_point.explicit_bytes == 4)
+				} break;
+
+				case TOKEN_LITERAL_FLOAT32:
 				{
 					literal->type = &type_float32;
-					literal->value_float32 = literal->token->floating_point.value;
-				}
-				else if (literal->token->floating_point.explicit_bytes == 8)
+					literal->value_f32 = literal->token->literal_float;
+				} break;
+
+				case TOKEN_LITERAL_FLOAT64:
 				{
 					literal->type = &type_float64;
-					literal->value_float64 = literal->token->floating_point.value;
-				}
-				else Unreachable();
-			}
-			else if (literal->token->kind == TOKEN_TRUE || literal->token->kind == TOKEN_FALSE)
-			{
-				literal->type = &type_bool;
-				literal->value_bool = literal->token->kind == TOKEN_TRUE;
-			}
-			else if (literal->token->kind == TOKEN_NULL)
-			{
-				literal->type = GetPointer(&type_byte);
-				literal->value_pointer = null;
-			}
-			else if (literal->token->kind == TOKEN_STRING_LITERAL)
-			{
-				literal->is_referential_value = true;
-				literal->type = GetFixedArray(&type_uint8, literal->token->string.length);
+					literal->value_f64 = literal->token->literal_float;
+				} break;
+
+				case TOKEN_TRUE:  literal->type = &type_bool; literal->value_int = 1; break;
+				case TOKEN_FALSE: literal->type = &type_bool; literal->value_int = 0; break;
+				case TOKEN_NULL:  literal->type = GetPointer(&type_byte); literal->value_int = 0; break;
+
+				case TOKEN_LITERAL_STRING:
+				{
+					literal->flags |= AST_EXPRESSION_FLAG_REFERENTIAL;
+					literal->type = GetFixedArray(&type_uint8, literal->token->literal_string.length);
+				} break;
+
+				default: Assert(); Unreachable();
 			}
 		} break;
 
 		case AST_EXPRESSION_TUPLE:
 		{
 			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
-			tuple->is_referential_value = false;
-			tuple->can_constantly_evaluate = true;
-			tuple->is_pure = true;
 
 			tuple->recursive_count = tuple->elements.count;
 
 			Type* types[tuple->elements.count];
 
-			for (u32 i = 0; i < tuple->elements.count; i++)
+			Ast_Expression_Flags element_flags =
+				AST_EXPRESSION_FLAG_REFERENTIAL |
+				AST_EXPRESSION_FLAG_PURE |
+				AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
+
+			Ast_Expression_Flags tuple_flags =
+				AST_EXPRESSION_FLAG_INTERNALLY_REFERENTIAL |
+				AST_EXPRESSION_FLAG_PURE |
+				AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
+
+			for (uint32 i = 0; i < tuple->elements.count; i++)
 			{
 				Ast_Expression* element = tuple->elements[i];
 				ScanExpression(element, scope, module);
@@ -615,22 +531,24 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 				if (element->kind == AST_EXPRESSION_TUPLE)
 				{
 					tuple->recursive_count += ((Ast_Expression_Tuple*)element)->recursive_count-1;
+					tuple_flags &= element->flags;
+				}
+				else
+				{
+					element_flags &= element->flags;
 				}
 
-				if (element->type == &empty_tuple && (element->kind != AST_EXPRESSION_TUPLE || tuple->elements.count > 1)) // @FixMe: ((), int) ????
+				if (element->type == &empty_tuple && (element->kind != AST_EXPRESSION_TUPLE || tuple->elements.count > 1))
 				{
 					Error(module, element->span, "Tuple elements aren't allowed to be of type %.\n", element->type);
 				}
+			}
 
-				if (!element->can_constantly_evaluate)
-				{
-					tuple->can_constantly_evaluate = false;
-				}
+			tuple->flags = element_flags & tuple_flags;
 
-				if (!element->is_pure)
-				{
-					tuple->is_pure = false;
-				}
+			if (element_flags & AST_EXPRESSION_FLAG_REFERENTIAL)
+			{
+				tuple->flags |= (tuple_flags & AST_EXPRESSION_FLAG_INTERNALLY_REFERENTIAL);
 			}
 
 			tuple->type = GetTuple(Array(types, tuple->elements.count));
@@ -640,24 +558,24 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
-			unary->type = GetPointer(unary->subexpression->type);
-			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
-			unary->is_pure = unary->subexpression->is_pure;
-			unary->is_referential_value = false;
 
-			if (!unary->subexpression->is_referential_value)
+			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+			if (!(unary->subexpression->flags & AST_EXPRESSION_FLAG_REFERENTIAL))
 			{
 				Error(module, unary->span, "Cannot take address of a non-referential value.\n");
 			}
+
+			unary->type = GetPointer(unary->subexpression->type);
 		} break;
 
 		case AST_EXPRESSION_UNARY_REFERENCE_OF:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
-			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
-			unary->is_pure = unary->subexpression->is_pure;
-			unary->is_referential_value = true;
+
+			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+			unary->flags |= AST_EXPRESSION_FLAG_REFERENTIAL;
 
 			if (!IsPointer(unary->subexpression->type))
 			{
@@ -671,36 +589,35 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
-			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
-			unary->is_pure = unary->subexpression->is_pure;
-			unary->is_referential_value = false;
+			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
-			if (!IsInteger(unary->subexpression->type) && !IsPointer(unary->subexpression->type))
+			if (IsEffectiveInteger(unary->subexpression->type))
+			{
+				unary->subexpression = ImplicitCast(unary->subexpression, GetEffectiveType(unary->subexpression->type), module);
+				unary->type = unary->subexpression->type;
+			}
+			else if (IsPointer(unary->subexpression->type))
+			{
+				unary->type = unary->subexpression->type;
+			}
+			else
 			{
 				Error(module, unary->subexpression->span, "Type % is not an integer or pointer.\n", unary->subexpression->type);
 			}
-
-			unary->type = unary->subexpression->type;
 		} break;
 
 		case AST_EXPRESSION_UNARY_MINUS:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
-			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
-			unary->is_pure = unary->subexpression->is_pure;
-			unary->is_referential_value = false;
+			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
-			if (!IsFloat(unary->subexpression->type) && !IsSignedInteger(unary->subexpression->type) && !IsPointer(unary->subexpression->type))
+			if (!IsEffectiveInteger(unary->subexpression->type) && !IsPointer(unary->subexpression->type) && !IsFloat(unary->subexpression->type))
 			{
-				if (!CanImplicitCast(unary->subexpression->type, &type_int64))
-				{
-					Error(module, unary->subexpression->span, "Type % is not an arithmetic type.\n", unary->subexpression->type);
-				}
-
-				unary->subexpression = ImplicitCast(unary->subexpression, &type_int64, module);
+				Error(module, unary->subexpression->span, "Unary minus does not work on type '%'.\n", unary->subexpression->type);
 			}
 
+			unary->subexpression = ImplicitCast(unary->subexpression, GetEffectiveType(unary->subexpression->type), module);
 			unary->type = unary->subexpression->type;
 		} break;
 
@@ -708,9 +625,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
-			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
-			unary->is_pure = unary->subexpression->is_pure;
-			unary->is_referential_value = false;
+			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 			if (!IsSignedInteger(unary->subexpression->type) && !IsFloat(unary->subexpression->type))
 			{
@@ -724,9 +639,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
-			unary->can_constantly_evaluate = unary->subexpression->can_constantly_evaluate;
-			unary->is_pure = unary->subexpression->is_pure;
-			unary->is_referential_value = false;
+			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 			if (!CanImplicitCast(unary->subexpression->type, &type_bool))
 			{
@@ -761,7 +674,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 				binary->right->kind = AST_EXPRESSION_TERMINAL_ENUM_MEMBER;
 
 				Ast_Expression_Enum_Member* member_terminal = (Ast_Expression_Enum_Member*)binary->right;
-				String name = member_terminal->token->string;
+				String name = member_terminal->token->identifier_string;
 
 				Ast_Enum_Member* member = FindEnumMember(ast_enum, name);
 
@@ -772,84 +685,87 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 
 				member_terminal->member = member;
 				member_terminal->type = type;
-				member_terminal->can_constantly_evaluate = true;
-				member_terminal->is_pure = true;
-				member_terminal->is_referential_value = false;
+				member_terminal->flags = AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
 				binary->type = type;
-				binary->can_constantly_evaluate = true;
-				binary->is_pure = true;
-				binary->is_referential_value = false;
+				binary->flags = AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 			}
-			else if (type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY || type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
-			{
-				if (binary->right->kind == AST_EXPRESSION_TERMINAL_NAME)
-				{
-					Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)binary->right;
-
-					if (terminal->token->kind != TOKEN_IDENTIFIER_CASUAL)
-					{
-						Error(module, binary->span, "Invalid dot expression on array.\n");
-					}
-
-					if (type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY && (
-						CompareStrings(terminal->token->string, "data") ||
-						CompareStrings(terminal->token->string, "begin")))
-						// @Todo: array.end
-					{
-						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_DATA;
-						binary->type = GetPointer(binary->left->type->subtype);
-						binary->is_referential_value = binary->left->is_referential_value;
-					}
-					else if (CompareStrings(terminal->token->string, "length") ||
-						CompareStrings(terminal->token->string, "count"))
-					{
-						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_LENGTH;
-						binary->type = &type_uint64;
-						binary->is_referential_value = binary->left->is_referential_value && binary->left->type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY;
-						binary->can_constantly_evaluate = binary->left->type->kind == TYPE_SPECIFIER_FIXED_ARRAY;
-					}
-					else
-					{
-						Error(module, binary->span, "Invalid array member: %\n", terminal->token);
-					}
-				}
-				else
-				{
-					Error(module, binary->span, "Invalid dot expression on array.\n");
-				}
-			}
-			else
+			else if (binary->right->kind == AST_EXPRESSION_TERMINAL_NAME && ((Ast_Expression_Terminal*)binary->right)->token->kind == TOKEN_IDENTIFIER_CASUAL)
 			{
 				Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)binary->right;
-				binary->is_referential_value = binary->left->is_referential_value || binary->left->type->kind == TYPE_SPECIFIER_POINTER;
+				String name = terminal->token->identifier_string;
 
 				while (type->kind == TYPE_SPECIFIER_POINTER) type = type->subtype;
 
 				if (type->kind == TYPE_BASETYPE_STRUCT)
 				{
-					if (binary->right->kind != AST_EXPRESSION_TERMINAL_NAME)
+					binary->flags = binary->left->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | AST_EXPRESSION_FLAG_REFERENTIAL);
+
+					if (binary->left->type->kind == TYPE_SPECIFIER_POINTER)
 					{
-						Error(module, binary->span, "Expected struct member name, not: %\n", terminal->token);
+						binary->flags |= AST_EXPRESSION_FLAG_REFERENTIAL;
 					}
 
 					Ast_Struct* ast_struct = type->structure;
-					Ast_Struct_Member* member = FindStructMember(ast_struct, terminal->token->string);
+					Ast_Struct_Member* member = FindStructMember(ast_struct, terminal->token->identifier_string);
 
 					if (!member)
 					{
 						Error(module, binary->span, "Struct % does not have a member named %\n", ast_struct->name, terminal->token);
 					}
 
-					binary->type = member->type.type;
+					binary->type = member->type;
 					terminal->kind = AST_EXPRESSION_TERMINAL_STRUCT_MEMBER;
 					((Ast_Expression_Struct_Member*)terminal)->member = member;
-					terminal->type = member->type.type;
+					terminal->type = member->type;
+				}
+				else if (type->kind == TYPE_SPECIFIER_DYNAMIC_ARRAY || type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
+				{
+					bool fixed = type->kind == TYPE_SPECIFIER_FIXED_ARRAY;
+
+					if (CompareString(name, "begin") || CompareString(name, "data"))
+					{
+						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_BEGIN;
+						binary->flags = binary->left->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+						if (!fixed)
+						{
+							binary->flags |= binary->left->flags & AST_EXPRESSION_FLAG_REFERENTIAL;
+						}
+
+						binary->type = GetPointer(binary->left->type->subtype);
+					}
+					else if (CompareString(name, "end"))
+					{
+						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_END;
+						binary->flags = binary->left->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+						binary->type = GetPointer(binary->left->type->subtype);
+					}
+					else if (CompareString(name, "length") || CompareString(name, "count"))
+					{
+						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_LENGTH;
+						binary->flags = binary->left->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+						if (!fixed)
+						{
+							binary->flags |= binary->left->flags & AST_EXPRESSION_FLAG_REFERENTIAL;
+						}
+
+						binary->type = &type_uint64;
+					}
+					else
+					{
+						Error(module, binary->right->span, "'%' does not have a member named '%'.\n", type, name);
+					}
 				}
 				else
 				{
-					Error(module, binary->span, "Cannot dot into type: %\n", binary->left->type);
+					Error(module, binary->span, "'%' does not have a member named '%'.\n", type, name);
 				}
+			}
+			else
+			{
+				Error(module, binary->span, "Invalid dot expression.\n", binary->left->type);
 			}
 		} break;
 
@@ -859,19 +775,12 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
-			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
-			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
-			binary->is_referential_value = false;
 
-			if (IsArithmetic(binary->left->type) || IsArithmetic(binary->right->type))
-			{
-				binary->left = TryImplicitCastToArithmeticType(binary->left, module);
-				binary->right = TryImplicitCastToArithmeticType(binary->right, module);
-			}
+			binary->flags = (binary->left->flags & binary->right->flags) & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 			Type* dominant = GetDominantType(binary->left->type, binary->right->type);
 
-			if (!CanImplicitCast(binary->left->type, dominant) || !CanImplicitCast(binary->right->type, dominant))
+			if (!dominant)
 			{
 				Error(module, binary->span, "% and % are incompatible types.\n", binary->left->type, binary->right->type);
 			}
@@ -890,23 +799,21 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
-			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
-			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
-			binary->is_referential_value = false;
+			binary->flags = (binary->left->flags & binary->right->flags) & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
-			Type* dominant = GetDominantType(GetArithmeticType(binary->left->type), GetArithmeticType(binary->right->type));
+			Type* dominant = GetDominantType(GetEffectiveType(binary->left->type), GetEffectiveType(binary->right->type));
 
-			if (!IsArithmetic(dominant))
-			{
-				Error(module, binary->span, "% is not an arithmetic type.\n", dominant);
-			}
-
-			if (!CanImplicitCast(binary->left->type, dominant) || !CanImplicitCast(binary->left->type, dominant))
+			if (!dominant)
 			{
 				Error(module, binary->span, "Incompatible types % and %\n", binary->left->type, binary->right->type);
 			}
 
-			binary->left = ImplicitCast(binary->left, dominant, module);
+			if (!IsInteger(dominant) && !IsFloat(dominant) && !IsPointer(dominant))
+			{
+				Error(module, binary->span, "Cannot compare types '%' and '%'.\n", binary->left->type, binary->right->type);
+			}
+
+			binary->left  = ImplicitCast(binary->left,  dominant, module);
 			binary->right = ImplicitCast(binary->right, dominant, module);
 
 			binary->type = &type_bool;
@@ -922,51 +829,87 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
-			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
-			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
-			binary->is_referential_value = false;
+			binary->flags = (binary->left->flags & binary->right->flags) & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
-			binary->left = TryImplicitCastToArithmeticType(binary->left, module);
-			binary->right = TryImplicitCastToArithmeticType(binary->right, module);
-
-			if (IsPointer(binary->left->type) && IsPointer(binary->right->type))
+			if (IsPointer(binary->left->type))
 			{
-				if (binary->left->type != binary->right->type && !IsBytePointer(binary->left->type) && !IsBytePointer(binary->right->type))
+				// ptr + int = ptr
+				// ptr - int = ptr
+				// ptr - ptr = int
+
+				if (binary->kind == AST_EXPRESSION_BINARY_ADD)
 				{
-					Error(module, binary->span,
-						"Cannot perform binary expression '%' on two pointers of different types: '%' and '%'.\n",
-						binary->op, binary->left->type, binary->right->type);
+					if (!CanImplicitCast(binary->right->type, &type_int64))
+					{
+						Error(module, binary->span, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+					}
+
+					binary->right = ImplicitCast(binary->right, &type_int64, module);
+					binary->type = binary->left->type;
 				}
-
-				binary->type = binary->left->type;
-
-				if (binary->kind == AST_EXPRESSION_BINARY_SUBTRACT)
+				else if (binary->kind == AST_EXPRESSION_BINARY_SUBTRACT)
 				{
-					binary->type = &type_int64;
+					if (IsPointer(binary->right->type))
+					{
+						Type* dominant = GetDominantType(binary->left->type, binary->right->type);
+
+						if (!dominant)
+						{
+							Error(module, binary->span, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+						}
+
+						binary->left = ImplicitCast(binary->left, dominant, module);
+						binary->right = ImplicitCast(binary->right, dominant, module);
+
+						binary->type = &type_int64;
+					}
+					else if (CanImplicitCast(binary->right->type, &type_int64))
+					{
+						binary->right = ImplicitCast(binary->right, &type_int64, module);
+						binary->type = binary->left->type;
+					}
+					else
+					{
+						Error(module, binary->span, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+					}
+				}
+				else
+				{
+					Error(module, binary->span, "Binary expression '%' cannot be used on a pointer.\n", binary->op);
 				}
 			}
-			else if (IsPointer(binary->left->type) && CanImplicitCast(binary->right->type, &type_int64))
+			else if (IsFloat(binary->left->type) || IsFloat(binary->right->type))
 			{
-				binary->right = ImplicitCast(binary->right, &type_int64, module);
-				binary->type = binary->left->type;
+				// float + float = float
+				// float - float = float
+				// float * float = float
+				// float / float = float
+
+				Type* dominant = GetDominantType(binary->left->type, binary->right->type);
+
+				if (!dominant || !IsFloat(dominant) || binary->kind == AST_EXPRESSION_BINARY_MODULO)
+				{
+					Error(module, binary->span, "Binary expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+				}
+
+				binary->left  = ImplicitCast(binary->left,  dominant, module);
+				binary->right = ImplicitCast(binary->right, dominant, module);
+
+				binary->type = dominant;
 			}
 			else
 			{
-				Type* dominant = GetDominantType(binary->left->type, binary->right->type);
+				// int + int
+				// int - int
+				// int * int
+				// int / int
+				// int % int
 
-				if (!IsArithmetic(binary->left->type))
-				{
-					Error(module, binary->span, "% is not an arithmetic type.\n", binary->left->type);
-				}
+				Type* dominant = GetDominantType(GetEffectiveType(binary->left->type), GetEffectiveType(binary->right->type));
 
-				if (!IsArithmetic(binary->right->type))
+				if (!dominant || !IsInteger(dominant))
 				{
-					Error(module, binary->span, "% is not an arithmetic type.\n", binary->right->type);
-				}
-
-				if (!CanImplicitCast(binary->left->type, dominant) || !CanImplicitCast(binary->right->type, dominant))
-				{
-					Error(module, binary->span, "Types % and % are incompatible.\n", binary->left->type, binary->right->type);
+					Error(module, binary->span, "Binary expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
 				}
 
 				binary->left = ImplicitCast(binary->left, dominant, module);
@@ -979,28 +922,53 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 		case AST_EXPRESSION_BINARY_BITWISE_OR:
 		case AST_EXPRESSION_BINARY_BITWISE_XOR:
 		case AST_EXPRESSION_BINARY_BITWISE_AND:
+		{
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
+			ScanExpression(binary->left,  scope, module);
+			ScanExpression(binary->right, scope, module);
+			binary->flags = (binary->left->flags & binary->right->flags) & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+			// ptr OR  int = ptr
+			// ptr XOR int = ptr
+			// ptr AND int = int
+
+			if (!IsEffectiveInteger(binary->left->type) && !IsPointer(binary->left->type))
+			{
+				Error(module, binary->span, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
+			}
+
+			if (!IsEffectiveInteger(binary->right->type) && !IsPointer(binary->right->type))
+			{
+				Error(module, binary->span, "Cannot use bitwise % with type: %\n", binary->op, binary->right->type);
+			}
+
+			binary->type = binary->left->type;
+		} break;
+
 		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
 		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
-			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
-			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
-			binary->is_referential_value = false;
+			binary->flags = (binary->left->flags & binary->right->flags) & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
-			if (!IsInteger(binary->left->type) && !IsPointer(binary->left->type))
+			if (!IsEffectiveInteger(binary->left->type) && !IsPointer(binary->left->type))
 			{
 				Error(module, binary->span, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
 			}
 
-			if (!IsInteger(binary->right->type) && !IsPointer(binary->right->type))
+			if (!IsEffectiveInteger(binary->right->type))
 			{
 				Error(module, binary->span, "Cannot use bitwise % with type: %\n", binary->op, binary->right->type);
 			}
 
-			binary->type = GetDominantType(binary->left->type, binary->right->type);
+			binary->left  = ImplicitCastToEffectiveType(binary->left,  module);
+			binary->right = ImplicitCastToEffectiveType(binary->right, module);
+
+			binary->type = binary->left->type;
 		} break;
+
 
 		case AST_EXPRESSION_BINARY_AND:
 		case AST_EXPRESSION_BINARY_OR:
@@ -1008,9 +976,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
-			binary->can_constantly_evaluate = binary->left->can_constantly_evaluate && binary->right->can_constantly_evaluate;
-			binary->is_pure = binary->left->is_pure && binary->right->is_pure;
-			binary->is_referential_value = false;
+			binary->flags = (binary->left->flags & binary->right->flags) & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 			if (!CanImplicitCast(binary->left->type, &type_bool))
 			{
@@ -1069,25 +1035,28 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 			ScanExpression(ternary->left,   scope, module);
 			ScanExpression(ternary->middle, scope, module);
 			ScanExpression(ternary->right,  scope, module);
-			ternary->can_constantly_evaluate = ternary->left->can_constantly_evaluate && ternary->middle->can_constantly_evaluate && ternary->right->can_constantly_evaluate;
-			ternary->is_pure = ternary->left->is_pure && ternary->middle->is_pure && ternary->right->is_pure;
-			ternary->is_referential_value = ternary->left->is_referential_value && ternary->right->is_referential_value && ternary->left->type == ternary->right->type;
+			ternary->flags = (ternary->left->flags & ternary->middle->flags & ternary->right->flags) & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 			Type* dominant = GetDominantType(ternary->left->type, ternary->right->type);
+
+			if (!dominant)
+			{
+				Error(module, ternary->left->span, "Types '%' and '%' are incompatible.\n", ternary->left->type, ternary->right->type);
+			}
 
 			if (!CanImplicitCast(ternary->middle->type, &type_bool))
 			{
 				Error(module, ternary->middle->span, "Type % not convertable to bool\n", ternary->middle->type);
 			}
 
-			if (!CanImplicitCast(ternary->left->type, dominant) || !CanImplicitCast(ternary->right->type, dominant))
-			{
-				Error(module, ternary->left->span, "Type mismatch between % and %\n", ternary->left->type, ternary->right->type);
-			}
-
 			ternary->middle = ImplicitCast(ternary->middle, &type_bool, module);
 			ternary->left = ImplicitCast(ternary->left, dominant, module);
 			ternary->right = ImplicitCast(ternary->right, dominant, module);
+
+			if (ternary->left->type == ternary->right->type)
+			{
+				ternary->flags |= ternary->left->flags & ternary->right->flags & AST_EXPRESSION_FLAG_REFERENTIAL;
+			}
 
 			ternary->type = dominant;
 		} break;
@@ -1101,8 +1070,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 
 			ScanExpression(call->parameters, scope, module);
 
-			if (call->function->kind == AST_EXPRESSION_BINARY_DOT &&
-				dot->right->kind == AST_EXPRESSION_TERMINAL_NAME &&
+			if (dot->kind == AST_EXPRESSION_BINARY_DOT && dot->right->kind == AST_EXPRESSION_TERMINAL_NAME &&
 				((Ast_Expression_Terminal*)dot->right)->token->kind == TOKEN_IDENTIFIER_FORMAL)
 			{
 				Ast_Expression_Dot_Call* call = (Ast_Expression_Dot_Call*)expression;
@@ -1118,11 +1086,11 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 				}
 
 				Type* full_param_type = MergeTypeRight(dot->left->type, call->parameters->type);
-				Ast_Function* function = FindFunction(function_expression->token->string, full_param_type, scope);
+				Ast_Function* function = FindFunction(scope, function_expression->token->identifier_string, full_param_type);
 
 				if (!function)
 				{
-					Error(module, call->span, "No function exists called % with input type: %.\n", function_expression->token->string, full_param_type);
+					Error(module, call->span, "No function exists called % with input type: %.\n", function_expression->token->identifier_string, full_param_type);
 				}
 
 				function_expression->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
@@ -1130,22 +1098,20 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 				function_expression->type = function->type;
 
 				call->type = function->return_type;
-				call->can_constantly_evaluate = false; // @FixMe: Need to figure out how to prove this.
-				call->is_pure = false;                 // @FixMe: This too.
-				call->is_referential_value = false;
+				call->flags = 0;
 
 				Assert(call->parameters->elements.count == function->parameters.count-1);
 
 				dot->left = ImplicitCast(dot->left, function->parameters[0].type, module);
 
-				for (u32 i = 0; i < call->parameters->elements.count; i++)
+				for (uint32 i = 0; i < call->parameters->elements.count; i++)
 				{
 					call->parameters->elements[i] = ImplicitCast(call->parameters->elements[i], function->parameters[i+1].type, module);
 				}
 			}
 			else if (call->function->kind == AST_EXPRESSION_TERMINAL_NAME && terminal->token->kind == TOKEN_IDENTIFIER_FORMAL)
 			{
-				if (Ast_Function* function = FindFunction(terminal->token->string, call->parameters->type, scope); function)
+				if (Ast_Function* function = FindFunction(scope, terminal->token->identifier_string, call->parameters->type); function)
 				{
 					Ast_Expression_Function* function_expression = (Ast_Expression_Function*)call->function;
 					call->function->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
@@ -1153,29 +1119,27 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 					function_expression->type = function->type;
 
 					call->type = function->return_type;
-					call->can_constantly_evaluate = false; // @FixMe: Need to figure out how to prove this.
-					call->is_pure = false;                 // @FixMe: This too.
-					call->is_referential_value = false;
+					call->flags = 0;
 
 					call->parameters = (Ast_Expression_Tuple*)ImplicitCast(call->parameters, function->type->input, module);
 				}
-				else if (Intrinsic_Function* intrinsic_function = FindIntrinsicFunction(terminal->token->string, call->parameters->type); intrinsic_function)
+				else if (IntrinsicID intrinsic = FindIntrinsic(terminal->token->identifier_string, call->parameters->type); intrinsic != INTRINSIC_INVALID)
 				{
-					Ast_Expression_Intrinsic_Function* intrinsic_function_expression = (Ast_Expression_Intrinsic_Function*)call->function;
-					intrinsic_function_expression->intrinsic_function = intrinsic_function;
-					intrinsic_function_expression->type = intrinsic_function->type;
+					Type* type = GetIntrinsicType(intrinsic);
 
-					call->function->kind = AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION;
-					call->type = intrinsic_function->output;
-					call->can_constantly_evaluate = false; // @FixMe: Might not always be false.
-					call->is_pure = false;                 // @FixMe: This too.
-					call->is_referential_value = false;
+					Ast_Expression_Intrinsic* intrinsic_expression = (Ast_Expression_Intrinsic*)call->function;
+					intrinsic_expression->intrinsic = intrinsic;
+					intrinsic_expression->type = type;
 
-					call->parameters = (Ast_Expression_Tuple*)ImplicitCast(call->parameters, intrinsic_function->input, module);
+					call->function->kind = AST_EXPRESSION_TERMINAL_INTRINSIC;
+					call->type = type->output;
+					call->flags = 0;
+
+					call->parameters = (Ast_Expression_Tuple*)ImplicitCast(call->parameters, type->input, module);
 				}
 				else
 				{
-					Error(module, terminal->token->location, "No function exists called % with input type: %.\n", terminal->token->string, call->parameters->type);
+					Error(module, terminal->token->location, "No function exists called % with input type: %.\n", terminal->token->identifier_string, call->parameters->type);
 				}
 			}
 			else
@@ -1188,8 +1152,7 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 				}
 
 				Type* function_type = call->function->type->subtype;
-				call->can_constantly_evaluate = false;
-				call->is_pure = false;
+				call->flags = 0;
 				call->type = function_type->output;
 
 				if (!CanImplicitCast(call->parameters->type, function_type->input))
@@ -1212,6 +1175,8 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 			ScanExpression(subscript->array, scope, module);
 			ScanExpression(subscript->index, scope, module);
 
+			bool fixed = subscript->array->type->kind == TYPE_SPECIFIER_FIXED_ARRAY;
+
 			if (subscript->array->type->kind != TYPE_SPECIFIER_FIXED_ARRAY   &&
 				subscript->array->type->kind != TYPE_SPECIFIER_DYNAMIC_ARRAY &&
 				subscript->array->type->kind != TYPE_SPECIFIER_POINTER)
@@ -1225,16 +1190,15 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 			}
 
 			subscript->index = ImplicitCast(subscript->index, &type_int64, module);
+			subscript->flags = subscript->array->flags & subscript->index->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+			subscript->flags |= subscript->array->flags & AST_EXPRESSION_FLAG_REFERENTIAL;
+
+			if (!fixed)
+			{
+				subscript->flags |= AST_EXPRESSION_FLAG_REFERENTIAL;
+			}
 
 			subscript->type = subscript->array->type->subtype;
-			subscript->can_constantly_evaluate = subscript->array->can_constantly_evaluate && subscript->index->can_constantly_evaluate;
-			subscript->is_pure = subscript->array->is_pure && subscript->index->is_pure;
-			subscript->is_referential_value = true;
-
-			if (subscript->array->type->kind == TYPE_SPECIFIER_FIXED_ARRAY)
-			{
-				subscript->is_referential_value = subscript->array->is_referential_value;
-			}
 		} break;
 
 		case AST_EXPRESSION_AS:
@@ -1243,11 +1207,9 @@ void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* mo
 			ScanExpression(as->expression, scope, module);
 			as->type = GetType(&as->ast_type, scope, module);
 
-			as->can_constantly_evaluate = as->expression->can_constantly_evaluate;
-			as->is_pure = as->expression->is_pure;
-			as->is_referential_value = false;
+			as->flags = as->expression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
-			if (!CanImplicitCast(as->expression->type, as->type))
+			if (!CanExplicitCast(as->expression->type, as->type))
 			{
 				Error(module, as->span, "Type % is not convertable to %\n", as->expression->type, as->type);
 			}
@@ -1266,7 +1228,7 @@ static void GenerateClosure(Ast_Struct* target, Array<Type*> tuple);
 
 static void GenerateClosure(Ast_Struct* target, Array<Type*> tuple)
 {
-	for (u32 i = 0; i < tuple.count; i++)
+	for (uint32 i = 0; i < tuple.count; i++)
 	{
 		Type* type = tuple[i];
 		if (type->kind == TYPE_BASETYPE_STRUCT)
@@ -1287,7 +1249,7 @@ static void GenerateClosure(Ast_Struct* target, Ast_Struct* ast_struct)
 {
 	for (Ast_Struct_Member* member = ast_struct->members; member < ast_struct->members.End(); member++)
 	{
-		Type* type = member->type.type;
+		Type* type = member->type;
 		if (type->kind == TYPE_BASETYPE_STRUCT)
 		{
 			if (target->closure.AddIfUnique(type->structure))
@@ -1308,7 +1270,7 @@ static void CheckForCircularDependencies(Ast_Struct* ast_struct, Ast_Module* mod
 
 	if (ast_struct->closure.Contains(ast_struct))
 	{
-		Error(module, ast_struct->name->location, "The closure of struct % contains % (circularly dependent)\n", ast_struct->name, ast_struct->name);
+		Error(module, ast_struct->name_token->location, "The closure of struct '%' contains '%' (circularly dependent)\n", ast_struct->name, ast_struct->name);
 	}
 }
 
@@ -1319,10 +1281,10 @@ static void CalculateTupleSize(Type* tuple)
 {
 	if (tuple->size) return;
 
-	u64 size = 0;
+	uint64 size = 0;
 
 	Assert(tuple->tuple.count);
-	for (u32 i = 0; i < tuple->tuple.count; i++)
+	for (uint32 i = 0; i < tuple->tuple.count; i++)
 	{
 		Type* type = tuple->tuple[i];
 		if (type->kind == TYPE_BASETYPE_STRUCT)
@@ -1344,11 +1306,11 @@ static void CalculateStructSize(Ast_Struct* s)
 {
 	if (s->type.size) return;
 
-	u64 size = 0;
+	uint64 size = 0;
 
 	for (Ast_Struct_Member* member = s->members; member < s->members.End(); member++)
 	{
-		Type* type = member->type.type;
+		Type* type = member->type;
 
 		if (type->kind == TYPE_BASETYPE_STRUCT)
 		{
@@ -1366,12 +1328,12 @@ static void CalculateStructSize(Ast_Struct* s)
 	s->type.size = size;
 }
 
-void ScanScope(Ast_Scope* scope, Ast_Module* module)
+static void ScanScope(Ast_Scope* scope, Ast_Module* module)
 {
-	for (u32 i = 0; i < scope->variables.count; i++) // @RemoveMe?
+	for (uint32 i = 0; i < scope->variables.count; i++) // @RemoveMe?
 	{
-		Ast_VariableDeclaration* var = scope->variables[i];
-		var->stack = IR_NONE;
+		Ast_Variable* var = scope->variables[i];
+		var->ir = None();
 	}
 
 	// @Yuck: This function is *disgusting*, all of this should be implicit when we try to use a type for the first time or something... Also, what about multi-threading?
@@ -1383,23 +1345,23 @@ void ScanScope(Ast_Scope* scope, Ast_Module* module)
 
 		for (Ast_Struct* other = scope->structs; other < ast_struct; other++)
 		{
-			if (CompareStrings(ast_struct->name->string, other->name->string))
+			if (CompareString(ast_struct->name, other->name))
 			{
-				Error(module, ast_struct->name->location, "Duplicate struct called '%'\n", ast_struct->name);
+				Error(module, ast_struct->name_token->location, "Duplicate struct called '%'\n", ast_struct->name);
 			}
 		}
 
 		for (Ast_Enum* ast_enum = scope->enums; ast_enum < scope->enums.End(); ast_enum++)
 		{
-			if (CompareStrings(ast_struct->name->string, ast_enum->name->string))
+			if (CompareString(ast_struct->name, ast_enum->name))
 			{
-				if (ast_struct->name->location.line < ast_enum->name->location.line)
+				if (ast_struct->name_token->location.line < ast_enum->name_token->location.line)
 				{
-					Error(module, ast_enum->name->location, "Duplicate type called '%'\n", ast_enum->name);
+					Error(module, ast_enum->name_token->location, "Duplicate type called '%'\n", ast_enum->name);
 				}
 				else
 				{
-					Error(module, ast_struct->name->location, "Duplicate type called '%'\n", ast_struct->name);
+					Error(module, ast_struct->name_token->location, "Duplicate type called '%'\n", ast_struct->name);
 				}
 			}
 		}
@@ -1408,9 +1370,9 @@ void ScanScope(Ast_Scope* scope, Ast_Module* module)
 		{
 			for (Ast_Struct_Member* member_other = ast_struct->members; member_other < member; member_other++)
 			{
-				if (CompareStrings(member->name->string, member_other->name->string))
+				if (CompareString(member->name, member_other->name))
 				{
-					Error(module, member->name->location, "Duplicate member called '%' in struct %\n", member->name, ast_struct->name);
+					Error(module, member->name_token->location, "Duplicate member called '%' in struct %\n", member->name, ast_struct->name);
 				}
 			}
 		}
@@ -1426,9 +1388,9 @@ void ScanScope(Ast_Scope* scope, Ast_Module* module)
 
 		for (Ast_Enum* eo = scope->enums; eo < ast_enum; eo++)
 		{
-			if (CompareStrings(ast_enum->name->string, eo->name->string))
+			if (CompareString(ast_enum->name, eo->name))
 			{
-				Error(module, ast_enum->name->location, "Duplicate enum called '%'\n", ast_enum->name);
+				Error(module, ast_enum->name_token->location, "Duplicate enum called '%'\n", ast_enum->name);
 			}
 		}
 
@@ -1436,9 +1398,9 @@ void ScanScope(Ast_Scope* scope, Ast_Module* module)
 		{
 			for (Ast_Enum_Member* member_other = ast_enum->members; member_other < member; member_other++)
 			{
-				if (CompareStrings(member->name->string, member_other->name->string))
+				if (CompareString(member->name, member_other->name))
 				{
-					Error(module, member->name->location, "Duplicate member called '%' in enum %\n", member->name, ast_enum->name);
+					Error(module, member->name_token->location, "Duplicate member called '%' in enum %\n", member->name, ast_enum->name);
 				}
 			}
 		}
@@ -1448,12 +1410,11 @@ void ScanScope(Ast_Scope* scope, Ast_Module* module)
 	{
 		for (Ast_Struct_Member* member = ast_struct->members; member < ast_struct->members.End(); member++)
 		{
-			Type* type = GetType(&member->type, scope, module);
-			member->type.type = type;
+			member->type = GetType(&member->ast_type, scope, module);
 
-			if (!type)
+			if (!member->type)
 			{
-				Error(module, member->type.basetype.token->location, "Unknown type '%'\n", member->type.basetype.token);
+				Error(module, member->ast_type.basetype.token->location, "Unknown type '%'\n", member->ast_type.basetype.token);
 			}
 		}
 	}
@@ -1479,7 +1440,7 @@ void ScanScope(Ast_Scope* scope, Ast_Module* module)
 
 		for (Ast_Function* other = scope->functions; other < function; other++)
 		{
-			if (function->type == other->type && CompareStrings(function->name, other->name))
+			if (function->type == other->type && CompareString(function->name, other->name))
 			{
 				Error(module, function->name_token->location, "Function '%' with type % already exists.\n", function->name, function->type);
 			}
@@ -1490,38 +1451,23 @@ void ScanScope(Ast_Scope* scope, Ast_Module* module)
 	{
 		ScanCode(&function->code, scope, function, module);
 
-		if (function->return_type != &empty_tuple)
+		if (function->return_type != &empty_tuple && !function->code.all_paths_return)
 		{
-			if (!function->code.all_paths_return)
+			if (function->code.contains_return)
+			{
+				Error(module, function->name_token->location, "Not all paths return a value.\n");
+			}
+			else
 			{
 				Error(module, function->name_token->location, "Function does not return a value.\n");
 			}
 		}
 	}
-
 }
 
-bool IsAssignable(Ast_Expression* expression)
+static bool IsAssignable(Ast_Expression* expression)
 {
-	if (expression->is_referential_value) return true;
-
-	if (expression->kind == AST_EXPRESSION_TUPLE)
-	{
-		// @RemoveMe: You can't even declare a variable with empty_tuple anyways, remove check?
-		if (expression->type == &empty_tuple) return false;
-
-		Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
-
-		for (u32 i = 0; i < tuple->elements.count; i++)
-		{
-			Ast_Expression* element = tuple->elements[i];
-			if (!IsAssignable(element)) return false;
-		}
-
-		return true;
-	}
-
-	return false;
+	return expression->flags & (AST_EXPRESSION_FLAG_REFERENTIAL | AST_EXPRESSION_FLAG_INTERNALLY_REFERENTIAL);
 }
 
 static bool IsLoop(Ast_Branch* branch)
@@ -1533,21 +1479,178 @@ static bool IsLoop(Ast_Branch* branch)
 			return false;
 
 		case AST_BRANCH_WHILE:
-		case AST_BRANCH_FOR_COUNT:
 		case AST_BRANCH_FOR_RANGE:
 		case AST_BRANCH_FOR_VERBOSE:
 			return true;
 	}
 }
 
-static bool DoesBranchAlwaysReturn(Ast_BranchBlock* branch_block, Ast_Branch_Index branch_index)
+static bool DoesBranchAlwaysReturn(Ast_Branch* branch)
 {
-	Ast_Branch* branch = &branch_block->branches[branch_index];
-	return branch_index != AST_BRANCH_INDEX_NONE
-		&& (branch->code.all_paths_return || (DoesBranchAlwaysReturn(branch_block, branch->else_branch_index) && DoesBranchAlwaysReturn(branch_block, branch->then_branch_index)));
+	if (!branch) return false;
+
+	bool true_path_returns = branch->code.all_paths_return || DoesBranchAlwaysReturn(branch->then_branch);
+
+	if (branch->kind == AST_BRANCH_NAKED) return true_path_returns;
+
+	return true_path_returns && DoesBranchAlwaysReturn(branch->else_branch);
 }
 
-void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Module* module)
+static void SemanticParseBranchBlock(Ast_Module* module, Ast_Function* function, Ast_Code* code, Ast_BranchBlock* branch_block)
+{
+	for (uint32 i = 0; i < branch_block->branches.count; i++)
+	{
+		Ast_Branch* branch = &branch_block->branches[i];
+
+		branch->code.scope.parent = &code->scope; // @Hack
+
+		switch (branch->kind)
+		{
+			case AST_BRANCH_NAKED:
+			{
+				branch->code.is_inside_loop = code->is_inside_loop;
+				code->contains_break = code->contains_break || branch->code.contains_break;
+			} break;
+
+			case AST_BRANCH_IF:
+			{
+				ScanExpression(branch->if_condition, &code->scope, module);
+
+				if (!CanImplicitCast(branch->if_condition->type, &type_bool))
+				{
+					Error(module, branch->if_condition->span, "Cannot implicitly cast condition with type % to bool\n", branch->if_condition->type);
+				}
+
+				branch->if_condition = ImplicitCast(branch->if_condition, &type_bool, module);
+
+				branch->code.is_inside_loop = code->is_inside_loop;
+				code->contains_break = code->contains_break || branch->code.contains_break;
+			} break;
+
+			case AST_BRANCH_WHILE:
+			{
+				ScanExpression(branch->while_condition, &code->scope, module);
+
+				if (!CanImplicitCast(branch->while_condition->type, &type_bool))
+				{
+					Error(module, branch->while_condition->span, "Cannot implicitly cast condition with type % to bool\n", branch->while_condition->type);
+				}
+
+				branch->while_condition = ImplicitCast(branch->while_condition, &type_bool, module);
+
+				branch->code.is_inside_loop = true;
+			} break;
+
+			case AST_BRANCH_FOR_RANGE:
+			{
+				ScanExpression(branch->for_range.range, &code->scope, module);
+				branch->code.scope.variables.Add(branch->for_range.iterator); // for i in i:
+
+				if (!IsDynamicArray(branch->for_range.range->type) && !IsFixedArray(branch->for_range.range->type))
+				{
+					Error(module, branch->for_range.range->span, "For loop cannot range over type: %\n", branch->for_range.range->type);
+				}
+
+				if (branch->for_range.filter)
+				{
+					ScanExpression(branch->for_range.filter, &branch->code.scope, module);
+
+					if (!CanImplicitCast(branch->for_range.filter->type, &type_bool))
+					{
+						Error(module, branch->for_range.filter->span, "For loop filter expression of type % cannot be implicitly casted to bool\n", branch->for_range.filter->type);
+					}
+
+					branch->for_range.filter = ImplicitCast(branch->for_range.filter, &type_bool, module);
+				}
+
+				if (branch->for_range.stride)
+				{
+					ScanExpression(branch->for_range.stride, &branch->code.scope, module);
+
+					if (!CanImplicitCast(branch->for_range.stride->type, &type_int64))
+					{
+						Error(module, branch->for_range.filter->span, "For loop filter expression of type % cannot be implicitly casted to bool\n", branch->for_range.filter->type);
+					}
+
+					branch->for_range.stride = ImplicitCast(branch->for_range.stride, &type_int64, module);
+				}
+
+				branch->code.is_inside_loop = true;
+			} break;
+
+			case AST_BRANCH_FOR_VERBOSE:
+			{
+				if (branch->for_verbose.variable->assignment)
+				{
+					ScanExpression(branch->for_verbose.variable->assignment, &code->scope, module);
+					branch->for_verbose.variable->type = branch->for_verbose.variable->assignment->type;
+				}
+
+				if (branch->for_verbose.variable->ast_type)
+				{
+					branch->for_verbose.variable->type = GetType(branch->for_verbose.variable->ast_type, &code->scope, module);
+				}
+
+				if (branch->for_verbose.variable->ast_type && branch->for_verbose.variable->assignment)
+				{
+					if (!CanImplicitCast(branch->for_verbose.variable->assignment->type, branch->for_verbose.variable->type))
+					{
+						Error(module, branch->for_verbose.variable->assignment->span, "Cannot assign expression with type % to variable with type %\n", branch->for_verbose.variable->assignment->type, branch->for_verbose.variable->type);
+					}
+
+					branch->for_verbose.variable->assignment = ImplicitCast(branch->for_verbose.variable->assignment, branch->for_verbose.variable->type, module);
+				}
+
+				Assert(branch->code.scope.parent);
+				branch->code.scope.variables.Add(branch->for_verbose.variable);
+
+				ScanExpression(branch->for_verbose.condition, &branch->code.scope, module);
+
+				if (!CanImplicitCast(branch->for_verbose.condition->type, &type_bool))
+				{
+					Error(module, branch->for_verbose.condition->span, "For loop condition expression of type % cannot be implicitly casted to bool\n", branch->for_verbose.condition->type);
+				}
+
+				branch->for_verbose.condition = ImplicitCast(branch->for_verbose.condition, &type_bool, module);
+
+				if (branch->for_verbose.stride)
+				{
+					ScanExpression(branch->for_verbose.stride, &branch->code.scope, module);
+
+					Type* preferred_stride_type = branch->for_verbose.variable->type;
+
+					if (IsPointer(branch->for_verbose.variable->type))
+					{
+						preferred_stride_type = &type_int64;
+					}
+
+					if (!IsFloat(branch->for_verbose.variable->type) && !IsInteger(branch->for_verbose.variable->type) && !IsPointer(branch->for_verbose.variable->type))
+					{
+						Error(module, branch->for_verbose.variable->assignment->span, "For loop variable type must be an int, float or pointer, not: %\n", branch->for_verbose.variable->type);
+					}
+
+					if (!CanImplicitCast(branch->for_verbose.stride->type, preferred_stride_type))
+					{
+						Error(module, branch->for_verbose.stride->span, "For loop stride expression of type % cannot be implicitly casted to %\n", branch->for_verbose.stride->type, preferred_stride_type);
+					}
+
+					branch->for_verbose.stride = ImplicitCast(branch->for_verbose.stride, preferred_stride_type, module);
+				}
+
+				branch->code.is_inside_loop = true;
+			} break;
+		}
+
+		ScanCode(&branch->code, &code->scope, function, module);
+
+		code->contains_return = code->contains_return || branch->code.contains_return;
+		branch->code.has_defer_that_returns = code->has_defer_that_returns;
+	}
+
+	code->all_paths_return = DoesBranchAlwaysReturn(&branch_block->branches[0]);
+}
+
+static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Module* module)
 {
 	code->scope.parent = scope;
 	ScanScope(&code->scope, module);
@@ -1559,171 +1662,7 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 			case AST_STATEMENT_BRANCH_BLOCK:
 			{
 				Ast_BranchBlock* branch_block = (Ast_BranchBlock*)&statement->branch_block;
-
-				for (u32 i = 0; i < branch_block->branches.count; i++)
-				{
-					Ast_Branch* branch = &branch_block->branches[i];
-
-					branch->code.scope.parent = &code->scope; // @Hack
-
-					switch (branch->kind)
-					{
-						case AST_BRANCH_NAKED:
-						{
-							branch->code.is_inside_loop = code->is_inside_loop;
-							code->does_break = code->does_break || branch->code.does_break;
-						} break;
-
-						case AST_BRANCH_IF:
-						{
-							ScanExpression(branch->condition, &code->scope, module);
-
-							if (!CanImplicitCast(branch->condition->type, &type_bool))
-							{
-								Error(module, branch->condition->span, "Cannot implicitly cast condition with type % to bool\n", branch->condition->type);
-							}
-
-							branch->condition = ImplicitCast(branch->condition, &type_bool, module);
-
-							branch->code.is_inside_loop = code->is_inside_loop;
-							code->does_break = code->does_break || branch->code.does_break;
-						} break;
-
-						case AST_BRANCH_WHILE:
-						{
-							ScanExpression(branch->condition, &code->scope, module);
-
-							if (!CanImplicitCast(branch->condition->type, &type_bool))
-							{
-								Error(module, branch->condition->span, "Cannot implicitly cast condition with type % to bool\n", branch->condition->type);
-							}
-
-							branch->condition = ImplicitCast(branch->condition, &type_bool, module);
-
-							branch->code.is_inside_loop = true;
-						} break;
-
-						case AST_BRANCH_FOR_COUNT:
-						{
-							ScanExpression(branch->count, &code->scope, module);
-
-							if (!CanImplicitCast(branch->count->type, &type_int64))
-							{
-								Error(module, branch->count->span, "For counter type must be an int, not: %\n", branch->count->type);
-							}
-
-							branch->count = ImplicitCast(branch->count, &type_int64, module);
-
-							branch->code.is_inside_loop = true;
-						} break;
-
-						case AST_BRANCH_FOR_RANGE:
-						{
-							branch->code.scope.variables.Add(branch->iterator);
-							ScanExpression(branch->range, &code->scope, module);
-
-							if (!IsDynamicArray(branch->range->type) && !IsFixedArray(branch->range->type))
-							{
-								Error(module, branch->range->span, "For loop cannot range over type: %\n", branch->range->type);
-							}
-
-							if (branch->filter)
-							{
-								ScanExpression(branch->filter, &branch->code.scope, module);
-
-								if (!CanImplicitCast(branch->filter->type, &type_bool))
-								{
-									Error(module, branch->filter->span, "For loop filter expression of type % cannot be implicitly casted to bool\n", branch->filter->type);
-								}
-
-								branch->filter = ImplicitCast(branch->filter, &type_bool, module);
-							}
-
-							if (branch->stride)
-							{
-								ScanExpression(branch->stride, &branch->code.scope, module);
-
-								if (!CanImplicitCast(branch->stride->type, &type_int64))
-								{
-									Error(module, branch->filter->span, "For loop filter expression of type % cannot be implicitly casted to bool\n", branch->filter->type);
-								}
-
-								branch->stride = ImplicitCast(branch->stride, &type_int64, module);
-							}
-
-							branch->code.is_inside_loop = true;
-						} break;
-
-						case AST_BRANCH_FOR_VERBOSE:
-						{
-							if (branch->variable->assignment)
-							{
-								ScanExpression(branch->variable->assignment, &code->scope, module);
-								branch->variable->type = branch->variable->assignment->type;
-							}
-
-							if (branch->variable->explicit_type)
-							{
-								branch->variable->type = GetType(branch->variable->explicit_type, &code->scope, module);
-							}
-
-							if (branch->variable->explicit_type && branch->variable->assignment)
-							{
-								if (!CanImplicitCast(branch->variable->assignment->type, branch->variable->type))
-								{
-									Error(module, branch->variable->assignment->span, "Cannot assign expression with type % to variable with type %\n", branch->variable->assignment->type, branch->variable->type);
-								}
-
-								branch->variable->assignment = ImplicitCast(branch->variable->assignment, branch->variable->type, module);
-							}
-
-							Assert(branch->code.scope.parent);
-							branch->code.scope.variables.Add(branch->variable);
-
-							ScanExpression(branch->condition, &branch->code.scope, module);
-
-							if (!CanImplicitCast(branch->condition->type, &type_bool))
-							{
-								Error(module, branch->condition->span, "For loop condition expression of type % cannot be implicitly casted to bool\n", branch->condition->type);
-							}
-
-							branch->condition = ImplicitCast(branch->condition, &type_bool, module);
-
-							if (branch->stride)
-							{
-								ScanExpression(branch->stride, &branch->code.scope, module);
-
-								Type* preferred_stride_type = branch->variable->type;
-
-								if (IsPointer(branch->variable->type))
-								{
-									preferred_stride_type = &type_int64;
-								}
-
-								if (!IsFloat(branch->variable->type) && !IsInteger(branch->variable->type) && !IsPointer(branch->variable->type))
-								{
-									Error(module, branch->variable->assignment->span, "For loop variable type must be an int, float or pointer, not: %\n", branch->variable->type);
-								}
-
-								if (!CanImplicitCast(branch->stride->type, preferred_stride_type))
-								{
-									Error(module, branch->stride->span, "For loop stride expression of type % cannot be implicitly casted to %\n", branch->stride->type, preferred_stride_type);
-								}
-
-								branch->stride = ImplicitCast(branch->stride, preferred_stride_type, module);
-							}
-
-							branch->code.is_inside_loop = true;
-						} break;
-					}
-
-					code->does_return = code->does_return || branch->code.does_return;
-					branch->code.has_defer_that_returns = code->has_defer_that_returns;
-
-					ScanCode(&branch->code, &code->scope, function, module);
-				}
-
-				code->all_paths_return = DoesBranchAlwaysReturn(branch_block, 0);
+				SemanticParseBranchBlock(module, function, code, branch_block);
 			} break;
 
 			case AST_STATEMENT_DEFER:
@@ -1767,7 +1706,7 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 					Error(module, inc->expression->span, "Cannot % type %, expression must be either an integer, float or pointer.\n", (direction ? "increment" : "decrement"), inc->expression->type);
 				}
 
-				if (!inc->expression->is_referential_value)
+				if (!(inc->expression->flags & AST_EXPRESSION_FLAG_REFERENTIAL))
 				{
 					Error(module, inc->expression->span, "Expression is not a referential value.\n");
 				}
@@ -1775,8 +1714,8 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 
 			case AST_STATEMENT_RETURN:
 			{
-				code->does_return = true;
-				code->all_paths_return = !code->does_break;
+				code->contains_return = true;
+				code->all_paths_return = !code->contains_break;
 				function->returns.Add(&statement->ret);
 
 				if (code->has_defer_that_returns)
@@ -1806,8 +1745,8 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 
 			case AST_STATEMENT_BREAK:
 			{
-				code->does_break = true;
-				code->all_paths_break = !code->does_return;
+				code->contains_break = true;
+				code->all_paths_break = !code->contains_return;
 
 				if (!code->is_inside_loop)
 				{
@@ -1822,13 +1761,13 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 
 			case AST_STATEMENT_VARIABLE_DECLARATION:
 			{
-				Ast_VariableDeclaration* variable = &statement->variable_declaration;
+				Ast_Variable* variable = &statement->variable_declaration;
 
-				for (Ast_VariableDeclaration** other_variable = code->scope.variables; other_variable < code->scope.variables.End(); other_variable++)
+				for (Ast_Variable** other_variable = code->scope.variables.Begin(); other_variable < code->scope.variables.End(); other_variable++)
 				{
-					if (CompareStrings(variable->name->string, (*other_variable)->name->string))
+					if (CompareString(variable->name, (*other_variable)->name))
 					{
-						Error(module, variable->name->location, "Variable with name '%' already declared in this scope.\n", variable->name);
+						Error(module, variable->name_token->location, "Variable with name '%' already declared in this scope.\n", variable->name);
 					}
 				}
 
@@ -1842,19 +1781,18 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 					}
 				}
 
-				if (variable->explicit_type)
+				if (variable->ast_type)
 				{
-					variable->type = GetType(variable->explicit_type, &code->scope, module);
-					variable->explicit_type->type = variable->type;
+					variable->type = GetType(variable->ast_type, &code->scope, module);
 
 					if (!variable->type)
 					{
-						Error(module, variable->name->location, "Unknown type %\n", variable->explicit_type->basetype.token);
+						Error(module, variable->name_token->location, "Unknown type %\n", variable->ast_type->basetype.token);
 					}
 
 					if (variable->assignment && !CanImplicitCast(variable->assignment->type, variable->type))
 					{
-						Error(module, variable->name->location, "Cannot assign expression with type % to variable with type %\n", variable->assignment->type, variable->type);
+						Error(module, variable->name_token->location, "Cannot assign expression with type % to variable with type %\n", variable->assignment->type, variable->type);
 					}
 				}
 				else
@@ -1872,34 +1810,36 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 
 			case AST_STATEMENT_ASSIGNMENT:
 			{
-				ScanExpression(statement->assignment.right, &code->scope, module);
-				ScanExpression(statement->assignment.left,  &code->scope, module);
+				Ast_Assignment* assignment = &statement->assignment;
 
-				if (!IsAssignable(statement->assignment.left))
+				ScanExpression(assignment->right, &code->scope, module);
+				ScanExpression(assignment->left,  &code->scope, module);
+
+				if (!IsAssignable(assignment->left))
 				{
-					Error(module, statement->assignment.left->span, "Expression is not assignable.\n");
+					Error(module, assignment->left->span, "Expression is not assignable.\n");
 				}
 
-				if (!CanImplicitCast(statement->assignment.right->type, statement->assignment.left->type))
+				if (!CanImplicitCast(assignment->right->type, assignment->left->type))
 				{
-					Error(module, statement->assignment.token->location, "Cannot cast % to %.\n", statement->assignment.right->type, statement->assignment.left->type);
+					Error(module, assignment->token->location, "Cannot cast % to %.\n", assignment->right->type, assignment->left->type);
 				}
 
-				statement->assignment.right = ImplicitCast(statement->assignment.right, statement->assignment.left->type, module);
+				assignment->right = ImplicitCast(assignment->right, assignment->left->type, module);
 			} break;
 
 			case AST_STATEMENT_ASSIGNMENT_ADD:
 			case AST_STATEMENT_ASSIGNMENT_SUBTRACT:
 			case AST_STATEMENT_ASSIGNMENT_MULTIPLY:
 			case AST_STATEMENT_ASSIGNMENT_DIVIDE:
-			case AST_STATEMENT_ASSIGNMENT_POWER:
+			case AST_STATEMENT_ASSIGNMENT_EXPONENTIAL:
 			{
 				Ast_Assignment* assignment = &statement->assignment;
 
 				ScanExpression(assignment->right, &code->scope, module);
 				ScanExpression(assignment->left,  &code->scope, module);
 
-				if (!assignment->left->is_referential_value)
+				if (!(assignment->left->flags & AST_EXPRESSION_FLAG_REFERENTIAL))
 				{
 					Error(module, assignment->left->span, "Expression is not assignable.\n");
 				}
@@ -1908,7 +1848,7 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 					!IsFloat(assignment->left->type) &&
 					!IsPointer(assignment->left->type))
 				{
-					Error(module, assignment->left->span, "Arithmetic assignment type must be to an integer, float or pointer, not: %\n", assignment->left->type);
+					Error(module, assignment->left->span, "Arithmetic assignment type must be to an integer, float or pointer, not: '%'\n", assignment->left->type);
 				}
 
 				// ptr += int
@@ -1928,7 +1868,7 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 				{
 					if (statement->kind != AST_STATEMENT_ASSIGNMENT_ADD && statement->kind != AST_STATEMENT_ASSIGNMENT_SUBTRACT)
 					{
-						Error(module, assignment->left->span, "Arithmetic assignment to pointer only allows += and -=.\n");
+						Error(module, assignment->left->span, "Arithmetic assignment to pointer only allows '+=' and '-='.\n");
 					}
 
 					if (!CanImplicitCast(assignment->right->type, &type_int64))
@@ -1942,7 +1882,7 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 				{
 					if (!CanImplicitCast(assignment->right->type, assignment->left->type))
 					{
-						Error(module, assignment->right->span, "Expression is not numerical.\n");
+						Error(module, assignment->right->span, "Cannot implicitly cast '%' to '%'.\n", assignment->right->type, assignment->left->type);
 					}
 
 					assignment->right = ImplicitCast(assignment->right, assignment->left->type, module);
@@ -1952,10 +1892,10 @@ void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Modu
 	}
 }
 
-static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Ast_Module* module)
+static Type* GetTypeFromParams(Array<Ast_Variable> params, Ast_Module* module)
 {
 	Type* types[params.count];
-	for (u32 i = 0; i < params.count; i++)
+	for (uint32 i = 0; i < params.count; i++)
 	{
 		types[i] = params[i].type;
 	}
@@ -1963,34 +1903,32 @@ static Type* GetTypeFromParams(Array<Ast_VariableDeclaration> params, Ast_Module
 	return GetTuple(Array(types, params.count));
 }
 
-void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* module)
+static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* module)
 {
-	for (Ast_VariableDeclaration* param = function->parameters; param < function->parameters.End(); param++)
+	for (Ast_Variable* param = function->parameters; param < function->parameters.End(); param++)
 	{
-		param->explicit_type->type = GetType(param->explicit_type, scope, module);
-		param->type = param->explicit_type->type;
+		param->type = GetType(param->ast_type, scope, module);
 		function->code.scope.variables.Add(param);
 
-		if (!param->explicit_type->type)
+		if (!param->type)
 		{
-			Error(module, param->explicit_type->basetype.token->location, "Unknown type '%'\n", param->explicit_type->basetype.token);
+			Error(module, param->ast_type->basetype.token->location, "Unknown type '%'\n", param->ast_type->basetype.token);
 		}
 
-		for (Ast_VariableDeclaration* param_other = function->parameters; param_other < param; param_other++)
+		for (Ast_Variable* param_other = function->parameters; param_other < param; param_other++)
 		{
-			if (CompareStrings(param_other->name->string, param->name->string))
+			if (CompareString(param_other->name, param->name))
 			{
-				Error(module, param->name->location, "Duplicate parameter called '%'\n", param->name->string);
+				Error(module, param->name_token->location, "Duplicate parameter called '%'\n", param->name);
 			}
 		}
 	}
 
 	if (function->ast_return_type)
 	{
-		function->ast_return_type->type = GetType(function->ast_return_type, scope, module);
-		function->return_type = function->ast_return_type->type;
+		function->return_type = GetType(function->ast_return_type, scope, module);
 
-		if (function->ast_return_type->type == null)
+		if (!function->return_type)
 		{
 			Error(module, function->ast_return_type->basetype.token->location, "Unknown type: %\n", function->ast_return_type);
 		}
@@ -2004,7 +1942,7 @@ void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* module)
 	function->type = GetFunctionType(param_type, function->return_type);
 }
 
-void SemanticParse(Ast_Module* module)
+static void SemanticParse(Ast_Module* module)
 {
 	ScanScope(&module->scope, module);
 }

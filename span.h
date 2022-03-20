@@ -1,8 +1,5 @@
 #pragma once
 
-#include "int.h"
-#include "initlist.h"
-
 template<typename T>
 struct Span
 {
@@ -12,22 +9,11 @@ struct Span
 	constexpr Span() = default;
 	constexpr Span(Null) : begin(null), end(null) { }
 	constexpr Span(T* begin, T* end) : begin(begin), end(end) { }
-	constexpr Span(T* begin, u64 length) : begin(begin), end(begin+length) { }
-	constexpr Span(InitList<T> list) : begin(list.begin()), end(list.end()) { }
-	constexpr operator bool() const { return static_cast<bool>(begin); }
-	constexpr operator T*() { return begin; }
-	constexpr T& operator[](u64 n) { return begin[n]; }
-	constexpr T  operator[](u64 n) const { return begin[n]; }
-	constexpr u64 Length() { return end - begin; }
-	constexpr T* Begin() { return begin; }
-	constexpr T* End() { return end; }
+	constexpr operator bool() const { return begin != end; }
+	constexpr T& operator[](uint64 n) { return begin[n]; }
+	constexpr T  operator[](uint64 n) const { return begin[n]; }
+	constexpr uint64 Length() { return end - begin; }
 };
-
-template<typename T>
-static constexpr u64 Length(Span<T> span)
-{
-	return span.end - span.begin;
-}
 
 template<typename T>
 static constexpr void ZeroMemory(Span<T> span)

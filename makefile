@@ -1,8 +1,20 @@
-bin/qualia: *.cpp *.h
+bin/qualia: *.cpp *.h *.asm
 	mkdir -p bin
-	nasm -felf64 util.asm -o bin/util.o
-	clang -o bin/qualia -march=znver3 -lm -std=c++20 -nostdinc++ -fno-rtti -fno-exceptions qualia.cpp bin/util.o \
-		-ggdb -g3 -fno-omit-frame-pointer -DDEBUG
+
+	# nasm -felf64 linux_bootstrap.asm -o bin/linux_bootstrap.o
+	nasm -felf64 general.asm -o bin/general.o
+
+	clang -o bin/qualia\
+		-march=znver3\
+		-std=c++20 -Wno-c99-designator\
+		-nostdinc -nostdinc++\
+		-fno-rtti -fno-exceptions\
+		qualia.cpp bin/general.o -lm\
+		-O3
+		# -Og -ggdb -DDEBUG
+		# -ggdb -g3 -fno-omit-frame-pointer -DDEBUG
+		# -fno-stack-protector\
+		# -nostdlib\
 		# -O3 -DDEBUG -Og 
 
 run: bin/qualia
@@ -13,7 +25,8 @@ time: bin/qualia
 
 clean:
 	rm bin/qualia
+	rm bin/*.o
 
 tags: *.cpp *.h
-	ctags -R --language-force=c++ --fields=+S *.h
+	ctags -R --language-force=c++ --fields=+S qualia.cpp
 

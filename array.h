@@ -1,31 +1,28 @@
 #pragma once
 
-#include "int.h"
-#include "initlist.h"
-
 template<typename T>
 struct Array
 {
-	T* data;
-	u64 count;
+	T* elements;
+	uint64 count;
 
 	constexpr Array() = default;
-	constexpr Array(T* data, u64 count) : data(data), count(count) { }
-	constexpr Array(InitList<T> initlist) : data(const_cast<T*>(initlist.begin())), count(initlist.size()) { }
-	constexpr Array(Null) : data(null), count(0) { }
-	constexpr operator T*() { return data; }
-	constexpr operator const T*() const { return data; }
-	constexpr operator bool() const { return static_cast<bool>(data); }
-	constexpr T& operator[](u64 n) { return data[n]; }
-	constexpr T  operator[](u64 n) const { return data[n]; }
+	constexpr Array(T* elements, uint64 count) : elements(elements), count(count) { }
+	constexpr Array(Null) : elements(null), count(0) { }
 
-	constexpr T* Begin() { return data; }
-	constexpr T* End()   { return data + count; }
+	constexpr operator T*() { return elements; }
+	constexpr operator const T*() const { return elements; }
+	constexpr operator bool() const { return static_cast<bool>(elements); }
+	constexpr T& operator[](uint64 n) { return elements[n]; }
+	constexpr T  operator[](uint64 n) const { return elements[n]; }
+
+	constexpr T* Begin() { return elements; }
+	constexpr T* End()   { return elements + count; }
 };
 
 template<typename T>
 static inline bool Compare(Array<T> a, Array<T> b)
 {
-	return a.count == b.count && (a.data == b.data || Compare(a.data, b.data, a.count));
+	return a.count == b.count && (a.elements == b.elements || Compare(a.elements, b.elements, a.count));
 }
 

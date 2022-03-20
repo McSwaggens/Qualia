@@ -9,7 +9,7 @@
 
 struct Ast_Expression;
 struct Ast_Expression_Tuple;
-struct Ast_VariableDeclaration;
+struct Ast_Variable;
 struct Ast_Import;
 struct Ast_Struct_Member;
 struct Ast_Enum_Member;
@@ -28,26 +28,12 @@ struct Ast_Break;
 struct Ast_Attribute;
 struct StackFrame;
 
-using Ast_ControlFlow_Flags = u8;
-const Ast_ControlFlow_Flags AST_CONTAINS_RETURN  = (1<<0);
-const Ast_ControlFlow_Flags AST_CONTAINS_BREAK   = (1<<1);
-const Ast_ControlFlow_Flags AST_ALL_PATHS_RETURN = (1<<2);
-const Ast_ControlFlow_Flags AST_ALL_PATHS_BREAK  = (1<<3);
-
-void Write(OutputBuffer* buffer, Ast_Expression* expression);
-void Write(OutputBuffer* buffer, Ast_Type* type);
-void Write(OutputBuffer* buffer, Ast_Type type);
-void Write(OutputBuffer* buffer, Type* type);
-
-using Intrinsic_Function_Type = void (*)(void*, void*);
-
-struct Intrinsic_Function
+enum IntrinsicID
 {
-	String name;
-	Type* input;
-	Type* output;
-	Type* type;
-	void (*function)(void* input, void* output);
+	INTRINSIC_SYSTEM_CALL = 0,
+
+	INTRINSIC_COUNT,
+	INTRINSIC_INVALID = INTRINSIC_COUNT
 };
 
 struct Ast_Attribute
@@ -88,7 +74,7 @@ struct Ast_BaseType
 {
 	Ast_BaseType_Kind kind;
 	Token* token;
-	Type*  type;
+	// Type*  type;
 
 	union
 	{
@@ -97,18 +83,17 @@ struct Ast_BaseType
 	};
 };
 
-struct Ast_Type // Change to 'Ast_Type_Description'?
+struct Ast_Type
 {
 	Array<Ast_Specifier> specifiers;
 	Ast_BaseType basetype;
-	Type* type;
 };
 
 enum Ast_Expression_Kind
 {
 	AST_EXPRESSION_TERMINAL_NAME,
 	AST_EXPRESSION_TERMINAL_FUNCTION,
-	AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION,
+	AST_EXPRESSION_TERMINAL_INTRINSIC,
 	AST_EXPRESSION_TERMINAL_LITERAL,
 	AST_EXPRESSION_TERMINAL_VARIABLE,
 	AST_EXPRESSION_TERMINAL_STRUCT,
@@ -117,8 +102,8 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_TERMINAL_STRUCT_MEMBER,
 	AST_EXPRESSION_TERMINAL_ENUM_MEMBER,
 	AST_EXPRESSION_TERMINAL_ARRAY_LENGTH,
-	AST_EXPRESSION_TERMINAL_ARRAY_DATA,
-	AST_EXPRESSION_IMPLICIT_CAST,
+	AST_EXPRESSION_TERMINAL_ARRAY_BEGIN,
+	AST_EXPRESSION_TERMINAL_ARRAY_END,
 	AST_EXPRESSION_UNARY_BITWISE_NOT,
 	AST_EXPRESSION_UNARY_NOT,
 	AST_EXPRESSION_UNARY_MINUS,
@@ -146,6 +131,8 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_BINARY_AND,
 	AST_EXPRESSION_BINARY_OR,
 	// AST_EXPRESSION_BINARY_RANGE,
+	AST_EXPRESSION_IF_ELSE,
+	AST_EXPRESSION_IMPLICIT_CAST,
 	AST_EXPRESSION_CALL,
 	AST_EXPRESSION_DOT_CALL,
 	AST_EXPRESSION_SUBSCRIPT,
@@ -154,15 +141,18 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_DYNAMIC_ARRAY,
 	AST_EXPRESSION_FIXED_ARRAY,
 	AST_EXPRESSION_AS,
-	AST_EXPRESSION_IF_ELSE,
 };
+
+using Ast_Expression_Flags = uint8;
+static const Ast_Expression_Flags AST_EXPRESSION_FLAG_REFERENTIAL            = (1<<0);
+static const Ast_Expression_Flags AST_EXPRESSION_FLAG_PURE                   = (1<<1);
+static const Ast_Expression_Flags AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE = (1<<2);
+static const Ast_Expression_Flags AST_EXPRESSION_FLAG_INTERNALLY_REFERENTIAL = (1<<3);
 
 struct Ast_Expression
 {
 	Ast_Expression_Kind kind;
-	bool is_pure;
-	bool can_constantly_evaluate;
-	bool is_referential_value;
+	Ast_Expression_Flags flags;
 	Type* type;
 	Span<Token> span;
 };
@@ -214,7 +204,7 @@ struct Ast_Expression_Dynamic_Array : Ast_Expression
 struct Ast_Expression_Tuple : Ast_Expression
 {
 	Array<Ast_Expression*> elements;
-	u32 recursive_count;
+	uint32 recursive_count;
 };
 
 struct Ast_Expression_Fixed_Array : Ast_Expression
@@ -235,23 +225,11 @@ struct Ast_Expression_Literal : Ast_Expression
 
 	union
 	{
-		u8 value_byte;
-		bool value_bool;
-
-		char* value_pointer;
-
-		s8  value_int8;
-		s16 value_int16;
-		s32 value_int32;
-		s64 value_int64;
-
-		u8  value_uint8;
-		u16 value_uint16;
-		u32 value_uint32;
-		u64 value_uint64;
-
-		f32 value_float32;
-		f64 value_float64;
+		bool    value_bool;
+		int64   value_int;
+		float16 value_f16;
+		float32 value_f32;
+		float64 value_f64;
 	};
 };
 
@@ -270,7 +248,7 @@ struct Ast_Expression_Terminal : Ast_Expression
 struct Ast_Expression_Variable : Ast_Expression
 {
 	Token* token;
-	Ast_VariableDeclaration* variable;
+	Ast_Variable* variable;
 };
 
 struct Ast_Expression_Function : Ast_Expression
@@ -279,10 +257,10 @@ struct Ast_Expression_Function : Ast_Expression
 	Ast_Function* function;
 };
 
-struct Ast_Expression_Intrinsic_Function : Ast_Expression
+struct Ast_Expression_Intrinsic : Ast_Expression
 {
 	Token* token;
-	Intrinsic_Function* intrinsic_function;
+	IntrinsicID intrinsic;
 };
 
 struct Ast_Expression_Struct : Ast_Expression
@@ -315,7 +293,7 @@ struct Ast_Scope
 	Array<Ast_Function> functions;
 	Array<Ast_Struct> structs;
 	Array<Ast_Enum> enums;
-	List<Ast_VariableDeclaration*> variables;
+	List<Ast_Variable*> variables;
 	List<StackFrame> stack_frames;
 };
 
@@ -324,11 +302,9 @@ struct Ast_Code
 	Array<Ast_Statement> statements;
 	List<Ast_Defer*> defers;
 	Ast_Scope scope;
-	u64 frame_size;
-	Ast_ControlFlow_Flags control_flow_flags;
-	// @FixMe: Should be using flags here not bools.
-	bool does_return;
-	bool does_break;
+	uint64 frame_size;
+	bool contains_return;
+	bool contains_break;
 	bool all_paths_return;
 	bool all_paths_break;
 	bool is_inside_loop;
@@ -345,7 +321,7 @@ enum Ast_Statement_Kind
 	AST_STATEMENT_ASSIGNMENT_SUBTRACT,
 	AST_STATEMENT_ASSIGNMENT_MULTIPLY,
 	AST_STATEMENT_ASSIGNMENT_DIVIDE,
-	AST_STATEMENT_ASSIGNMENT_POWER,
+	AST_STATEMENT_ASSIGNMENT_EXPONENTIAL,
 
 	AST_STATEMENT_INCREMENT,
 	AST_STATEMENT_DECREMENT,
@@ -359,14 +335,14 @@ enum Ast_Statement_Kind
 	AST_STATEMENT_DEFER,
 };
 
-enum Ast_Branch_Clause_Kind : u8
+enum Ast_Branch_Clause_Kind : uint8
 {
 	AST_BRANCH_CLAUSE_INIT = 0,
 	AST_BRANCH_CLAUSE_ELSE,
 	AST_BRANCH_CLAUSE_THEN
 };
 
-enum Ast_Branch_Kind : u8
+enum Ast_Branch_Kind : uint8
 {
 	AST_BRANCH_NAKED = 0,
 
@@ -375,9 +351,6 @@ enum Ast_Branch_Kind : u8
 
 	// while bool:
 	AST_BRANCH_WHILE,
-
-	// for int:
-	AST_BRANCH_FOR_COUNT,
 
 	// for it in []T:
 	// for it in []T where bool:
@@ -390,38 +363,39 @@ enum Ast_Branch_Kind : u8
 	AST_BRANCH_FOR_VERBOSE,
 };
 
-using Ast_Branch_Index = u16;
-const Ast_Branch_Index AST_BRANCH_INDEX_NONE = -1;
+struct Ast_Branch_For_Range
+{
+	Ast_Variable* iterator;
+	Ast_Expression* range;
+	Ast_Expression* filter;
+	Ast_Expression* stride;
+};
+
+struct Ast_Branch_For_Verbose
+{
+	Ast_Variable* variable;
+	Ast_Expression* condition;
+	Ast_Expression* stride;
+};
 
 struct Ast_Branch
 {
 	Ast_Branch_Kind kind;
 	Ast_Branch_Clause_Kind clause;
+	IrBlockID ir;
 
-	Token* token;
+	Span<Token> span;
 
 	union
 	{
-		struct
-		{
-			Ast_VariableDeclaration* iterator;
-			Ast_Expression* range;
-			Ast_Expression* filter;
-		};
-
-		struct
-		{
-			Ast_VariableDeclaration* variable;
-			Ast_Expression* condition;
-		};
-
-		Ast_Expression* count;
+		Ast_Expression* if_condition;
+		Ast_Expression* while_condition;
+		Ast_Branch_For_Range for_range;
+		Ast_Branch_For_Verbose for_verbose;
 	};
 
-	Ast_Expression* stride;
-
-	Ast_Branch_Index else_branch_index;
-	Ast_Branch_Index then_branch_index;
+	Ast_Branch* else_branch;
+	Ast_Branch* then_branch;
 
 	Ast_Code code;
 };
@@ -429,7 +403,7 @@ struct Ast_Branch
 struct Ast_BranchBlock
 {
 	Array<Ast_Branch> branches;
-	Ast_ControlFlow_Flags control_flow_flags;
+	Span<Token> span;
 };
 
 struct Ast_Defer
@@ -468,21 +442,24 @@ struct Ast_Increment // Nudge?
 	Ast_Expression* expression;
 };
 
-struct Ast_VariableDeclaration
+using Ast_Variable_Flags = uint8;
+static const Ast_Variable_Flags AST_VARIABLE_FLAG_PARAMETER = (1<<0);
+static const Ast_Variable_Flags AST_VARIABLE_FLAG_GLOBAL    = (1<<1);
+static const Ast_Variable_Flags AST_VARIABLE_FLAG_CONSTANT  = (1<<2);
+static const Ast_Variable_Flags AST_VARIABLE_FLAG_ITERATOR  = (1<<3);
+
+struct Ast_Variable
 {
-	Token* name;
+	String name;
+	Token* name_token;
+	Ast_Variable_Flags flags;
 	Type* type;
-	Ast_Type* explicit_type;
+	Ast_Type* ast_type;
 	Ast_Expression* assignment;
-	Ast_Attribute attribute;
-	IrLogicIndex stack;
-	u64 offset;
-	bool is_parameter;
-	bool is_pure;
-	bool is_global;
-	bool is_constant;
-	bool is_iterator;
-	bool can_constantly_evaluate;
+	Ast_Attribute* attribute;
+	IrValue ir;
+	uint64 offset; // @RemoveMe?
+	// @Todo: Add span
 };
 
 struct StackFrame
@@ -491,12 +468,12 @@ struct StackFrame
 	Ast_Function* function;
 	bool do_return;
 	bool do_break;
-
-	inline char* GetData(Ast_VariableDeclaration* variable)
-	{
-		return data + variable->offset;
-	}
 };
+
+static inline char* StackFrameGetVariable(StackFrame* frame, Ast_Variable* variable)
+{
+	return frame->data + variable->offset;
+}
 
 struct Ast_Assignment
 {
@@ -511,15 +488,15 @@ struct Ast_Statement
 
 	union
 	{
-		Ast_Assignment          assignment;
-		Ast_BranchBlock         branch_block;
-		Ast_Defer               defer;
-		Ast_Claim               claim;
-		Ast_Break               brk;
-		Ast_Return              ret;
-		Ast_VariableDeclaration variable_declaration; // @FixMe @Optimization: Change to pointer, Ast_VariableDeclaration is yuuuge!
-		Ast_Increment           increment;
-		Ast_Expression*         expression;
+		Ast_Assignment  assignment;
+		Ast_BranchBlock branch_block;
+		Ast_Defer       defer;
+		Ast_Claim       claim;
+		Ast_Break       brk;
+		Ast_Return      ret;
+		Ast_Variable    variable_declaration; // @FixMe @Optimization: Change to pointer, Ast_Variable is yuuuge!
+		Ast_Increment   increment;
+		Ast_Expression* expression;
 	};
 };
 
@@ -527,16 +504,17 @@ struct Ast_Function
 {
 	String name;
 	Token* name_token;
-	Array<Ast_VariableDeclaration> parameters;
+	Array<Ast_Variable> parameters; // @Todo: Give parameters their own struct? Ast_Parameter?
 	Ast_Code code;
 	Type* type;
 	Type* return_type;
 	List<Ast_Return*> returns; // @Todo: Infer return type.
 	Ast_Type* ast_return_type;
-	Ast_Attribute attribute;
-	IrFunctionInfoIndex ir_index;
+	Ast_Attribute* attribute;
+	IrFunction* ir;
 	bool is_pure;
 	bool is_global;
+	// @Todo: Expression functions =>
 	// @Todo: Implement 'inline' keyword.
 };
 
@@ -550,83 +528,80 @@ struct Ast_Import
 
 struct Ast_Struct_Member
 {
-	Token* name;
-	Ast_Type type;
-	u64 offset;
-	u32 index;
-	Ast_Attribute attribute;
+	String name;
+	Token* name_token;
+	Type* type;
+	Ast_Type ast_type;
+	uint64 offset;
+	uint32 index;
+	Ast_Attribute* attribute;
 };
 
 struct Ast_Enum_Member
 {
-	Token* name;
+	String name;
+	Token* name_token;
 	Ast_Expression* expression;
-	u32 index;
-	Ast_Attribute attribute;
+	uint32 index;
+	Ast_Attribute* attribute;
 };
 
 struct Ast_Struct
 {
-	Token* name;
 	Type type;
+	String name;
+	Token* name_token;
 	Array<Ast_Struct_Member> members;
 	List<Ast_Struct*> closure;
-	Ast_Attribute attribute;
+	Ast_Attribute* attribute;
 };
 
 struct Ast_Enum
 {
-	Token* name;
 	Type type;
+	String name;
+	Token* name_token;
 	Type* underlying_type;
 	Array<Ast_Enum_Member> members;
-	Ast_Attribute attribute;
+	Ast_Attribute* attribute;
+};
+
+struct Line
+{
+	int16 indent;
+	String string;
+	int64 tokens_begin_index;
+	int64 tokens_count;
 };
 
 struct Ast_Module
 {
 	Stack stack;
-	List<Token> tokens;
-	List<Span<char>> lines;
-	Span<char> code;
-	String file_path;
-	Array<Ast_Import> imports;
 	Ast_Scope scope;
+
+	String code;
+	String file_path;
+	String name;
+
+	Array<Token> tokens;
+	Array<Line> lines;
+	Array<Ast_Module*> users;
+	Array<Ast_Import> imports;
 };
 
-struct MemoryBlock
-{
-	char* head;
-	u64   size;
-	MemoryBlock* prev;
-	MemoryBlock* next;
-	char  data[];
-};
+static void LexerParse(Ast_Module* module);
+static void InitIntrinsicFunctions(Ast_Module* module);
+static Ast_Module* ParseFile(String file_path);
+static void SemanticParse(Ast_Module* module);
+static uint64 CalculateStackFrameSize(Ast_Function* function);
+static uint64 CalculateStackFrameSize(Ast_Code* code, uint64 offset);
+static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* module);
+static void ScanScope(Ast_Scope* scope, Ast_Module* module);
+static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Module* module);
+static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* module);
 
-struct Interpreter
-{
-	MemoryBlock* block;
-};
-
-extern Array<Intrinsic_Function> intrinsic_functions;
-
-void LexicalParse(String file_path, Ast_Module* module);
-void InitIntrinsicFunctions(Ast_Module* module);
-Ast_Module* ParseFile(String file_path);
-void SemanticParse(Ast_Module* module);
-void Interpret(Ast_Code* code, char* output, StackFrame* frame, Interpreter* interpreter);
-void Interpret(Ast_Function* function, char* input, char* output, Interpreter* interpreter);
-void Interpret(Ast_Expression* expression, char* output, bool allow_referential, StackFrame* frame, Interpreter* interpreter);
-StackFrame CreateStackFrame(Ast_Function* function, Interpreter* interpreter);
-u8 GetTypePrecedence(Type* type);
-Type* GetDominantType(Type* a, Type* b);
-void Convert(Type* from_type, Value* from_value, Type* to_type, Value* to_value);
-u64 CalculateStackFrameSize(Ast_Function* function);
-u64 CalculateStackFrameSize(Ast_Code* code, u64 offset);
-MemoryBlock* CreateMemoryBlock(u64 min_size, MemoryBlock* prev = null);
-Interpreter* CreateInterpreter(Ast_Module* module);
-void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* module);
-void ScanScope(Ast_Scope* scope, Ast_Module* module);
-void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Module* module);
-void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* module);
+static void GenericWrite(OutputBuffer* buffer, Ast_Expression* expression);
+static void GenericWrite(OutputBuffer* buffer, Ast_Type* type);
+static void GenericWrite(OutputBuffer* buffer, Ast_Type type);
+static void GenericWrite(OutputBuffer* buffer, Type* type);
 

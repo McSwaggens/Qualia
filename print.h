@@ -1,90 +1,71 @@
 #pragma once
 
-#include "int.h"
-#include "util.h"
+#include "general.h"
 #include "string.h"
-#include "file.h"
+#include "file_system.h"
 #include "span.h"
 #include "list.h"
+#include "ascii.h"
 
-#define DebugPrint(s, ...) { if (IsDebug()) Print("[DEBUG] " s, ##__VA_ARGS__); }
+static void GenericWrite(OutputBuffer* buffer, char   c);
+static void GenericWrite(OutputBuffer* buffer, uint8  n);
+static void GenericWrite(OutputBuffer* buffer, uint16 n);
+static void GenericWrite(OutputBuffer* buffer, uint32 n);
+static void GenericWrite(OutputBuffer* buffer, uint64 n);
 
-void Write(OutputBuffer* buffer, u8  n);
-void Write(OutputBuffer* buffer, u16 n);
-void Write(OutputBuffer* buffer, u32 n);
-void Write(OutputBuffer* buffer, u64 n);
+static void GenericWrite(OutputBuffer* buffer, int8  n);
+static void GenericWrite(OutputBuffer* buffer, int16 n);
+static void GenericWrite(OutputBuffer* buffer, int32 n);
+static void GenericWrite(OutputBuffer* buffer, int64 n);
 
-void Write(OutputBuffer* buffer, s8  n);
-void Write(OutputBuffer* buffer, s16 n);
-void Write(OutputBuffer* buffer, s32 n);
-void Write(OutputBuffer* buffer, s64 n);
-void Write(OutputBuffer* buffer, s64 n);
-
-void Write(OutputBuffer* buffer, f32 n);
-void Write(OutputBuffer* buffer, f64 n);
+static void GenericWrite(OutputBuffer* buffer, float32 n);
+static void GenericWrite(OutputBuffer* buffer, float64 n);
 
 // Need this, otherwise sizeof won't work...
-static inline void Write(OutputBuffer* buffer, unsigned long int n)
+static void GenericWrite(OutputBuffer* buffer, unsigned long int n);
+
+struct IntFormat
 {
-	Write(buffer, (u64)n);
-}
+	Base base;
+	uint64 value;
+};
 
-static inline void Write(OutputBuffer* buffer, String str)
-{
-	if (str)
-	{
-		buffer->Write(str, str.length);
-	}
-	else
-	{
-		buffer->Write("<null-string>", 13);
-	}
-}
+static inline IntFormat Hex(uint64 n) { return (IntFormat){ .base = BASE_HEX,    .value = n }; }
+static inline IntFormat Bin(uint64 n) { return (IntFormat){ .base = BASE_BINARY, .value = n }; }
 
-// Need to provide explicit definition otherwise it will default to bool... Thanks C++!
-template<u64 size>
-static inline void Write(OutputBuffer* buffer, const char (&s)[size])
-{
-	if constexpr (size < 2) return;
-	if constexpr (size == 2) buffer->Write(s[0]);
-	else buffer->Write(s, size-1);
-}
+static void GenericWrite(OutputBuffer* buffer, IntFormat format);
 
-static inline void Write(OutputBuffer* buffer, char c)
-{
-	buffer->Write(c);
-}
-
-struct Token;
-
-void Write(OutputBuffer* buffer, Span<Token> span);
+static void GenericWrite(OutputBuffer* buffer, void* p);
+static void GenericWrite(OutputBuffer* buffer, String str);
 
 template<typename T>
-static void Write(OutputBuffer* buffer, Span<T> span)
+static void GenericWrite(OutputBuffer* buffer, Span<T> span)
 {
-	for (u64 i = 0; i < span.Length(); i++)
+	for (uint64 i = 0; i < span.Length(); i++)
 	{
-		if (i != 0) Write(buffer, " ");
-		Write(buffer, span[i]);
+		if (i != 0) BufferWriteString(buffer, " ");
+		GenericWrite(buffer, span[i]);
 	}
-}
-
-static void Write(OutputBuffer* buffer, Span<char> span)
-{
-	buffer->Write(span, span.Length());
-	// Write(buffer, "{ ");
-	// for (u64 i = 0; i < span.Length(); i++)
-	// {
-	// 	if (i != 0) Write(buffer, ", ");
-	// 	Write(buffer, span[i]);
-	// }
-	// Write(buffer, " }");
 }
 
 template<typename T>
-static void Write(OutputBuffer* buffer, List<T> list)
+static void GenericWrite(OutputBuffer* buffer, List<T> list)
 {
-	Write(buffer, (Span<T>)list);
+	GenericWrite(buffer, list.ToSpan());
+}
+
+template<typename T>
+static void GenericWrite(OutputBuffer* buffer, Array<T> array)
+{
+	BufferWriteString(buffer, "{ ");
+
+	for (uint64 i = 0; i < array.count; i++)
+	{
+		if (i != 0) BufferWriteString(buffer, ", ");
+		GenericWrite(buffer, array[i]);
+	}
+
+	BufferWriteString(buffer, " }");
 }
 
 template<typename ...Args>
@@ -101,12 +82,12 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args)
 
 		if (start != p)
 		{
-			buffer->Write(start, p-start);
+			BufferWriteData(buffer, start, p-start);
 		}
 
 		if (p < end)
 		{
-			Write(buffer, t);
+			GenericWrite(buffer, t);
 			p++;
 		}
 	};
@@ -115,25 +96,19 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args)
 
 	if (p < end)
 	{
-		buffer->Write(p, end - p);
+		BufferWriteData(buffer, p, end - p);
 	}
 }
 
 template<typename ...Args>
 static void Print(String format, Args&&... args)
 {
-	Print(&standard_output_buffer, format, args...);
+	Print(&unix_output_buffer, format, args...);
 }
 
-static inline void Write(OutputBuffer* buffer, bool b)
+static inline void GenericWrite(OutputBuffer* buffer, bool b)
 {
-	if (b)
-	{
-		buffer->Write("true", 4);
-	}
-	else
-	{
-		buffer->Write("false", 5);
-	}
+	if (b) BufferWriteString(buffer, "true");
+	else   BufferWriteString(buffer, "false");
 }
 

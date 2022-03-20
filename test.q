@@ -1,11 +1,42 @@
-Foo(n : int) -> int:
+Foo(a: int, b: int, c: int, d: int, e: int) -> int:
+	x := a + b * c / d MOD e
+	return x
+
+LogicalAnd(a: int, b: int, c: int, d: int) -> bool:
+	return a < 1 and b > 2 and c != 3 and d = 4
+
+LogicalOr(a : int, b : int, c : int, d : int) -> bool:
+	return a < 1 or b > 2 or c != 3 or d = 4
+
+UnaryPlus(n : int) -> int:
+	return +n
+
+AllPathsReturnTest() -> int:
+	if true:
+	else: x := 123
+	then if 1: return 1
+	else: return 1
+
+// WhileLoop(n : int):
+	// while n: n = 111
+
+	// j := 0fffh
+	// 18446744073709551615
+	// u64_max := 123
+	// x       := 55555555555555555555
+
+	// if n = -1: if n: n = 222; n = 333;
+
+	// while n: n = 444 then: n = 555
+	// while n: n = 666 else: n = 777 then: n = 888
+
+// VerboseForLoops(n : int) -> int:
 	// for i := 0, i < n, 1:
 	// for i := 0, i < n:
 	// for i : int, i < n:
-	// for n:
-	return 0
+	// return 0
 
-Foo(begin : *int, end : *int) -> int:
+// Foo(begin : *int, end : *int) -> int:
 	// for p := begin, p < end, 1:
 	// for p := begin, p < end:
 	// for p := begin, p < end:
@@ -15,31 +46,31 @@ Foo(begin : *int, end : *int) -> int:
 	// for p in [begin .. 10], 1:
 	// for p in [begin .. 10]:
 
-	return 0
+	// return 0
 
 // Foo(nums : []int) -> int:
 // 	for n in nums:
 // 	for nums:
 // 	for x: 
 
-FooBar():
-	n : int = 42
-	m : int
+// FooBar():
+// 	n : int = 42
+// 	m : int
 
-	if n = 1:
-		m = 111
-	else if n != 2:
-		m = 222
-	else if n < 3:
-		m = 333
-	else if n <= 4:
-		m = 444
-	else if n > 5:
-		m = 555
-	else if n >= 6:
-		m = 666
-	else:
-		m = 777
+// 	if n = 1:
+// 		m = 111
+// 	else if n != 2:
+// 		m = 222
+// 	else if n < 3:
+// 		m = 333
+// 	else if n <= 4:
+// 		m = 444
+// 	else if n > 5:
+// 		m = 555
+// 	else if n >= 6:
+// 		m = 666
+// 	else:
+// 		m = 777
 
 // Variable_Declarations_And_Assignment():
 // 	a := 0

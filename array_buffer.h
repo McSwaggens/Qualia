@@ -1,6 +1,5 @@
 #pragma once
 
-#include "int.h"
 #include "array.h"
 #include "memory.h"
 #include "print.h"
@@ -11,30 +10,30 @@
 struct Array_Buffer_Entry
 {
 	void* data;
-	u64 size;
+	uint64 size;
 };
 
-static Array_Buffer_Entry GetArrayBufferEntry(u64 current_size);
-static void ReleaseArrayBuffer(void* data, u64 size);
+static Array_Buffer_Entry GetArrayBufferEntry(uint64 min_size);
+static void ReleaseArrayBuffer(void* data, uint64 size);
 static void InitArrayBufferPool();
 
 template<typename T>
 struct Array_Buffer
 {
 	T* data;
-	u64 count;
-	u64 capacity;
-	u64 size;
+	uint64 count;
+	uint64 capacity;
+	uint64 size;
 
 	void Add(T value)
 	{
 		if (count+1 >= capacity) COLD
 		{
-			Array_Buffer_Entry entry = GetArrayBufferEntry(size);
+			Array_Buffer_Entry entry = GetArrayBufferEntry(size + sizeof(T));
 
 			if (count) COLD
 			{
-				CopyMemory(data, (T*)entry.data, count);
+				CopyMemory((T*)entry.data, data, count);
 				ReleaseArrayBuffer(data, size);
 			}
 
@@ -43,7 +42,8 @@ struct Array_Buffer
 			capacity = size / sizeof(T);
 		}
 
-		data[count++] = value;
+		data[count] = value;
+		count++;
 	}
 
 	Array<T> Lock()
@@ -68,7 +68,7 @@ struct Array_Buffer
 };
 
 template<typename T>
-Array_Buffer<T> CreateArrayBuffer()
+static Array_Buffer<T> CreateArrayBuffer()
 {
 	Array_Buffer<T> result;
 	result.data = null;

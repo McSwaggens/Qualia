@@ -7,7 +7,7 @@
 struct Ast_Struct;
 struct Ast_Enum;
 
-enum Type_Kind : u8
+enum Type_Kind : uint8
 {
 	TYPE_BASETYPE_BYTE,
 	TYPE_BASETYPE_BOOL,
@@ -42,7 +42,7 @@ struct Type_Extension
 	union
 	{
 		Type* output;
-		u64 length;
+		uint64 length;
 	};
 };
 
@@ -65,14 +65,14 @@ struct Type
 
 		struct
 		{
-			u16 recursive_count;
+			uint16 recursive_count;
 			Array<Type*> tuple;
 		};
 	};
 
 	Type* specifiers;
-	u64 length; // Fixed array size
-	u64 size;   // Size of the type in bytes
+	uint64 length; // Fixed array size
+	uint64 size;   // Size of the type in bytes
 
 	List<Type_Extension> extensions;
 };
@@ -174,29 +174,7 @@ static bool IsFloat(Type* type)
 	}
 }
 
-static bool IsArithmetic(Type* type)
-{
-	switch (type->kind)
-	{
-		case TYPE_BASETYPE_UINT8:
-		case TYPE_BASETYPE_UINT16:
-		case TYPE_BASETYPE_UINT32:
-		case TYPE_BASETYPE_UINT64:
-		case TYPE_BASETYPE_INT8:
-		case TYPE_BASETYPE_INT16:
-		case TYPE_BASETYPE_INT32:
-		case TYPE_BASETYPE_INT64:
-		case TYPE_BASETYPE_FLOAT16:
-		case TYPE_BASETYPE_FLOAT32:
-		case TYPE_BASETYPE_FLOAT64:
-		case TYPE_SPECIFIER_POINTER:
-			return true;
-		default:
-			return false;
-	}
-}
-
-static u8 GetTypePrecedence(Type* type)
+static uint8 GetTypePrecedence(Type* type)
 {
 	switch (type->kind)
 	{
@@ -206,28 +184,26 @@ static u8 GetTypePrecedence(Type* type)
 		case TYPE_SPECIFIER_OPTIONAL:
 		case TYPE_SPECIFIER_DYNAMIC_ARRAY:
 		case TYPE_SPECIFIER_FIXED_ARRAY:
-			return 10;
+		case TYPE_BASETYPE_BYTE:     return 0;
 
-		case TYPE_BASETYPE_BYTE:     return 20;
-		case TYPE_BASETYPE_ENUM:     return 21;
+		case TYPE_BASETYPE_ENUM:     return 2;
 
-		case TYPE_BASETYPE_UINT8:    return 30;
-		case TYPE_BASETYPE_UINT16:   return 31;
-		case TYPE_BASETYPE_UINT32:   return 32;
-		case TYPE_BASETYPE_UINT64:   return 33;
+		case TYPE_SPECIFIER_POINTER: return 3;
+		case TYPE_BASETYPE_BOOL:     return 4;
 
-		case TYPE_BASETYPE_INT8:     return 60;
-		case TYPE_BASETYPE_INT16:    return 61;
-		case TYPE_BASETYPE_INT32:    return 62;
-		case TYPE_BASETYPE_INT64:    return 63;
+		case TYPE_BASETYPE_UINT8:
+		case TYPE_BASETYPE_UINT16:
+		case TYPE_BASETYPE_UINT32:
+		case TYPE_BASETYPE_UINT64:
+		case TYPE_BASETYPE_INT8:
+		case TYPE_BASETYPE_INT16:
+		case TYPE_BASETYPE_INT32:
+		case TYPE_BASETYPE_INT64:    return 5;
 
-		case TYPE_BASETYPE_FLOAT16:  return 70;
-		case TYPE_BASETYPE_FLOAT32:  return 71;
-		case TYPE_BASETYPE_FLOAT64:  return 72;
+		case TYPE_BASETYPE_FLOAT16:  return 6;
+		case TYPE_BASETYPE_FLOAT32:  return 7;
+		case TYPE_BASETYPE_FLOAT64:  return 8;
 
-		case TYPE_SPECIFIER_POINTER: return 80;
-
-		case TYPE_BASETYPE_BOOL:     return 255;
 	}
 }
 
@@ -324,48 +300,6 @@ static bool IsBaseType(Type* type)
 	return !IsSpecifier(type);
 }
 
-static Type* FindBaseType(Type* type)
-{
-	while (IsSpecifier(type)) type = type->subtype;
-	return type;
-}
-
-static Type* GetOptimalInteger(Type* a, Type* b)
-{
-	if (a == b) return a;
-
-	if (IsSignedInteger(a) != IsSignedInteger(b))
-	{
-		if (IsSignedInteger(a))
-		{
-			b = GetPrimitiveTypeFromKind(GetSignedVersionOf(b->kind));
-		}
-		else
-		{
-			a = GetPrimitiveTypeFromKind(GetSignedVersionOf(a->kind));
-		}
-	}
-
-	return a->size >= b->size ? a : b;
-}
-
-static Type* GetDominantType(Type* a, Type* b)
-{
-	if (a == b) return a;
-
-	if (IsInteger(a) && IsInteger(b))
-	{
-		return GetOptimalInteger(a, b);
-	}
-
-	return GetTypePrecedence(a) >= GetTypePrecedence(b) ? a : b;
-}
-
-static bool IsConvertableToArithmeticType(Type* type)
-{
-	return IsArithmetic(type) || type->kind == TYPE_BASETYPE_BOOL || type->kind == TYPE_BASETYPE_ENUM;
-}
-
 static bool IsEnum(Type* type)
 {
 	return type->kind == TYPE_BASETYPE_ENUM;
@@ -424,9 +358,12 @@ static void InitTypeSystem();
 static Type* GetPointer(Type* type);
 static Type* GetOptional(Type* type);
 static Type* GetDynamicArray(Type* type);
-static Type* GetFixedArray(Type* type, u64 length);
+static Type* GetFixedArray(Type* type, uint64 length);
 static Type* GetTuple(Array<Type*> types);
 static Type* GetFunctionType(Type* input, Type* output);
 static Type* MergeTypeRight(Type* a, Type* b);
+static Type* GetDominantType(Type* a, Type* b);
+static Type* GetOptimalInteger(Type* a, Type* b);
 static bool CanImplicitCast(Type* from, Type* to);
+static bool CanExplicitCast(Type* from, Type* to);
 

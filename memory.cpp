@@ -1,48 +1,38 @@
 #include "memory.h"
-#include "util.h"
+#include "general.h"
 #include "assert.h"
 
-// [ ffffffff_ffffffff_F7654321_08765432_10876543_21087654_3210XXXX_XXXXXXXX ]
-// [ ffffffff_ffffffff_FTTTTTTT_TGGGDDDD_DDCCCCCC_BBBBBBAA_AAAAXXXX_XXXXXXXX ]
-// [ ffffffff_ffffffff_FTTTTTTT_TGGGGGGG_GGMMMMMM_MMMKKKKK_KKKKXXXX_XXXXXXXX ]
-// [ ffffffff_ffffffff_FTTTTTTT_T1631864_21521631_84215216_3184XXXX_XXXXXXXX ]
-// [ 00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000 ]
-
-static void* AllocateVirtualPage(u64 size, PageFlags flags)
+static byte* AllocateVirtualPage(uint64 size, PageFlags flags)
 {
-	Assert(size);
-	Assert((size & 4095) == 0, "Invalid page size detected.");
+	Assert(size && (size & 4095) == 0, "Invalid page size detected.");
 
-	// Print("AllocateVirtualPage(%k)\n", size >> 10);
+	uint64 protection = 1; // Pages are always readable on x86.
+	if (flags & PAGE_FLAG_WRITE)   protection |= Bit(1);
+	if (flags & PAGE_FLAG_STACK)   protection |= Bit(17);
+	if (flags & PAGE_FLAG_EXECUTE) protection |= Bit(2);
 
-	u32 protection = 1; // Pages are always readable on x86.
-	if (flags & PAGE_WRITE_FLAG)   protection |= 2;
-	if (flags & PAGE_EXECUTE_FLAG) protection |= 4;
+	byte* page = (byte*)SystemCall(9, 0, size, protection, 0x22, -1, 0);
+	page = (byte*)AssumeAligned(page, 4096);
 
-	u32 inflags = 0x22;
-	// if (prefault) inflags |= 0x8000;
-
-	void* page = (void*)SystemCall(9, 0, size, protection, inflags, -1, 0);
-
-	Assert(page != (void*)-1, "Failed to map virtual page.");
+	Assert(page != (byte*)-1, "Failed to map virtual page.");
 
 	return page;
 }
 
-static void DeAllocateVirtualPage(void* page, u64 size, PageFlags flags)
+static void DeAllocateVirtualPage(byte* page, uint64 size, PageFlags flags)
 {
 	Assert(size);
 	Assert((size & 4095) == 0, "Invalid page size detected.");
-	SystemCall(11, (u64)page, size);
+	SystemCall(11, (int64)page, size);
 }
 
-static const u64 PAGE_CACHE_BITS = 16; // 256M max
-static const u64 PAGE_CACHE_SIZE = 16; // How many pages are cached per page size.
+static const uint64 PAGE_CACHE_BITS = 16; // 256M max
+static const uint64 PAGE_CACHE_SIZE = 16; // How many pages are cached per page size.
 
 struct PageCache
 {
-	u8 counts[PAGE_CACHE_BITS];
-	void* pages[PAGE_CACHE_SIZE * PAGE_CACHE_BITS];
+	uint8 counts[PAGE_CACHE_BITS];
+	byte* pages[PAGE_CACHE_SIZE * PAGE_CACHE_BITS];
 };
 
 static PageCache page_cache;
@@ -51,69 +41,66 @@ static void InitPageCache()
 {
 	ZeroMemory(&page_cache);
 
-	page_cache.counts[0]  = 8; // 4k
-	page_cache.counts[1]  = 0; // 8k
-	page_cache.counts[2]  = 2; // 16k
-	page_cache.counts[3]  = 0; // 32k
-	page_cache.counts[4]  = 0; // 64k
-	page_cache.counts[5]  = 0; // 128k
-	page_cache.counts[6]  = 0; // 256k
-	page_cache.counts[7]  = 0; // 512k
-	page_cache.counts[8]  = 0; // 1m
+	page_cache.counts[0]  = 8;  // 4k
+	page_cache.counts[1]  = 0;  // 8k
+	page_cache.counts[2]  = 2;  // 16k
+	page_cache.counts[3]  = 0;  // 32k
+	page_cache.counts[4]  = 0;  // 64k
+	page_cache.counts[5]  = 0;  // 128k
+	page_cache.counts[6]  = 0;  // 256k
+	page_cache.counts[7]  = 0;  // 512k
+	page_cache.counts[8]  = 0;  // 1m
 	page_cache.counts[9]  = 16; // 2m
-	page_cache.counts[10] = 0; // 4m
-	page_cache.counts[11] = 0; // 8m
-	page_cache.counts[12] = 0; // 16m
-	page_cache.counts[13] = 0; // 32m
-	page_cache.counts[14] = 0; // 64m
-	page_cache.counts[15] = 0; // 128m
+	page_cache.counts[10] = 0;  // 4m
+	page_cache.counts[11] = 0;  // 8m
+	page_cache.counts[12] = 0;  // 16m
+	page_cache.counts[13] = 0;  // 32m
+	page_cache.counts[14] = 0;  // 64m
+	page_cache.counts[15] = 0;  // 128m
 
-	u64 sum = 0;
+	uint64 sum = 0;
 
-	for (u64 i = 0; i < PAGE_CACHE_BITS; i++)
+	for (uint64 i = 0; i < PAGE_CACHE_BITS; i++)
 	{
-		sum += page_cache.counts[i] << (i + 11);
+		sum += page_cache.counts[i] << (i + 12);
 		Assert(page_cache.counts[i] <= PAGE_CACHE_SIZE);
 	}
 
-	char* p = (char*)AllocateVirtualPage(sum, PAGE_WRITE_FLAG);
+	byte* p = (byte*)AllocateVirtualPage(sum, PAGE_FLAG_WRITE);
 
-	for (s64 i = PAGE_CACHE_BITS-1; i >= 0; i--)
+	for (uint64 i = 0; i < PAGE_CACHE_BITS; i++)
 	{
-		for (u32 j = 0; j < page_cache.counts[i]; j++)
+		for (uint64 j = 0; j < page_cache.counts[i]; j++)
 		{
 			page_cache.pages[i * PAGE_CACHE_SIZE + j] = p;
-			p += 1 << (i + 11);
+			p += 1 << (i + 12);
 		}
 	}
 }
 
-static void* GetPage(u64 size)
+static byte* GetPage(uint64 size)
 {
-	Assert(size);
-	Assert((size & 4095) == 0, "Invalid page size detected.");
+	Assert(size && (size & 4095) == 0, "Invalid page size detected.");
 
 	size = NextPow2(size);
-	s64 index = CountTrailingZeroes(size >> 12);
+	int64 index = CountTrailingZeroes64(size >> 12);
 
-	if (index < PAGE_CACHE_BITS)
+	if (index < PAGE_CACHE_BITS) HOT
 	{
-		if (page_cache.counts[index])
+		if (page_cache.counts[index]) HOT
 		{
-			void* page = page_cache.pages[index * PAGE_CACHE_SIZE + page_cache.counts[index] - 1];
+			byte* page = page_cache.pages[index * PAGE_CACHE_SIZE + page_cache.counts[index] - 1];
 			page_cache.counts[index]--;
-
 			return page;
 		}
 		else
 		{
 			StaticAssert(PAGE_CACHE_SIZE >= PAGE_CACHE_BITS);
-			Assert(index < PAGE_CACHE_SIZE);
 
-			char* pages = (char*)AllocateVirtualPage(size * (PAGE_CACHE_SIZE - index), PAGE_WRITE_FLAG);
-			page_cache.counts[index] = (PAGE_CACHE_SIZE-index-1);
+			byte* pages = (byte*)AllocateVirtualPage(size * (PAGE_CACHE_SIZE - index), PAGE_FLAG_WRITE);
+			page_cache.counts[index] = PAGE_CACHE_SIZE-index;
 
-			for (u32 i = 0; i < (PAGE_CACHE_SIZE-index-1); i++)
+			for (uint32 i = 0; i < PAGE_CACHE_SIZE-index; i++)
 			{
 				page_cache.pages[index * PAGE_CACHE_SIZE + i] = pages;
 				pages += size;
@@ -123,37 +110,38 @@ static void* GetPage(u64 size)
 		}
 	}
 
-	return AllocateVirtualPage(size, PAGE_WRITE_FLAG);
+	return AllocateVirtualPage(size, PAGE_FLAG_WRITE);
 }
 
-static void RetirePage(void* page, u64 size)
+static void RetirePage(byte* page, uint64 size)
 {
-	Assert(size);
+	Assert(page && size);
 	Assert((size & 4095) == 0, "Invalid page size detected.");
 
 	size = NextPow2(size);
-	s64 index = CountTrailingZeroes(size >> 12);
+	int64 index = CountTrailingZeroes64(size >> 12);
 
 	if (index < PAGE_CACHE_BITS && page_cache.counts[index] < PAGE_CACHE_SIZE) HOT
 	{
-		page_cache.pages[index * PAGE_CACHE_SIZE + page_cache.counts[index]] = page;
+		page_cache.pages[index * PAGE_CACHE_SIZE + page_cache.counts[index]] = (byte*)page;
 		page_cache.counts[index]++;
 	}
 	else
 	{
-		DeAllocateVirtualPage(page, size, PAGE_WRITE_FLAG);
+		DeAllocateVirtualPage(page, size, PAGE_FLAG_WRITE);
 	}
 }
 
 struct ArenaPool
 {
-	void* head;
-	void* data;
-	u32   count;
+	void*  head;
+	void*  data;
+	uint32 count;
 };
 
-#define ARENA_MIN_POW 3
-#define ARENA_POOL_COUNT (16 - ARENA_MIN_POW)
+static const uint64 ARENA_MIN_POW    = 5;
+static const uint64 ARENA_MIN_SIZE   = (1 << ARENA_MIN_POW);
+static const uint64 ARENA_POOL_COUNT = (16 - ARENA_MIN_POW);
 
 struct Arena
 {
@@ -165,11 +153,11 @@ static Arena arena;
 static void InitGlobalArena()
 {
 	ZeroMemory(&arena);
-	char* pages = (char*)GetPage((1<<21) * ARENA_POOL_COUNT);
+	byte* pages = (byte*)GetPage((1<<21) * ARENA_POOL_COUNT);
 
-	for (u32 index = 0; index < ARENA_POOL_COUNT; index++)
+	for (uint32 index = 0; index < ARENA_POOL_COUNT; index++)
 	{
-		u32 pow = index + ARENA_MIN_POW;
+		uint32 pow = index + ARENA_MIN_POW;
 
 		arena.pools[index].head = null;
 		arena.pools[index].data = pages;
@@ -179,37 +167,30 @@ static void InitGlobalArena()
 	}
 }
 
-static u64 GetArenaEffectiveSize(u64 size)
+static uint64 GetArenaEffectiveSize(uint64 size)
 {
-	return NextPow2((size-1) | 7);
+	return NextPow2(size-1 | ARENA_MIN_SIZE-1);
 }
 
-static void* Allocate(u64 size)
+static byte* AllocateMemory(uint64 size)
 {
-	// Check if size is 0?
+	byte* result = null;
+
 	Assert(size);
 
-	// Print("Allocate(%) -> %\n", size, GetArenaEffectiveSize(size));
-
-	// if (size == 768)
-	// {
-	// 	DebugBreak();
-	// }
-
 	size = GetArenaEffectiveSize(size);
-	u32 pow = CountTrailingZeroes(size);
-	u32 index = pow - ARENA_MIN_POW;
+	uint32 pow = CountTrailingZeroes64(size);
+	uint32 index = pow - ARENA_MIN_POW;
 
-	void* result = null;
 
-	if (index < ARENA_POOL_COUNT)
+	if (index < ARENA_POOL_COUNT) HOT
 	{
 		ArenaPool* pool = &arena.pools[index];
 
 		if (pool->head)
 		{
-			void* result = pool->head;
-			pool->head = *(char**)result;
+			byte* result = (byte*)pool->head;
+			pool->head = *(byte**)result;
 			return result;
 		}
 		else if (!pool->count)
@@ -218,30 +199,27 @@ static void* Allocate(u64 size)
 			pool->count = 1<<(21-pow);
 		}
 
-		result = pool->data;
-		pool->data = (char*)pool->data + size;
+		result = (byte*)pool->data;
+		pool->data = (byte*)pool->data + size;
 		pool->count--;
 	}
 	else
 	{
-		result = GetPage(size);
+		result = (byte*)GetPage(size);
 	}
 
-	// Print("result = %, size = %, pow = %\n", (u64)result, size, pow);
-	// standard_output_buffer.Flush();
-
+	result = (byte*)AssumeAligned(result, Bit(ARENA_MIN_POW));
 	return result;
 }
 
-static void DeAllocate(void* p, u64 size)
+static void DeAllocateMemory(byte* p, uint64 size)
 {
 	// Check if p is not null? Or leave that up to the caller?
-	Assert(p);
-	Assert(size);
+	Assert(p && size);
 
 	size = GetArenaEffectiveSize(size);
-	u32 pow = CountTrailingZeroes(size);
-	u32 index = pow - ARENA_MIN_POW;
+	uint32 pow = CountTrailingZeroes64(size);
+	uint32 index = pow - ARENA_MIN_POW;
 
 	if (index < ARENA_POOL_COUNT)
 	{
@@ -255,35 +233,34 @@ static void DeAllocate(void* p, u64 size)
 	}
 }
 
-static void* ReAllocate(void* p, u64 old_size, u64 new_size)
+static byte* ReAllocateMemory(byte* p, uint64 old_size, uint64 new_size)
 {
 	// @Todo: Deal with shrinking
 	Assert(new_size > old_size); // @RemoveMe @FixMe
 	Assert(new_size);
 	Assert(new_size != old_size, "Redundant ReAllocation\n");
 
+
 	if (new_size <= GetArenaEffectiveSize(old_size))
 	{
+		// Print("[SAME]   ReAllocate(%, %)\n", GetArenaEffectiveSize(old_size), GetArenaEffectiveSize(new_size));
 		return p;
 	}
 
-	char* result = (char*)Allocate(new_size);
+	byte* result = (byte*)AllocateMemory(new_size);
 
 	if (old_size)
 	{
-		CopyMemory(result, (char*)p, old_size);
-		DeAllocate(p, old_size);
+		CopyMemory(result, p, old_size);
+		DeAllocateMemory(p, old_size);
 	}
 
 	Assert(result);
 
-	// Print("ReAllocate(%, %, %) -> %\n", (u64)p, old_size, new_size, (u64)result);
-	// standard_output_buffer.Flush();
-
 	return result;
 }
 
-static Stack CreateStack(u64 size)
+static Stack CreateStack(uint64 size)
 {
 	Assert((size & 4095) == 0);
 
@@ -296,9 +273,10 @@ static Stack CreateStack(u64 size)
 	return stack;
 }
 
-static void* StackAllocate(Stack* stack, u64 size)
+static void* StackAllocate(Stack* stack, uint64 size)
 {
-	char* result = stack->head;
+	// Print("StackAllocate(%)\n", size);
+	byte* result = stack->head;
 	stack->head += size;
 
 	if (stack->head < stack->end) HOT
@@ -306,8 +284,8 @@ static void* StackAllocate(Stack* stack, u64 size)
 		return result;
 	}
 
-	u64 old_block_size = stack->block->size;
-	u64 new_block_size = (old_block_size << 1) | (size & -old_block_size);
+	uint64 old_block_size = stack->block->size;
+	uint64 new_block_size = (old_block_size << 1) | (size & -old_block_size);
 
 	Stack_Block* old_block = stack->block;
 	Stack_Block* new_block = (Stack_Block*)GetPage(new_block_size);
@@ -330,8 +308,97 @@ static void FreeStack(Stack* stack)
 	while (block)
 	{
 		Stack_Block* previous = block->previous;
-		RetirePage(block, block->size);
+		RetirePage((byte*)block, block->size);
 		block = previous;
 	}
 }
+
+// extern "C" void memcpy(void* dest, const void* src, unsigned long int count)
+// {
+// 	for (unsigned long int i = 0; i < count; i++)
+// 	{
+// 		((char*)dest)[i] = ((const char*)src)[i];
+// 	}
+// }
+
+// extern "C" int memcmp(const void* p0, const void* p1, unsigned long int count)
+// {
+// 	// Print("memcmp(\"%\", \"%\", %)\n", String((const char*)p0, count), String((const char*)p1, count), count);
+
+// 	const uint8* a8 = (const uint8*)p0;
+// 	const uint8* b8 = (const uint8*)p1;
+
+// 	uint64 i = 0;
+
+// 	while (i + 64 <= count)
+// 	{
+// 		const uint64* a64 = (const uint64*)(a8+i);
+// 		const uint64* b64 = (const uint64*)(b8+i);
+
+// 		int64 buffer[8] = {
+// 			(int64)ReverseBytes64(a64[0]) - (int64)ReverseBytes64(b64[0]),
+// 			(int64)ReverseBytes64(a64[1]) - (int64)ReverseBytes64(b64[1]),
+// 			(int64)ReverseBytes64(a64[2]) - (int64)ReverseBytes64(b64[2]),
+// 			(int64)ReverseBytes64(a64[3]) - (int64)ReverseBytes64(b64[3]),
+// 			(int64)ReverseBytes64(a64[4]) - (int64)ReverseBytes64(b64[4]),
+// 			(int64)ReverseBytes64(a64[5]) - (int64)ReverseBytes64(b64[5]),
+// 			(int64)ReverseBytes64(a64[6]) - (int64)ReverseBytes64(b64[6]),
+// 			(int64)ReverseBytes64(a64[7]) - (int64)ReverseBytes64(b64[7]),
+// 		};
+
+// 		if (buffer[0] < 0) return -1;
+// 		if (buffer[1] < 0) return -1;
+// 		if (buffer[2] < 0) return -1;
+// 		if (buffer[3] < 0) return -1;
+// 		if (buffer[4] < 0) return -1;
+// 		if (buffer[5] < 0) return -1;
+// 		if (buffer[6] < 0) return -1;
+// 		if (buffer[7] < 0) return -1;
+
+// 		if (buffer[0] > 0) return  1;
+// 		if (buffer[1] > 0) return  1;
+// 		if (buffer[2] > 0) return  1;
+// 		if (buffer[3] > 0) return  1;
+// 		if (buffer[4] > 0) return  1;
+// 		if (buffer[5] > 0) return  1;
+// 		if (buffer[6] > 0) return  1;
+// 		if (buffer[7] > 0) return  1;
+
+// 		i += 64;
+// 	}
+
+// 	for (; i < count; i++)
+// 	{
+// 		if (a8[i] < b8[i]) return -1;
+// 		if (a8[i] > b8[i]) return 1;
+// 	}
+
+// 	return 0;
+// }
+
+// extern "C" void* memset(void* begin, int v, unsigned long int count)
+// {
+// 	// @OptimizeMe?
+// 	byte* p = (byte*)begin;
+// 	for (uint64 i = 0; i < count; i++) p[i] = v;
+// 	return p + count;
+// }
+
+// extern "C" int bcmp(const void* p0, const void* p1, unsigned long int count)
+// {
+// 	for (unsigned long int i = 0; i < count; i++)
+// 	{
+// 		if (((const char*)p0)[i] != ((const char*)p1)[i]) return 1;
+// 	}
+
+// 	return 0;
+// }
+
+// extern "C" void memmove(void* p0, const void* p1, unsigned long int count)
+// {
+// 	for (unsigned long int i = 0; i < count; i++)
+// 	{
+// 		((char*)p0)[i] = ((const char*)p1)[i];
+// 	}
+// }
 

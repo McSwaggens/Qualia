@@ -1,63 +1,75 @@
-#pragma once
-
 // -------------------------------------------- //
 
 #define null nullptr
-using Null = decltype(null);
+typedef decltype(null) Null;
+typedef char byte;
+
+static_assert(sizeof(byte) == 1);
 
 // -------------------------------------------- //
 
-using u8  = unsigned char;
-using u16 = unsigned short;
-using u32 = unsigned int;
-using u64 = unsigned long long;
+typedef signed char      int8;
+typedef signed short     int16;
+typedef signed int       int32;
+typedef signed long long int64;
 
-static_assert(sizeof(u8 ) == 1);
-static_assert(sizeof(u16) == 2);
-static_assert(sizeof(u32) == 4);
-static_assert(sizeof(u64) == 8);
+static_assert(sizeof(int8 ) == 1);
+static_assert(sizeof(int16) == 2);
+static_assert(sizeof(int32) == 4);
+static_assert(sizeof(int64) == 8);
 
-static const u64 U8_MIN  = 0x0;
-static const u64 U16_MIN = 0x0;
-static const u64 U32_MIN = 0x0;
-static const u64 U64_MIN = 0x0;
+static const int64 INT8_MAX  = 0x7F;               // 127
+static const int64 INT16_MAX = 0x7FFF;             // 32767
+static const int64 INT32_MAX = 0x7FFFFFFF;         // 2147483647
+static const int64 INT64_MAX = 0x7FFFFFFFFFFFFFFF; // 9223372036854775807
 
-static const u64 U8_MAX  = 0xFF;
-static const u64 U16_MAX = 0xFFFF;
-static const u64 U32_MAX = 0xFFFFFFFF;
-static const u64 U64_MAX = 0xFFFFFFFFFFFFFFFF;
+static const int64 INT8_MIN  = 0x80;                 // -128
+static const int64 INT16_MIN = 0x8000;               // -32768
+static const int64 INT32_MIN = 0x80000000;           // -2147483648
+static const int64 INT64_MIN = 0x8000000000000000ll; // -9223372036854775808
 
-// -------------------------------------------- //
-
-using s8  = signed char;
-using s16 = signed short;
-using s32 = signed int;
-using s64 = signed long long;
-
-static_assert(sizeof(s8 ) == 1);
-static_assert(sizeof(s16) == 2);
-static_assert(sizeof(s32) == 4);
-static_assert(sizeof(s64) == 8);
-
-static const u64 S8_MAX  = 0x7F;
-static const u64 S16_MAX = 0x7FFF;
-static const u64 S32_MAX = 0x7FFFFFFF;
-static const u64 S64_MAX = 0x7FFFFFFFFFFFFFFF;
-
-static const u64 S8_MIN  = 0x80;
-static const u64 S16_MIN = 0x8000;
-static const u64 S32_MIN = 0x80000000;
-static const u64 S64_MIN = 0x8000000000000000;
+static const int64 INT8_MAX_DIGITS  = 3;
+static const int64 INT16_MAX_DIGITS = 5;
+static const int64 INT32_MAX_DIGITS = 10;
+static const int64 INT64_MAX_DIGITS = 19;
 
 // -------------------------------------------- //
 
-using f16 = __fp16;
-using f32 = float;
-using f64 = double;
-static_assert(sizeof(f32) == 4);
-static_assert(sizeof(f64) == 8);
+typedef unsigned char      uint8;
+typedef unsigned short     uint16;
+typedef unsigned int       uint32;
+typedef unsigned long long uint64;
 
-// @Todo: f32 and f64 min, max and epsilon.
+static_assert(sizeof(uint8 ) == 1);
+static_assert(sizeof(uint16) == 2);
+static_assert(sizeof(uint32) == 4);
+static_assert(sizeof(uint64) == 8);
+
+static const uint64 UINT8_MIN  = 0;
+static const uint64 UINT16_MIN = 0;
+static const uint64 UINT32_MIN = 0;
+static const uint64 UINT64_MIN = 0;
+
+static const uint64 UINT8_MAX  = 0xFF;
+static const uint64 UINT16_MAX = 0xFFFF;
+static const uint64 UINT32_MAX = 0xFFFFFFFF;
+static const uint64 UINT64_MAX = 0xFFFFFFFFFFFFFFFFull;
+
+static const int64 UINT8_MAX_DIGITS  = 3;
+static const int64 UINT16_MAX_DIGITS = 5;
+static const int64 UINT32_MAX_DIGITS = 10;
+static const int64 UINT64_MAX_DIGITS = 20;
+
+// -------------------------------------------- //
+
+typedef __fp16 float16;
+typedef float  float32;
+typedef double float64;
+static_assert(sizeof(float16) == 2);
+static_assert(sizeof(float32) == 4);
+static_assert(sizeof(float64) == 8);
+
+// @Todo: float32 and float64 min, max and epsilon.
 
 // -------------------------------------------- //
 

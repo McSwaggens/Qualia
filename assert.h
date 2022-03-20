@@ -1,62 +1,56 @@
 #pragma once
 
-#include "int.h"
 #include "print.h"
-#include "util.h"
+#include "general.h"
 #include "string.h"
 
 #define StaticAssert(x) static_assert(x)
 
-struct InternalSourceLocation
+struct InternalLocation
 {
-	s32 line;
-	String function;
 	String file;
+	String function;
+	int32 line;
+	int32 offset;
 };
 
-static constexpr InternalSourceLocation GetSourcePosition(
-	s32 line = __builtin_LINE(),
-	const char* function = __builtin_FUNCTION(),
-	const char* file = __builtin_FILE())
+static constexpr InternalLocation GetInternalLocation(
+	String file     = GetInternalFileName(),
+	String function = GetInternalFunctionName(),
+	int32  line     = GetInternalLineNumber(),
+	int32  offset   = GetInternalColumnNumber())
 {
-	InternalSourceLocation pos;
-	pos.line = line;
-	pos.function = ToString(function);
-	pos.file = ToString(file);
-	return pos;
+	InternalLocation location;
+	location.file = file;
+	location.function = function;
+	location.line = line;
+	location.offset = offset;
+	return location;
 }
 
-static void Assert(bool b = false, String desc = null, InternalSourceLocation pos = GetSourcePosition())
+static void Assert(bool b = false, String desc = null, InternalLocation loc = GetInternalLocation())
 {
-	if (!b)
+	if (IsDebug() && !b)
 	{
-		if (IsDebug())
-		{
-			Print("%:%: error: Assertion failed in %\n", pos.file, pos.line, pos.function);
+		Print("%:%: error: Assertion failed in %\n", loc.file, loc.line, loc.function);
 
-			if (desc)
-			{
-				Print("%:%: error: %\n", pos.file, pos.line, desc);
-			}
+		if (desc)
+		{
+			Print("%:%: error: %\n", loc.file, loc.line, desc);
 		}
 
-		Fail();
+		ExitProcess(false);
 	}
 }
 
-static void Assert(String message, InternalSourceLocation pos = GetSourcePosition())
-{
-	if (IsDebug())
-	{
-		Print("%:%: error: % (%)\n", pos.file, pos.line, message, pos.function);
-	}
+// [[noreturn]]
+// static void Assert(String message, InternalLocation loc = GetSourcePosition())
+// {
+// 	if (IsDebug())
+// 	{
+// 		Print("%:%: error: % (%)\n", loc.file, loc.line, message, loc.function);
+// 	}
 
-	Fail();
-}
-
-template<u32 N>
-static void Assert(const char (&s)[N], InternalSourceLocation pos = GetSourcePosition())
-{
-	Assert(String(s, N-1), pos);
-}
+// 	ExitProcess(false);
+// }
 

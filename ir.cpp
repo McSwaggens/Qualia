@@ -3,311 +3,247 @@
 #include "print.h"
 #include "assert.h"
 
-List<IrFunctionInfo*> ir_functions = null;
+static List<IrFunction*> ir_functions = null;
 
-void RemoveLogic(IrLogicIndex logic_index, IrFunctionInfo* function)
+static void RemoveInstruction(IrFunction* function, IrInstructionID id)
 {
-	IrLogic* logic = &function->logic[logic_index];
-	logic->kind = LOGOS_NOP;
-	logic->operands[0] = function->free_logic;
-	function->free_logic = logic_index;
-	function->blocks[logic->block].logic.Remove(logic_index);
+	IrInstruction* instruction = GetInstruction(function, id);
+	instruction->kind = IR_NOP;
+	instruction->operands[0] = GetValue(function->free_instruction);
+	function->free_instruction = id;
+	GetBlock(function, instruction->block)->instructions.Remove(id);
 }
 
-void DeclareDependency(IrIndex dependant, IrLogicIndex dependee, IrFunctionInfo* function)
+static void DeclareDependency(IrFunction* function, IrInstructionID dependant, IrInstructionID dependee)
 {
-	if (dependant) return;
-	function->logic[dependant].users.Add(dependee);
+	Assert(dependant != IR_NONE);
+	Assert(dependee  != IR_NONE);
+	function->instructions[dependant].users.Add(dependee);
 }
 
-void RemoveDependency(IrIndex dependant, IrLogicIndex dependee, IrFunctionInfo* function)
+static void RemoveDependency(IrFunction* function, IrInstructionID dependant, IrInstructionID dependee)
 {
-	if (dependant) return;
-	function->logic[dependant].users.Remove(dependee);
+	Assert(dependant != IR_NONE);
+	Assert(dependee  != IR_NONE);
+	function->instructions[dependant].users.Remove(dependee);
 }
 
-IrLogicIndex InsertLogic(IrLogic logic, IrFunctionInfo* function, IrLogicIndex block)
+static IrInstructionID Insert(IrFunction* function, IrInstruction instruction)
 {
-	IrLogicIndex index;
+	IrInstructionID id = function->free_instruction;
 
-	logic.block = block;
-
-	if (function->free_logic)
+	if (id == IR_NONE)
 	{
-		index = function->logic.count;
-		function->logic.Add(logic);
+		id = function->instructions.count;
+		function->instructions.Add(instruction);
 	}
 	else
 	{
-		index = function->free_logic;
-		function->free_logic = function->logic[index].operands[0];
-		function->logic[index] = logic;
+		function->free_instruction = function->instructions[id].operands[0].instruction;
+		function->instructions[id] = instruction;
 	}
 
-	GetBlockInfo(block, function)->logic.Add(index);
-
-	DeclareDependency(logic.operands[0], index, function);
-	DeclareDependency(logic.operands[1], index, function);
-	DeclareDependency(logic.operands[2], index, function);
-
-	return index;
+	return id;
 }
 
-IrLogicIndex InsertLogic(IrLogicKind kind, Type* type, IrIndex operand0, IrIndex operand1, IrIndex operand2, IrFunctionInfo* function, IrLogicIndex block)
+static IrValue Insert(IrFunction* function, IrBlockID block, Type* type, IrInstructionKind kind, IrValue operand0 = None(), IrValue operand1 = None(), IrValue operand2 = None())
 {
-	IrLogic logic;
-	ZeroMemory(&logic);
+	IrInstruction instruction;
+	ZeroMemory(&instruction);
 
-	logic.kind = kind;
-	logic.type = type;
-	logic.operands[0] = operand0;
-	logic.operands[1] = operand1;
-	logic.operands[2] = operand2;
+	instruction.kind = kind;
+	instruction.type = type;
+	instruction.block = block;
 
-	return InsertLogic(logic, function, block);
+	instruction.operands[0] = operand0;
+	instruction.operands[1] = operand1;
+	instruction.operands[2] = operand2;
+
+	IrInstructionID id = Insert(function, instruction);
+
+	if (instruction.operands[0].kind == IR_VALUE_INSTRUCTION) DeclareDependency(function, GetInstruction(instruction.operands[0]), id);
+	if (instruction.operands[1].kind == IR_VALUE_INSTRUCTION) DeclareDependency(function, GetInstruction(instruction.operands[1]), id);
+	if (instruction.operands[2].kind == IR_VALUE_INSTRUCTION) DeclareDependency(function, GetInstruction(instruction.operands[2]), id);
+
+	GetBlock(function, instruction.block)->instructions.Add(id);
+
+	return GetValue(id);
 }
 
-IrLogicIndex InsertLogic(IrLogicKind kind, Type* type, IrIndex operand0, IrIndex operand1, IrFunctionInfo* function, IrLogicIndex block)
+static IrInstructionID InsertPhi(IrFunction* function, IrBlockID block, Type* type)
 {
-	return InsertLogic(kind, type, operand0, operand1, IR_NONE, function, block);
+	IrInstruction instruction;
+	ZeroMemory(&instruction);
+	instruction.kind = IR_PHI;
+	instruction.block = block;
+
+	IrInstructionID id = Insert(function, instruction);
+	GetBlock(function, block)->phis.Add(id);
+
+	return id;
 }
 
-IrLogicIndex InsertLogic(IrLogicKind kind, Type* type, IrIndex operand0, IrFunctionInfo* function, IrLogicIndex block)
+static void AddPhiEntry(IrFunction* function, IrInstructionID phi, IrPhiEntry entry)
 {
-	return InsertLogic(kind, type, operand0, IR_NONE, IR_NONE, function, block);
+	IrInstruction* instruction = GetInstruction(function, phi);
+	Assert(GetInstruction(function, phi)->kind == IR_PHI);
+	instruction->phi_entries.Add(entry);
 }
 
-IrLogicIndex InsertLogic(IrLogicKind kind, Type* type, IrFunctionInfo* function, IrLogicIndex block)
+static IrBlockID CreateBlock(IrFunction* function)
 {
-	return InsertLogic(kind, type, IR_NONE, IR_NONE, IR_NONE, function, block);
-}
+	IrIndex id = function->free_block.index;
 
-IrLogicIndex GetConstantBool(bool b, IrFunctionInfo* function)
-{
-	if (function->bool_cache[b] != IR_NONE)
+	IrBlock block;
+	ZeroMemory(&block);
+	block.kind = IR_BLOCK_UNSPECIFIED;
+
+	if (id != IR_NONE)
 	{
-		return function->bool_cache[b];
+		function->free_block = GetBlock(function, IrBlockID { id })->next;
 	}
-
-	IrLogic logic;
-	ZeroMemory(&logic);
-	logic.kind = LOGOS_CONSTANT;
-	logic.type = &type_bool;
-	logic.constant_bool = b;
-	logic.operands[0] = IR_NONE;
-	logic.operands[1] = IR_NONE;
-	logic.operands[2] = IR_NONE;
-
-	IrLogicIndex index = InsertLogic(logic, function, 0); // @Bug: Block 0 may not be valid.
-	function->constants.Add(index);
-	function->bool_cache[b] = index;
-
-	return index;
-}
-
-IrLogicIndex GetConstantInt(s64 n, IrFunctionInfo* function)
-{
-	IrLogicIndex* constant_index_pointer = null;
-
-	if ((u64)(n+1) < 3 && function->int_cache[n+1] != IR_NONE)
+	else
 	{
-		return function->int_cache[n+1];
-	}
-
-	for (u32 i = 0; i < function->constants.count; i++)
-	{
-		IrLogicIndex index = function->constants[i];
-		IrLogic* logic = &function->logic[index];
-
-		if (logic->constant_int64 == n && logic->type == &type_int64) // @FixMe: type_int64
-		{
-			return index;
-		}
-	}
-
-	IrLogic logic;
-	ZeroMemory(&logic);
-	logic.kind = LOGOS_CONSTANT;
-	logic.type = &type_int64;
-	logic.constant_int64 = n;
-	logic.operands[0] = IR_NONE;
-	logic.operands[1] = IR_NONE;
-	logic.operands[2] = IR_NONE;
-
-	IrLogicIndex index = InsertLogic(logic, function, 0); // @Bug: Block 0 may not be valid.
-	function->constants.Add(index);
-
-	if ((u64)(n+1) < 3)
-	{
-		function->int_cache[n+1] = index;
-	}
-
-	return index;
-}
-
-IrLogicIndex GetConstantFloat32(f32 f, IrFunctionInfo* function)
-{
-	for (u32 i = 0; i < function->constants.count; i++)
-	{
-		IrLogicIndex index = function->constants[i];
-		IrLogic* constant = &function->logic[index];
-
-		if (constant->constant_float32 == f && constant->type == &type_float32)
-		{
-			return index;
-		}
-	}
-
-	IrLogic constant;
-	ZeroMemory(&constant);
-	constant.kind = LOGOS_CONSTANT;
-	constant.type = &type_float32;
-	constant.constant_float32 = f;
-
-	IrLogicIndex index = InsertLogic(constant, function, 0); // @Bug: Block 0 may not be valid.
-	function->constants.Add(index);
-
-	return index;
-}
-
-IrLogicIndex InsertInversion(Type* type, IrIndex v, IrFunctionInfo* function, IrLogicIndex block)
-{
-	Assert(IsInteger(type));
-	return InsertLogic(LOGOS_SUBTRACT, type, v, GetConstantInt(0, function), function, block);
-}
-
-// @RemoveMe?
-IrLogicIndex InsertStack(Type* type, IrFunctionInfo* function, IrLogicIndex block)
-{
-	return InsertLogic(LOGOS_STACK, type, function, block);
-}
-
-// @RemoveMe?
-IrLogicIndex InsertParameter(Type* type, u32 parameter_index, IrFunctionInfo* function, IrLogicIndex block)
-{
-	return InsertLogic(LOGOS_PARAMETER, type, parameter_index, function, block);
-}
-
-// @RemoveMe?
-IrLogicIndex InsertLoad(Type* type, IrIndex address, IrFunctionInfo* function, IrLogicIndex block)
-{
-	return InsertLogic(LOGOS_LOAD, type, address, function, block);
-}
-
-// @RemoveMe?
-IrLogicIndex InsertStore(Type* type, IrIndex address, IrIndex value, IrFunctionInfo* function, IrLogicIndex block)
-{
-	return InsertLogic(LOGOS_STORE, type, address, value, function, block);
-}
-
-// @RemoveMe?
-IrLogicIndex InsertCopy(Type* type, IrIndex destination, IrIndex source, IrFunctionInfo* function, IrLogicIndex block)
-{
-	return InsertLogic(LOGOS_COPY, type, destination, source, function, block);
-}
-
-IrLogicIndex InsertBranch(IrIndex condition, IrIndex true_block, IrIndex false_block, IrFunctionInfo* function, IrLogicIndex block)
-{
-	IrLogicIndex branch = InsertLogic(LOGOS_BRANCH, null, condition, true_block, false_block, function, block);
-	GetBlockInfo(block, function)->branch = branch;
-	return branch;
-}
-
-IrLogicIndex InsertJump(IrLogicIndex to_block, IrFunctionInfo* function, IrLogicIndex block)
-{
-	IrLogicIndex jump = InsertLogic(LOGOS_JUMP, null, to_block, function, block);
-	GetBlockInfo(block, function)->branch = jump;
-	return jump;
-}
-
-IrLogicIndex InsertReturnValue(IrLogicIndex value, IrFunctionInfo* function, IrLogicIndex block)
-{
-	IrLogicIndex ret = InsertLogic(LOGOS_RETURN, null, value, function, block);
-	GetBlockInfo(block, function)->branch = ret;
-	return ret;
-}
-
-void RemoveBlock(IrLogicIndex block_index, IrFunctionInfo* function)
-{
-	IrBlockInfo* block = GetBlockInfo(block_index, function);
-	block->next = function->free_block;
-	FreeList(block->logic);
-}
-
-IrLogicIndex CreateBlock(IrFunctionInfo* function)
-{
-	IrBlockInfoIndex block_index = function->free_block;
-
-	if (block_index == IR_NONE)
-	{
-		block_index = function->blocks.count;
-
-		IrBlockInfo block;
-		ZeroMemory(&block);
-
-		block.next = IR_NONE;
-		block.branch = IR_NONE;
+		id = function->blocks.count;
 		function->blocks.Add(block);
 	}
-	else
-	{
-		function->free_block = function->blocks[block_index].next;
-		ZeroMemory(&function->blocks[block_index]);
-		function->blocks[block_index].branch = IR_NONE;
-		function->blocks[block_index].next = IR_NONE;
-	}
 
-	IrLogicIndex rep = InsertLogic(LOGOS_BLOCK, null, function, block_index);
-	function->blocks[block_index].representation = rep;
-
-	return rep;
+	function->blocks[id] = block;
+	return IrBlockID { id };
 }
 
-IrLogicIndex InsertConversion(IrLogicIndex value, Type* from, Type* to, IrFunctionInfo* function, IrLogicIndex block)
+static void RemoveBlock(IrFunction* function, IrBlockID id)
 {
+	Assert(id.index != IR_NONE);
+	Assert(id.index < function->blocks.count);
+	Assert(id.index != 0);
+
+	IrBlock* block = GetBlock(function, id);
+	block->kind = IR_BLOCK_FREE;
+	block->next = function->free_block;
+
+	FreeList(block->users);
+	FreeList(block->instructions);
+	FreeList(block->phis);
+
+	block->users = null;
+	block->instructions = null;
+	block->phis = null;
+}
+
+static void Jump(IrFunction* function, IrBlockID from_id, IrBlockID to_id)
+{
+	IrBlock* from = GetBlock(function, from_id);
+	Assert(from->kind == IR_BLOCK_UNSPECIFIED);
+	from->kind = IR_BLOCK_JUMP;
+	from->jump = to_id;
+}
+
+static void Branch(IrFunction* function, IrBlockID block_id, IrValue condition, IrBlockID true_block, IrBlockID false_block)
+{
+	IrBlock* block = GetBlock(function, block_id);
+	Assert(block->kind == IR_BLOCK_UNSPECIFIED);
+	block->kind = IR_BLOCK_BRANCH;
+	block->branch.branch_instruction = GetInstruction(Insert(function, block_id, null, IR_BRANCH, condition));
+	block->branch.true_branch = true_block;
+	block->branch.false_branch = false_block;
+}
+
+static void Return(IrFunction* function, IrBlockID block_id, IrValue value)
+{
+	IrBlock* block = GetBlock(function, block_id);
+	Assert(block->kind == IR_BLOCK_UNSPECIFIED);
+
+	block->kind = IR_BLOCK_RETURN;
+	block->return_instruction = GetInstruction(Insert(function, block_id, null, IR_RETURN, value));
+}
+
+static IrValue InsertCast(IrFunction* function, IrBlockID block, IrValue value, Type* from, Type* to)
+{
+	if (IsEnum(from)) from = from->enumeration->underlying_type;
+	if (IsEnum(to))   to   = to->enumeration->underlying_type;
+
 	if (from == to) return value;
 
-	if (IsFloat(from) && IsFloat(to))
+	if (IsPointer(from) && IsPointer(to)) return value;
+
+	if (from->kind == TYPE_BASETYPE_BOOL && IsInteger(to)) return Insert(function, block, to, IR_ZERO_EXTEND, value);
+
+	if (IsInteger(from)                     && to->kind == TYPE_BASETYPE_BOOL) return Insert(function, block, to, IR_COMPARE_NOT_EQUAL, value, GetConstantInt(0));
+	if (IsPointer(from)                     && to->kind == TYPE_BASETYPE_BOOL) return Insert(function, block, to, IR_COMPARE_NOT_EQUAL, value, GetConstantInt(0));
+	if (from->kind == TYPE_BASETYPE_FLOAT32 && to->kind == TYPE_BASETYPE_BOOL) return Insert(function, block, to, IR_COMPARE_NOT_EQUAL, value, GetConstantFloat32(0));
+	if (from->kind == TYPE_BASETYPE_FLOAT64 && to->kind == TYPE_BASETYPE_BOOL) return Insert(function, block, to, IR_COMPARE_NOT_EQUAL, value, GetConstantFloat64(0));
+
+	if (from->kind == TYPE_BASETYPE_FLOAT32 && to->kind == TYPE_BASETYPE_FLOAT64) return Insert(function, block, to, IR_FLOAT_CAST, value);
+	if (from->kind == TYPE_BASETYPE_FLOAT64 && to->kind == TYPE_BASETYPE_FLOAT32) return Insert(function, block, to, IR_FLOAT_CAST, value);
+	if (from->kind == TYPE_BASETYPE_FLOAT32 && IsInteger(to)) return Insert(function, block, to, IR_FLOAT_TO_INT, value);
+	if (from->kind == TYPE_BASETYPE_FLOAT64 && IsInteger(to)) return Insert(function, block, to, IR_FLOAT_TO_INT, value);
+
+	if (IsInteger(from)         && from->kind == TYPE_BASETYPE_FLOAT32)     return Insert(function, block, to, IR_INT_TO_FLOAT, value);
+	if (IsInteger(from)         && from->kind == TYPE_BASETYPE_FLOAT64)     return Insert(function, block, to, IR_INT_TO_FLOAT, value);
+	if (IsInteger(from)         && IsInteger(to) && from->size == to->size) return value;
+	if (IsInteger(from)         && IsInteger(to) && from->size >  to->size) return Insert(function, block, to, IR_TRUNCATE, value);
+	if (IsSignedInteger(from)   && IsInteger(to) && from->size <  to->size) return Insert(function, block, to, IR_SIGN_EXTEND, value);
+	if (IsUnsignedInteger(from) && IsInteger(to) && from->size <  to->size) return Insert(function, block, to, IR_ZERO_EXTEND, value);
+
+	// if (to->kind == TYPE_BASETYPE_TUPLE && to->tuple.count == from->tuple.count)
+	if (from->kind == TYPE_BASETYPE_TUPLE && to->kind == TYPE_BASETYPE_TUPLE)
 	{
-		return InsertLogic(LOGOS_FLOAT_CONVERT, to, value, function, block);
+		Assert(from->tuple.count == to->tuple.count);
+
+		for (uint32 i = 0; i < from->tuple.count; i++)
+		{
+			Type* from_element = from->tuple[i];
+			Type* to_element   = to->tuple[i];
+		}
+
+		Assert();
 	}
 
-	if (IsInteger(from) && IsFloat(to))
+	// return to->kind == TYPE_BASETYPE_BOOL
+	// 	|| CanImplicitCast(from, to->subtype);
+	if (from->kind == TYPE_SPECIFIER_OPTIONAL)
 	{
-		return InsertLogic(LOGOS_INT_TO_FLOAT, to, value, function, block);
+		Assert();
 	}
 
-	if (IsFloat(from) && IsInteger(to))
+	// return (to->kind == TYPE_SPECIFIER_FIXED_ARRAY
+	// 	&& from->length == to->length
+	// 	&& CanImplicitCast(from->subtype, to->subtype));
+		// || (from->length == 1 && CanImplicitCast(from->subtype, to->subtype));
+	if (from->kind == TYPE_SPECIFIER_FIXED_ARRAY)
 	{
-		return InsertLogic(LOGOS_FLOAT_TO_INT, to, value, function, block);
+		Assert();
 	}
+
+	if (from->kind == TYPE_BASETYPE_BYTE) return value;
 
 	Assert();
 	return value;
 }
 
-IrIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, IrLogicIndex& block);
+static IrValue ExpressionToIR(IrFunction* function, IrBlockID& block, Ast_Expression* expression);
 
-IrIndex GenerateIRLoad(Ast_Expression* expression, IrFunctionInfo* function, IrLogicIndex& block)
+static IrValue ExpressionToIRLoad(IrFunction* function, IrBlockID& block, Ast_Expression* expression)
 {
-	IrLogicIndex value = GenerateIR(expression, function, block);
+	IrValue value = ExpressionToIR(function, block, expression);
 
-	if (expression->is_referential_value)
+	if ((expression->flags & AST_EXPRESSION_FLAG_REFERENTIAL))
 	{
-		value = InsertLoad(expression->type, value, function, block);
+		value = Insert(function, block, expression->type, IR_LOAD, value);
 	}
 
 	return value;
 }
 
-IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, IrLogicIndex& block)
+static IrValue ExpressionToIR(IrFunction* function, IrBlockID& block, Ast_Expression* expression)
 {
 	switch (expression->kind)
 	{
 		case AST_EXPRESSION_TERMINAL_NAME: Assert(); Unreachable();
 
 		case AST_EXPRESSION_TERMINAL_FUNCTION:
-		case AST_EXPRESSION_TERMINAL_INTRINSIC_FUNCTION:
+		case AST_EXPRESSION_TERMINAL_INTRINSIC:
 		{
 			Assert();
 		} break;
@@ -316,32 +252,30 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 		{
 			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
 
-			if (IsPointer(literal->type))
+			if (IsInteger(literal->type) || IsPointer(literal->type) || literal->type == &type_bool)
 			{
-				return GetConstantInt(literal->value_int64, function);
+				return GetConstantInt(literal->value_int);
 			}
-			else if (IsInteger(literal->type))
+			else if (literal->type == &type_float64)
 			{
-				return GetConstantInt(literal->value_int64, function);
+				return GetConstantFloat64(literal->value_f64);
 			}
 			else if (literal->type == &type_float32)
 			{
-				return GetConstantFloat32(literal->value_float32, function);
+				return GetConstantFloat32(literal->value_f32);
 			}
-			else if (literal->type == &type_bool)
-			{
-				return GetConstantBool(literal->value_bool, function);
-			}
-			else
+			else if (literal->type == &type_float16)
 			{
 				Assert();
+				return GetConstantFloat32(literal->value_f16);
 			}
+			else Assert();
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_VARIABLE:
 		{
 			Ast_Expression_Variable* var = (Ast_Expression_Variable*)expression;
-			return var->variable->stack;
+			return var->variable->ir;
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_STRUCT:
@@ -350,7 +284,8 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER:
 		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER:
 		case AST_EXPRESSION_TERMINAL_ARRAY_LENGTH:
-		case AST_EXPRESSION_TERMINAL_ARRAY_DATA:
+		case AST_EXPRESSION_TERMINAL_ARRAY_BEGIN:
+		case AST_EXPRESSION_TERMINAL_ARRAY_END:
 		case AST_EXPRESSION_FIXED_ARRAY:
 		{
 			Assert();
@@ -371,11 +306,11 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
-			IrLogicIndex left = GenerateIRLoad(binary->left, function, block);
-			IrLogicIndex right = GenerateIRLoad(binary->right, function, block);
+			IrValue left  = ExpressionToIRLoad(function, block, binary->left);
+			IrValue right = ExpressionToIRLoad(function, block, binary->right);
 
-			IrLogicKind logos = binary->kind == AST_EXPRESSION_BINARY_COMPARE_EQUAL ? LOGOS_COMPARE_EQUAL : LOGOS_COMPARE_NOT_EQUAL;
-			return InsertLogic(logos, &type_bool, left, right, function, block);
+			IrInstructionKind kind = binary->kind == AST_EXPRESSION_BINARY_COMPARE_EQUAL ? IR_COMPARE_EQUAL : IR_COMPARE_NOT_EQUAL;
+			return Insert(function, block, &type_bool, kind, left, right);
 		}
 
 		case AST_EXPRESSION_BINARY_COMPARE_LESS:
@@ -385,19 +320,19 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 
-			IrLogicIndex left = GenerateIRLoad(binary->left, function, block);
-			IrLogicIndex right = GenerateIRLoad(binary->right, function, block);
+			IrValue left  = ExpressionToIRLoad(function, block, binary->left);
+			IrValue right = ExpressionToIRLoad(function, block, binary->right);
 
-			IrLogicKind kind;
+			IrInstructionKind kind;
 
 			if (IsFloat(binary->left->type))
 			{
 				switch (binary->kind)
 				{
-					case AST_EXPRESSION_BINARY_COMPARE_LESS:             kind = LOGOS_FLOAT_COMPARE_LESS;             break;
-					case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    kind = LOGOS_FLOAT_COMPARE_LESS_OR_EQUAL;    break;
-					case AST_EXPRESSION_BINARY_COMPARE_GREATER:          kind = LOGOS_FLOAT_COMPARE_GREATER;          break;
-					case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: kind = LOGOS_FLOAT_COMPARE_GREATER_OR_EQUAL; break;
+					case AST_EXPRESSION_BINARY_COMPARE_LESS:             kind = IR_FLOAT_COMPARE_LESS;             break;
+					case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    kind = IR_FLOAT_COMPARE_LESS_OR_EQUAL;    break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER:          kind = IR_FLOAT_COMPARE_GREATER;          break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: kind = IR_FLOAT_COMPARE_GREATER_OR_EQUAL; break;
 					default: Unreachable();
 				}
 			}
@@ -405,68 +340,82 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 			{
 				switch (binary->kind)
 				{
-					case AST_EXPRESSION_BINARY_COMPARE_LESS:             kind = LOGOS_SIGNED_COMPARE_LESS;             break;
-					case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    kind = LOGOS_SIGNED_COMPARE_LESS_OR_EQUAL;    break;
-					case AST_EXPRESSION_BINARY_COMPARE_GREATER:          kind = LOGOS_SIGNED_COMPARE_GREATER;          break;
-					case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: kind = LOGOS_SIGNED_COMPARE_GREATER_OR_EQUAL; break;
+					case AST_EXPRESSION_BINARY_COMPARE_LESS:             kind = IR_SIGNED_COMPARE_LESS;             break;
+					case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    kind = IR_SIGNED_COMPARE_LESS_OR_EQUAL;    break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER:          kind = IR_SIGNED_COMPARE_GREATER;          break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: kind = IR_SIGNED_COMPARE_GREATER_OR_EQUAL; break;
 					default: Unreachable();
 				}
 			}
 			else
 			{
+				Assert(IsUnsignedInteger(binary->left->type));
 				switch (binary->kind)
 				{
-					case AST_EXPRESSION_BINARY_COMPARE_LESS:             kind = LOGOS_UNSIGNED_COMPARE_LESS;             break;
-					case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    kind = LOGOS_UNSIGNED_COMPARE_LESS_OR_EQUAL;    break;
-					case AST_EXPRESSION_BINARY_COMPARE_GREATER:          kind = LOGOS_UNSIGNED_COMPARE_GREATER;          break;
-					case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: kind = LOGOS_UNSIGNED_COMPARE_GREATER_OR_EQUAL; break;
+					case AST_EXPRESSION_BINARY_COMPARE_LESS:             kind = IR_UNSIGNED_COMPARE_LESS;             break;
+					case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:    kind = IR_UNSIGNED_COMPARE_LESS_OR_EQUAL;    break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER:          kind = IR_UNSIGNED_COMPARE_GREATER;          break;
+					case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: kind = IR_UNSIGNED_COMPARE_GREATER_OR_EQUAL; break;
 					default: Unreachable();
 				}
 			}
 
-			return InsertLogic(kind, &type_bool, left, right, function, block);
+			return Insert(function, block, &type_bool, kind, left, right);
 
 		} break;
 
 		case AST_EXPRESSION_UNARY_MINUS:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
+			IrValue value = ExpressionToIRLoad(function, block, unary->subexpression);
+
+			if (unary->type == &type_float64)
+			{
+				return Insert(function, block, unary->type, IR_FLOAT_SUBTRACT, GetConstantFloat64(0), value);
+			}
+			else if (unary->type == &type_float32)
+			{
+				return Insert(function, block, unary->type, IR_FLOAT_SUBTRACT, GetConstantFloat32(0), value);
+			}
+			else if (IsInteger(unary->type))
+			{
+				return Insert(function, block, unary->type, IR_INT_SUBTRACT, GetConstantInt(0), value);
+			}
+
 			Assert();
 		} break;
 
 		case AST_EXPRESSION_UNARY_NOT:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			return InsertLogic(LOGOS_COMPARE_EQUAL, &type_bool, GenerateIRLoad(unary->subexpression, function, block), GetConstantBool(false, function), function, block);
+			return Insert(function, block, &type_bool, IR_COMPARE_EQUAL, ExpressionToIRLoad(function, block, unary->subexpression), GetConstantInt(0));
 		} break;
 
-		case AST_EXPRESSION_UNARY_BITWISE_NOT:
 		case AST_EXPRESSION_UNARY_PLUS:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			IrLogicKind kind;
+			IrValue value = ExpressionToIRLoad(function, block, unary->subexpression);
+			IrValue value_flipped = Insert(function, block, unary->type, IR_INT_SUBTRACT, GetConstantInt(0), value);
+			IrValue is_negative = Insert(function, block, &type_bool, IR_SIGNED_COMPARE_LESS, value, GetConstantInt(0));
+			return Insert(function, block, unary->type, IR_SELECT, is_negative, value_flipped, value);
+		} break;
 
-			switch (unary->kind)
-			{
-				case AST_EXPRESSION_UNARY_BITWISE_NOT: kind = LOGOS_BITWISE_NOT; break;
-				case AST_EXPRESSION_UNARY_NOT:         Assert(); break; // compare_equal(false)
-				case AST_EXPRESSION_UNARY_PLUS:        Assert(); break;
-				default: Assert(); Unreachable();
-			}
-
-			return InsertLogic(kind, unary->type, GenerateIRLoad(unary->subexpression, function, block), function, block);
+		case AST_EXPRESSION_UNARY_BITWISE_NOT:
+		{
+			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
+			return Insert(function, block, unary->type, IR_NOT, ExpressionToIRLoad(function, block, unary->subexpression));
 		} break;
 
 		case AST_EXPRESSION_UNARY_REFERENCE_OF:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			return GenerateIR(unary->subexpression, function, block);
+			return ExpressionToIR(function, block, unary->subexpression);
 		} break;
 
 		case AST_EXPRESSION_UNARY_ADDRESS_OF:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			return GenerateIR(unary->subexpression, function, block);
+			return ExpressionToIR(function, block, unary->subexpression);
 		} break;
 
 		case AST_EXPRESSION_BINARY_ADD:
@@ -475,57 +424,76 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 		case AST_EXPRESSION_BINARY_DIVIDE:
 		case AST_EXPRESSION_BINARY_MODULO:
 		case AST_EXPRESSION_BINARY_EXPONENTIAL:
+		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
+		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
 		case AST_EXPRESSION_BINARY_BITWISE_OR:
 		case AST_EXPRESSION_BINARY_BITWISE_XOR:
 		case AST_EXPRESSION_BINARY_BITWISE_AND:
-		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
-		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
-			IrLogicKind kind;
+			IrInstructionKind kind;
 
-			IrLogicIndex left = GenerateIRLoad(binary->left, function, block);
-			IrLogicIndex right = GenerateIRLoad(binary->right, function, block);
+			IrValue left = ExpressionToIRLoad(function, block, binary->left);
+			IrValue right = ExpressionToIRLoad(function, block, binary->right);
 
 			if (IsPointer(binary->left->type) && IsInteger(binary->right->type) && binary->kind == AST_EXPRESSION_BINARY_ADD)
 			{
-				return InsertLogic(LOGOS_INDEX, binary->type, left, right, function, block);
+				return Insert(function, block, binary->type, IR_INDEX, left, right);
 			}
 			else if (IsPointer(binary->left->type) && IsInteger(binary->right->type) && binary->kind == AST_EXPRESSION_BINARY_SUBTRACT)
 			{
-				return InsertLogic(LOGOS_INDEX, binary->type, left, InsertInversion(binary->right->type, right, function, block), function, block);
+				right = Insert(function, block, binary->right->type, IR_INT_SUBTRACT, GetConstantInt(0), right);
+				return Insert(function, block, binary->type, IR_INDEX, left, right);
 			}
 			else if (IsPointer(binary->left->type) && IsPointer(binary->right->type) && binary->kind == AST_EXPRESSION_BINARY_SUBTRACT)
 			{
-				left = InsertLogic(LOGOS_SUBTRACT, binary->left->type, left, right, function, block);
-				return InsertLogic(LOGOS_DIVIDE, binary->type, left, GetConstantInt(binary->left->type->size, function), function, block);
+				left = Insert(function, block, binary->left->type, IR_INT_SUBTRACT, left, right);
+				return Insert(function, block, binary->type, IR_UNSIGNED_DIVIDE, left, GetConstantInt(binary->left->type->size));
 			}
-			else
+			else if (IsInteger(binary->type))
 			{
+				bool is_signed = IsSignedInteger(binary->type);
+
 				switch (binary->kind)
 				{
-					case AST_EXPRESSION_BINARY_ADD:         kind = LOGOS_ADD;         break;
-					case AST_EXPRESSION_BINARY_SUBTRACT:    kind = LOGOS_SUBTRACT;    break;
-					case AST_EXPRESSION_BINARY_MULTIPLY:    kind = LOGOS_MULTIPLY;    break;
-					case AST_EXPRESSION_BINARY_DIVIDE:      kind = LOGOS_DIVIDE;      break;
-					case AST_EXPRESSION_BINARY_MODULO:      kind = LOGOS_MODULO;      break;
-					case AST_EXPRESSION_BINARY_EXPONENTIAL: kind = LOGOS_EXPONENTIAL; break;
-					case AST_EXPRESSION_BINARY_BITWISE_OR:  kind = LOGOS_BITWISE_OR;  break;
-					case AST_EXPRESSION_BINARY_BITWISE_XOR: kind = LOGOS_BITWISE_XOR; break;
-					case AST_EXPRESSION_BINARY_BITWISE_AND: kind = LOGOS_BITWISE_AND; break;
-					case AST_EXPRESSION_BINARY_LEFT_SHIFT:  kind = LOGOS_BITWISE_LEFT_SHIFT;  break;
-					case AST_EXPRESSION_BINARY_RIGHT_SHIFT: kind = LOGOS_BITWISE_RIGHT_SHIFT; break;
+					case AST_EXPRESSION_BINARY_ADD:         kind = IR_INT_ADD;         break;
+					case AST_EXPRESSION_BINARY_SUBTRACT:    kind = IR_INT_SUBTRACT;    break;
+					case AST_EXPRESSION_BINARY_MULTIPLY:    kind = IR_INT_MULTIPLY;    break;
+					case AST_EXPRESSION_BINARY_DIVIDE:      kind = is_signed ? IR_SIGNED_DIVIDE : IR_UNSIGNED_DIVIDE;  break;
+					case AST_EXPRESSION_BINARY_MODULO:      kind = is_signed ? IR_SIGNED_MODULO : IR_UNSIGNED_MODULO;  break;
+					case AST_EXPRESSION_BINARY_EXPONENTIAL: Assert(); break;
+					case AST_EXPRESSION_BINARY_LEFT_SHIFT:  kind = is_signed ? IR_SIGNED_LEFT_SHIFT  : IR_UNSIGNED_LEFT_SHIFT;  break;
+					case AST_EXPRESSION_BINARY_RIGHT_SHIFT: kind = is_signed ? IR_SIGNED_RIGHT_SHIFT : IR_UNSIGNED_RIGHT_SHIFT; break;
+					case AST_EXPRESSION_BINARY_BITWISE_OR:  kind = IR_OR;  break;
+					case AST_EXPRESSION_BINARY_BITWISE_XOR: kind = IR_XOR; break;
+					case AST_EXPRESSION_BINARY_BITWISE_AND: kind = IR_AND; break;
 					default: Assert(); Unreachable();
 				}
 
-				return InsertLogic(kind, binary->type, left, right, function, block);
+				return Insert(function, block, binary->type, kind, left, right);
+			}
+			else
+			{
+				Assert(IsFloat(binary->type));
+
+				switch (binary->kind)
+				{
+					case AST_EXPRESSION_BINARY_ADD:         kind = IR_FLOAT_ADD;      break;
+					case AST_EXPRESSION_BINARY_SUBTRACT:    kind = IR_FLOAT_SUBTRACT; break;
+					case AST_EXPRESSION_BINARY_MULTIPLY:    kind = IR_FLOAT_MULTIPLY; break;
+					case AST_EXPRESSION_BINARY_DIVIDE:      kind = IR_FLOAT_DIVIDE;   break;
+					case AST_EXPRESSION_BINARY_EXPONENTIAL: Assert(); break;
+					default: Assert(); Unreachable();
+				}
+
+				return Insert(function, block, binary->type, kind, left, right);
 			}
 		} break;
 
 		case AST_EXPRESSION_IMPLICIT_CAST:
 		{
 			Ast_Expression_Implicit_Cast* cast = (Ast_Expression_Implicit_Cast*)expression;
-			return InsertConversion(GenerateIR(cast->subexpression, function, block), cast->subexpression->type, cast->type, function, block);
+			return InsertCast(function, block, ExpressionToIRLoad(function, block, cast->subexpression), cast->subexpression->type, cast->type);
 		} break;
 
 		case AST_EXPRESSION_TUPLE:
@@ -536,7 +504,7 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 
 			if (tuple->elements.count == 1)
 			{
-				return GenerateIR(tuple->elements[0], function, block);
+				return ExpressionToIR(function, block, tuple->elements[0]);
 			}
 			else
 			{
@@ -547,12 +515,46 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 
 		case AST_EXPRESSION_BINARY_AND:
 		{
-			Assert();
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
+
+			IrValue left = ExpressionToIRLoad(function, block, binary->left);
+			IrBlockID right_block = CreateBlock(function);
+			IrValue right = ExpressionToIRLoad(function, right_block, binary->right);
+
+			IrBlockID post = CreateBlock(function);
+
+			Branch(function, block, left, right_block, post);
+			Jump(function, right_block, post);
+
+			IrInstructionID phi = InsertPhi(function, post, &type_bool);
+			AddPhiEntry(function, phi, IrPhiEntry { block, GetConstantInt(0) });
+			AddPhiEntry(function, phi, IrPhiEntry { right_block, right });
+
+			block = post;
+
+			return GetValue(phi);
 		} break;
 
 		case AST_EXPRESSION_BINARY_OR:
 		{
-			Assert();
+			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
+
+			IrValue left = ExpressionToIRLoad(function, block, binary->left);
+			IrBlockID right_block = CreateBlock(function);
+			IrValue right = ExpressionToIRLoad(function, right_block, binary->right);
+
+			IrBlockID post = CreateBlock(function);
+
+			Branch(function, block, left, post, right_block);
+			Jump(function, right_block, post);
+
+			IrInstructionID phi = InsertPhi(function, post, &type_bool);
+			AddPhiEntry(function, phi, IrPhiEntry { block, GetConstantInt(1) });
+			AddPhiEntry(function, phi, IrPhiEntry { right_block, right });
+
+			block = post;
+
+			return GetValue(phi);
 		} break;
 
 		case AST_EXPRESSION_CALL:
@@ -567,7 +569,19 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 
 		case AST_EXPRESSION_SUBSCRIPT:
 		{
-			Assert();
+			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
+
+			if (IsPointer(subscript->array->type))
+			{
+				IrValue pointer = ExpressionToIRLoad(function, block, subscript->array);
+				IrValue index   = ExpressionToIRLoad(function, block, subscript->index);
+				return Insert(function, block, subscript->array->type, IR_INDEX, pointer, index);
+			}
+			else
+			{
+				Assert();
+			}
+
 		} break;
 
 		case AST_EXPRESSION_LAMBDA:
@@ -577,7 +591,8 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 
 		case AST_EXPRESSION_AS:
 		{
-			Assert();
+			Ast_Expression_As* as = (Ast_Expression_As*)expression;
+			return InsertCast(function, block, ExpressionToIRLoad(function, block, as->expression), as->expression->type, as->type);
 		} break;
 
 		case AST_EXPRESSION_IF_ELSE:
@@ -586,14 +601,19 @@ IrLogicIndex GenerateIR(Ast_Expression* expression, IrFunctionInfo* function, Ir
 		} break;
 	}
 
-	return IR_NONE;
+	Assert();
+	return None();
 }
 
-IrLogicIndex GenerateIR(Ast_Code* code, IrFunctionInfo* function, IrLogicIndex initial_block, IrLogicIndex exit_block, IrLogicIndex break_block)
+struct IrGeneratorInfo
 {
-	IrLogicIndex block = initial_block;
+	IrBlockID return_block;
+	IrValue   return_stack;
+};
 
-	for (u32 j = 0; j < code->statements.count; j++)
+static void CodeToIR(IrFunction* function, IrBlockID block, Ast_Code* code, IrBlockID exit_block, IrBlockID break_block, IrGeneratorInfo* generator_info)
+{
+	for (uint32 j = 0; j < code->statements.count; j++)
 	{
 		Ast_Statement* statement = &code->statements[j];
 
@@ -602,82 +622,54 @@ IrLogicIndex GenerateIR(Ast_Code* code, IrFunctionInfo* function, IrLogicIndex i
 			case AST_STATEMENT_BRANCH_BLOCK:
 			{
 				Ast_BranchBlock* branch_block = &statement->branch_block;
-				IrLogicIndex post_block = CreateBlock(function);
 
-				IrLogicIndex blocks[branch_block->branches.count];
-
-				if (branch_block->branches[0].kind == AST_BRANCH_IF)
+				for (Ast_Branch* branch = branch_block->branches.Begin(); branch < branch_block->branches.End(); branch++)
 				{
-					blocks[0] = block;
-				}
-				else
-				{
-					blocks[0] = CreateBlock(function);
-					InsertJump(blocks[0], function, block);
+					branch->ir = CreateBlock(function);
 				}
 
-				for (u32 i = 1; i < branch_block->branches.count; i++)
+				Jump(function, block, branch_block->branches[0].ir);
+				IrBlockID post_block = CreateBlock(function);
+
+				for (Ast_Branch* branch = branch_block->branches.Begin(); branch < branch_block->branches.End(); branch++)
 				{
-					blocks[i] = CreateBlock(function);
-				}
+					bool clean = !branch->else_branch && !branch->then_branch;
 
-				for (u32 i = 0; i < branch_block->branches.count; i++)
-				{
-					Ast_Branch* branch = &branch_block->branches[i];
-
-					IrLogicIndex false_block = branch->else_branch_index != AST_BRANCH_INDEX_NONE
-						? branch->else_branch_index
-						: post_block;
-
-					IrLogicIndex condition_block = blocks[i];
+					IrBlockID else_block = branch->else_branch ? branch->else_branch->ir : post_block;
+					IrBlockID then_block = branch->then_branch ? branch->then_branch->ir : post_block;
+					IrBlockID head_block = branch->ir;
+					IrBlockID body_block = CreateBlock(function);
 
 					switch (branch->kind)
 					{
 						case AST_BRANCH_IF:
 						{
-							IrLogicIndex true_block = GenerateIR(
-								&branch->code,
-								function,
-								CreateBlock(function),
-								branch->then_branch_index != AST_BRANCH_INDEX_NONE ? blocks[branch->then_branch_index] : post_block,
-								post_block);
+							CodeToIR(function, body_block, &branch->code, then_block, break_block, generator_info);
 
-							IrLogicIndex condition_value = GenerateIR(branch->condition, function, condition_block);
-							InsertBranch(condition_value, true_block, false_block, function, condition_block);
+							IrValue condition = ExpressionToIRLoad(function, head_block, branch->if_condition);
+							Branch(function, head_block, condition, body_block, else_block);
 						} break;
 
 						case AST_BRANCH_WHILE:
 						{
-							Assert();
-							IrLogicIndex true_block = GenerateIR(
-								&branch->code,
-								function,
-								CreateBlock(function),
-								branch->then_branch_index != AST_BRANCH_INDEX_NONE
-									? blocks[branch->then_branch_index]
-									: post_block,
-								post_block);
-
-							IrLogicIndex false_block = branch->else_branch_index != AST_BRANCH_INDEX_NONE
-								? blocks[branch->else_branch_index]
-								: post_block;
-
-							IrLogicIndex initial_condition_value = GenerateIR(branch->condition, function, condition_block);
-							InsertBranch(initial_condition_value, true_block, false_block, function, condition_block);
-
-							IrLogicIndex inner_condition_block = CreateBlock(function);
-
-							if (branch->then_branch_index != AST_BRANCH_INDEX_NONE)
+							if (clean)
 							{
-								IrLogicIndex initial_condition_value = GenerateIR(branch->condition, function, condition_block);
-								InsertBranch(initial_condition_value, true_block, false_block, function, condition_block);
+								CodeToIR(function, body_block, &branch->code, head_block, then_block, generator_info);
+
+								IrValue head_condition = ExpressionToIRLoad(function, head_block, branch->while_condition);
+								Branch(function, head_block, head_condition, body_block, else_block);
 							}
+							else
+							{
+								IrBlockID tail_block = CreateBlock(function);
+								CodeToIR(function, body_block, &branch->code, tail_block, then_block, generator_info);
 
-						} break;
+								IrValue head_condition = ExpressionToIRLoad(function, head_block, branch->while_condition);
+								Branch(function, head_block, head_condition, body_block, else_block);
 
-						case AST_BRANCH_FOR_COUNT:
-						{
-							Assert();
+								IrValue tail_condition = ExpressionToIRLoad(function, tail_block, branch->while_condition);
+								Branch(function, tail_block, tail_condition, body_block, then_block);
+							}
 						} break;
 
 						case AST_BRANCH_FOR_RANGE:
@@ -692,7 +684,7 @@ IrLogicIndex GenerateIR(Ast_Code* code, IrFunctionInfo* function, IrLogicIndex i
 
 						case AST_BRANCH_NAKED:
 						{
-							GenerateIR(&branch->code, function, blocks[i], post_block, break_block);
+							CodeToIR(function, branch->ir, &branch->code, then_block, break_block, generator_info);
 						} break;
 					}
 				}
@@ -702,81 +694,93 @@ IrLogicIndex GenerateIR(Ast_Code* code, IrFunctionInfo* function, IrLogicIndex i
 
 			case AST_STATEMENT_EXPRESSION:
 			{
-				GenerateIR(statement->expression, function, block);
+				ExpressionToIR(function, block, statement->expression);
 			} break;
 
 			case AST_STATEMENT_VARIABLE_DECLARATION:
 			{
-				Ast_VariableDeclaration* var = &statement->variable_declaration;
+				Ast_Variable* var = &statement->variable_declaration;
 
-				IrLogicIndex stack = InsertStack(var->type, function, block);
-				var->stack = stack;
+				IrValue stack = Insert(function, block, var->type, IR_STACK);
+				var->ir = stack;
 
 				if (var->assignment)
 				{
-					IrIndex value = GenerateIR(var->assignment, function, block);
-					InsertStore(var->type, stack, value, function, block);
+					IrValue value = ExpressionToIRLoad(function, block, var->assignment);
+					Insert(function, block, var->type, IR_STORE, stack, value);
 				}
 			} break;
 
 			case AST_STATEMENT_ASSIGNMENT:
 			{
 				Ast_Assignment* assignment = &statement->assignment;
-				IrIndex left = GenerateIR(assignment->left, function, block);
-				IrIndex right = GenerateIRLoad(assignment->right, function, block);
-				InsertStore(assignment->left->type, left, right, function, block);
+				IrValue left = ExpressionToIR(function, block, assignment->left);
+				IrValue right = ExpressionToIRLoad(function, block, assignment->right);
+				Assert(assignment->left->type->kind != TYPE_BASETYPE_TUPLE);
+				// @Todo: Handle tuple assignment.
+				Insert(function, block, assignment->left->type, IR_STORE, left, right);
 			} break;
 
 			case AST_STATEMENT_ASSIGNMENT_ADD:
 			case AST_STATEMENT_ASSIGNMENT_SUBTRACT:
 			case AST_STATEMENT_ASSIGNMENT_MULTIPLY:
 			case AST_STATEMENT_ASSIGNMENT_DIVIDE:
-			case AST_STATEMENT_ASSIGNMENT_POWER:
+			case AST_STATEMENT_ASSIGNMENT_EXPONENTIAL:
 			{
 				Ast_Assignment* assignment = &statement->assignment;
-				IrIndex left_address = GenerateIR(assignment->left, function, block);
-				IrIndex left_value = InsertLoad(assignment->left->type, left_address, function, block);
-				IrIndex right = GenerateIRLoad(assignment->right, function, block);
+				IrValue left_address = ExpressionToIR(function, block, assignment->left);
+				IrValue left_value = Insert(function, block, assignment->left->type, IR_LOAD, left_address);
+				IrValue right = ExpressionToIRLoad(function, block, assignment->right);
 
-				IrIndex new_value;
+				IrValue new_value = None();
 
 				if (IsPointer(assignment->left->type))
 				{
 					Assert(IsInteger(assignment->right->type));
+
+					if (statement->kind == AST_STATEMENT_ASSIGNMENT_SUBTRACT)
+					{
+						right = Insert(function, block, assignment->right->type, IR_INT_SUBTRACT, GetConstantInt(0), right);
+					}
+
+					new_value = Insert(function, block, assignment->left->type, IR_INDEX, left_value, right);
+				}
+				else if (IsFloat(assignment->left->type))
+				{
+					IrInstructionKind kind;
+
 					switch (statement->kind)
 					{
-						case AST_STATEMENT_ASSIGNMENT_ADD:
-						{
-							new_value = InsertLogic(LOGOS_INDEX, assignment->left->type, left_value, right, function, block);
-						} break;
-
-						case AST_STATEMENT_ASSIGNMENT_SUBTRACT:
-						{
-							right = InsertInversion(assignment->right->type, right, function, block);
-							new_value = InsertLogic(LOGOS_INDEX, assignment->left->type, left_value, right, function, block);
-						} break;
-
-						default: Assert(); Unreachable();
+						case AST_STATEMENT_ASSIGNMENT_ADD:      kind = IR_FLOAT_ADD;      break;
+						case AST_STATEMENT_ASSIGNMENT_SUBTRACT: kind = IR_FLOAT_SUBTRACT; break;
+						case AST_STATEMENT_ASSIGNMENT_MULTIPLY: kind = IR_FLOAT_MULTIPLY; break;
+						case AST_STATEMENT_ASSIGNMENT_DIVIDE:   kind = IR_FLOAT_DIVIDE;   break;
+						case AST_STATEMENT_ASSIGNMENT_EXPONENTIAL:
+						default: Assert();
 					}
+
+					new_value = Insert(function, block, assignment->left->type, kind, left_value, right);
 				}
 				else
 				{
-					IrLogicKind kind;
+					Assert(IsInteger(assignment->left->type));
+
+					IrInstructionKind kind;
 
 					switch (statement->kind)
 					{
-						case AST_STATEMENT_ASSIGNMENT_ADD:      kind = LOGOS_ADD;         break;
-						case AST_STATEMENT_ASSIGNMENT_SUBTRACT: kind = LOGOS_SUBTRACT;    break;
-						case AST_STATEMENT_ASSIGNMENT_MULTIPLY: kind = LOGOS_MULTIPLY;    break;
-						case AST_STATEMENT_ASSIGNMENT_DIVIDE:   kind = LOGOS_DIVIDE;      break;
-						case AST_STATEMENT_ASSIGNMENT_POWER:    kind = LOGOS_EXPONENTIAL; break;
-						default: Assert(); Unreachable();
+						case AST_STATEMENT_ASSIGNMENT_ADD:      kind = IR_INT_ADD;      break;
+						case AST_STATEMENT_ASSIGNMENT_SUBTRACT: kind = IR_INT_SUBTRACT; break;
+						case AST_STATEMENT_ASSIGNMENT_MULTIPLY: kind = IR_INT_MULTIPLY; break;
+						case AST_STATEMENT_ASSIGNMENT_DIVIDE:   kind = IsSignedInteger(assignment->left->type) ? IR_SIGNED_DIVIDE : IR_UNSIGNED_DIVIDE; break;
+						case AST_STATEMENT_ASSIGNMENT_EXPONENTIAL:
+						default: Assert();
 					}
 
-					new_value = InsertLogic(kind, assignment->left->type, left_value, right, function, block);
+					new_value = Insert(function, block, assignment->left->type, kind, left_value, right);
 				}
 
-				InsertStore(assignment->left->type, left_address, new_value, function, block);
+				Insert(function, block, assignment->left->type, IR_STORE, left_address, new_value);
 			} break;
 
 			case AST_STATEMENT_INCREMENT:
@@ -784,25 +788,30 @@ IrLogicIndex GenerateIR(Ast_Code* code, IrFunctionInfo* function, IrLogicIndex i
 			{
 				Ast_Increment* inc = &statement->increment;
 
+				IrValue address = ExpressionToIR(function, block, inc->expression);
+				IrValue value = Insert(function, block, inc->expression->type, IR_LOAD, address);
+
 				bool direction = statement->kind == AST_STATEMENT_INCREMENT;
-				IrIndex address = GenerateIR(inc->expression, function, block);
-				IrIndex value = InsertLoad(inc->expression->type, address, function, block);
 
 				if (IsPointer(inc->expression->type))
 				{
-					value = InsertLogic(LOGOS_INDEX, inc->expression->type, value, GetConstantInt(direction ? 1 : -1, function), function, block);
+					value = Insert(function, block, inc->expression->type, IR_INDEX, value, direction ? GetConstantInt(1) : GetConstantInt(-1));
 				}
 				else if (IsInteger(inc->expression->type))
 				{
-					value = InsertLogic(direction ? LOGOS_ADD : LOGOS_SUBTRACT, inc->expression->type, value, GetConstantInt(1, function), function, block);
+					value = Insert(function, block, inc->expression->type, direction ? IR_INT_ADD : IR_INT_SUBTRACT, value, GetConstantInt(1));
 				}
 				else if (inc->expression->type == &type_float32)
 				{
-					value = InsertLogic(direction ? LOGOS_ADD : LOGOS_SUBTRACT, inc->expression->type, value, GetConstantFloat32(1, function), function, block);
+					value = Insert(function, block, inc->expression->type, direction ? IR_FLOAT_ADD : IR_FLOAT_SUBTRACT, value, GetConstantFloat32(1));
+				}
+				else if (inc->expression->type == &type_float64)
+				{
+					value = Insert(function, block, inc->expression->type, direction ? IR_FLOAT_ADD : IR_FLOAT_SUBTRACT, value, GetConstantFloat64(1));
 				}
 				else Assert();
 
-				InsertStore(inc->expression->type, address, value, function, block);
+				Insert(function, block, inc->expression->type, IR_STORE, address, value);
 			} break;
 
 			case AST_STATEMENT_RETURN:
@@ -811,17 +820,16 @@ IrLogicIndex GenerateIR(Ast_Code* code, IrFunctionInfo* function, IrLogicIndex i
 
 				if (ret->expression)
 				{
-					IrIndex value = GenerateIRLoad(ret->expression, function, block);
-					InsertLogic(LOGOS_RETURN, function->function->type->output, value, function, block);
+					Insert(function, block, ret->expression->type, IR_STORE, generator_info->return_stack, ExpressionToIRLoad(function, block, ret->expression));
 				}
 
-				InsertLogic(LOGOS_RETURN, function->function->type->output, function, block);
-			} return initial_block;
+				Jump(function, block, generator_info->return_block);
+			} return;
 
 			case AST_STATEMENT_BREAK:
 			{
-				InsertJump(break_block, function, block);
-			} return initial_block;
+				Jump(function, block, break_block);
+			} return;
 
 			case AST_STATEMENT_CLAIM:
 			{
@@ -833,63 +841,75 @@ IrLogicIndex GenerateIR(Ast_Code* code, IrFunctionInfo* function, IrLogicIndex i
 			{
 				Assert();
 			} break;
-
 		}
 	}
 
-	if (exit_block != IR_NONE)
+	if (IsValid(exit_block))
 	{
-		InsertJump(exit_block, function, block);
+		Jump(function, block, exit_block);
 	}
-
-	return initial_block;
 }
 
-IrFunctionInfoIndex GenerateIR(Ast_Function* function)
+static IrFunction* FunctionToIR(Ast_Function* function)
 {
-	if (function->ir_index == IR_NONE)
+	if (!function->ir)
 	{
-		IrFunctionInfo* ir = Allocate<IrFunctionInfo>();
+		IrFunction* ir = Allocate<IrFunction>();
 		ZeroMemory(ir);
 
-		ir->bool_cache[0] = IR_NONE;
-		ir->bool_cache[1] = IR_NONE;
-
-		ir->int_cache[0] = IR_NONE;
-		ir->int_cache[1] = IR_NONE;
-		ir->int_cache[2] = IR_NONE;
-
-		ir->float32_cache[0] = IR_NONE;
-		ir->float32_cache[1] = IR_NONE;
-		ir->float32_cache[2] = IR_NONE;
-
-		ir->float64_cache[0] = IR_NONE;
-		ir->float64_cache[1] = IR_NONE;
-		ir->float64_cache[2] = IR_NONE;
+		function->ir = ir;
 
 		ir->id = ir_functions.count;
 		ir->function = function;
-		ir->free_block = IR_NONE;
-		ir->free_logic = IR_NONE;
+		ir->instructions = AllocateList<IrInstruction>(64);
+		ir->free_block.index = IR_NONE;
+		ir->free_instruction = IR_NONE;
 		ir_functions.Add(ir);
 
-		IrLogicIndex initial_block = CreateBlock(ir);
-		IrLogicIndex return_block = CreateBlock(ir);
-		InsertLogic(LOGOS_RETURN, null, ir, return_block);
+		IrBlockID initial_block = CreateBlock(ir);
+		IrBlockID return_block  = CreateBlock(ir);
 
-		GenerateIR(&function->code, ir, initial_block, return_block, IR_NONE);
+		bool does_return_value = function->return_type != &empty_tuple;
+
+		IrGeneratorInfo generator_info;
+		generator_info.return_block = return_block;
+		generator_info.return_stack = None();
+
+		if (does_return_value)
+		{
+			generator_info.return_stack = Insert(ir, initial_block, GetPointer(function->return_type), IR_STACK);
+		}
+
+		for (uint32 i = 0; i < function->parameters.count; i++)
+		{
+			Ast_Variable* param = &function->parameters[i];
+			param->ir = Insert(ir, initial_block, GetPointer(param->type), IR_PARAMETER, GetConstantInt(i));
+		}
+
+		CodeToIR(ir, initial_block, &function->code, return_block, { IR_NONE }, &generator_info);
+
+		IrValue return_value = None();
+
+		if (does_return_value)
+		{
+			return_value = Insert(ir, return_block, function->return_type, IR_LOAD, generator_info.return_stack);
+		}
+
+		Return(ir, return_block, return_value);
+
 		Print("%\n", ir);
 	}
 
-	return function->ir_index;
+	return function->ir;
 }
 
-void GenerateIR(Ast_Module* module)
+static void GenerateIR(Ast_Module* module)
 {
-	for (u32 i = 0; i < module->scope.functions.count; i++)
+	// Print("module->scope.functions.count = %\n", module->scope.functions.count);
+	for (uint32 i = 0; i < module->scope.functions.count; i++)
 	{
 		Ast_Function* function = &module->scope.functions[i];
-		GenerateIR(function);
+		FunctionToIR(function);
 	}
 }
 

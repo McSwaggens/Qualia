@@ -1,34 +1,26 @@
 #pragma once
 
-#include "int.h"
 #include "memory.h"
 #include "span.h"
 
 struct String
 {
 	char* data;
-	u32   length;
-	u32   capacity;
+	uint32 length;
+	uint32 capacity;
 
 	constexpr String() = default;
 	constexpr String(Null) : data(null), length(0), capacity(0) { }
-	constexpr String(char* data, u32 length, u32 cap = 0) : data(data), length(length), capacity(cap) { }
-	constexpr String(const char* data, u32 length, u32 cap = 0) : data(const_cast<char*>(data)), length(length), capacity(cap) { }
+	constexpr String(char* data, uint32 length, uint32 cap = 0) : data(data), length(length), capacity(cap) { }
+	constexpr String(char* begin, char* end) : data(begin), length(end-begin), capacity(0) { }
+	constexpr String(const char* data, uint32 length, uint32 cap = 0) : data(const_cast<char*>(data)), length(length), capacity(cap) { }
 
-	template<u32 N>
+	template<uint64 N>
 	constexpr String(const char (&s)[N]) : data(const_cast<char*>(s)), length(N-1), capacity(0) { }
+	constexpr operator bool() const { return data != null; }
 
-	constexpr operator Span<char>() { return { data, data + length }; }
-	constexpr operator char*() { return data; }
-	constexpr operator bool() const { return data == null; }
-
-	constexpr char& operator[](u32 n) { return data[n]; }
-	constexpr char  operator[](u32 n) const { return data[n]; }
-
-	constexpr Span<char> ToSpan()
-	{
-		return { data, data + length };
-	}
+	constexpr char& operator[](uint32 n) { return data[n]; }
+	constexpr char  operator[](uint32 n) const { return data[n]; }
 
 	constexpr char* Begin() { return data; }
 	constexpr char* End()   { return data + length; }
@@ -41,13 +33,13 @@ struct String
 		length = 0;
 	}
 
-	void Add(String other)
+	void Append(String other)
 	{
 		if (length + other.length >= capacity)
 		{
-			u32 old_capacity = capacity;
+			uint32 old_capacity = capacity;
 			capacity = capacity * 2 + other.length;
-			ReAllocate(data, old_capacity, capacity);
+			data = ReAllocate(data, old_capacity, capacity);
 		}
 
 		CopyMemory(data + length, other.data, other.length);
@@ -58,40 +50,56 @@ struct String
 	{
 		if (length + 1 >= capacity)
 		{
-			u32 old_capacity = capacity;
+			uint32 old_capacity = capacity;
 			capacity += length + 1;
-			ReAllocate(data, old_capacity, capacity);
+			data = ReAllocate(data, old_capacity, capacity);
 		}
 
 		data[length++] = c;
 	}
 };
 
-[[nodiscard]]
-static inline String CreateString(u64 capacity = 16)
+static inline String AllocateString(uint64 length, uint64 extra_capacity)
 {
-	return String(Allocate<char>(capacity), 0, capacity);
+	return String(Allocate<char>(length+extra_capacity), length, length+extra_capacity);
 }
 
-[[nodiscard]]
-static String CopyString(String string)
+static inline String StackAllocateString(Stack* stack, uint64 length)
+{
+	return String(StackAllocate<char>(stack, length), length, 0);
+}
+
+static inline void DeAllocateString(String string)
+{
+	DeAllocate(string.data, string.length);
+}
+
+static String DuplicateString(String string)
 {
 	String copy = String(Allocate<char>(string.length), string.length, string.capacity);
 	CopyMemory(copy.data, string.data, string.length);
 	return copy;
 }
 
-static constexpr bool Compare(String a, String b)
+static String DuplicateString(char* s, uint64 length)
+{
+	String copy = AllocateString(length, 0);
+	CopyMemory(copy.data, s, length);
+	return copy;
+}
+
+static constexpr bool CompareString(String a, String b)
 {
 	return a.length == b.length && CompareMemory(a.data, b.data, a.length);
 }
 
-static constexpr bool CompareStrings(String a, String b)
+template<uint64 N>
+static inline bool CompareStringRaw(const char* a, const char (&b)[N])
 {
-	return a.length == b.length && CompareMemory(a.data, b.data, a.length);
+	return CompareMemory(a, b, N-1);
 }
 
-static constexpr u64 CStringLength(const char* s)
+static constexpr uint64 CStringLength(const char* s)
 {
 	// What kind of demented "person" would "design" a string like this?
 	// It's an extremely simple concept, but still they managed to fuck it up somehow.
@@ -101,7 +109,6 @@ static constexpr u64 CStringLength(const char* s)
 	return s - start;
 }
 
-[[nodiscard]]
 static constexpr String ToString(const char* cstr)
 {
 	return String(cstr, CStringLength(cstr));

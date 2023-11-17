@@ -15,7 +15,7 @@
 
 #define COUNT(a) (sizeof(a)/sizeof((a)[0]))
 
-#define Bit(n) (1ll << (int64)n)
+#define Bit(n) (1ll << (int64)(n))
 #define CEEEE_FUNCTION extern "C"
 
 static inline uint64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc
@@ -32,6 +32,14 @@ static inline void Assume(bool b) { __builtin_assume(b); }
 #define GetInternalColumnNumber() __builtin_COLUMN()
 
 static inline auto Abs(auto n) { return n >= 0 ? n : -n; }
+
+template<typename T>
+static inline void Swap(T* a, T* b)
+{
+	T tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
 
 template<typename T>
 static inline T Max(T a, T b) { return a >= b ? a : b; }
@@ -74,7 +82,7 @@ static inline uint16 ReverseBytes16(uint16 n) { return __builtin_bswap16(n); }
 static inline uint64 ReverseBits64(uint64 n) { return __builtin_bitreverse64(n); }
 static inline uint32 ReverseBits32(uint32 n) { return __builtin_bitreverse32(n); }
 static inline uint16 ReverseBits16(uint16 n) { return __builtin_bitreverse16(n); }
-static inline uint8  ReverseBits8(uint8 n)   { return __builtin_bitreverse16(n) >> 8; }
+static inline uint8  ReverseBits8(uint8 n)   { return __builtin_bitreverse16(n) >> 8u; }
 
 // popcnt
 static inline uint64 CountBits64(uint64 n) { return __builtin_popcountll(n); }
@@ -95,8 +103,8 @@ static inline uint32 CountLeadingZeroes8(uint8 n)   { return n == 0 ? 8  : Count
 // tzcnt
 static inline uint64 CountTrailingZeroes64(uint64 n) { return n == (uint64)0 ? (uint64)64 : __builtin_ctzll(n); }
 static inline uint32 CountTrailingZeroes32(uint32 n) { return n == 0 ? 32 : __builtin_ctz(n); }
-static inline uint32 CountTrailingZeroes16(uint16 n) { return n == 0 ? 16 : CountLeadingZeroes32(n); }
-static inline uint32 CountTrailingZeroes8(uint8 n)   { return n == 0 ? 8  : CountLeadingZeroes32(n); }
+static inline uint32 CountTrailingZeroes16(uint16 n) { return n == 0 ? 16 : CountTrailingZeroes32(n); }
+static inline uint32 CountTrailingZeroes8(uint8 n)   { return n == 0 ? 8  : CountTrailingZeroes32(n); }
 
 static inline uint64 BitsOfInformation64(uint64 n) { return 64llu-CountLeadingZeroes64(n); }
 static inline uint32 BitsOfInformation32(uint32 n) { return 32-CountLeadingZeroes32(n); }
@@ -155,6 +163,11 @@ static uint64 NextPow2(uint64 n)
 	n++;
 	return n;
 }
+
+static int64 NextPow2(int8 n)  { return NextPow2((uint8)n);  }
+static int64 NextPow2(int16 n) { return NextPow2((uint16)n); }
+static int64 NextPow2(int32 n) { return NextPow2((uint32)n); }
+static int64 NextPow2(int64 n) { return NextPow2((uint64)n); }
 
 // @Note: 2^n -> 2^(n+1)
 // @Todo: Test performance of NextPow2 and NextPow2_Fast

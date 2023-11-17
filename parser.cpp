@@ -8,132 +8,194 @@
 
 static bool IsSpecifier(Token_Kind kind)
 {
-	return kind == TOKEN_ASTERISK
-		|| kind == TOKEN_QUESTION_MARK
-		|| kind == TOKEN_OPEN_BRACKET;
+	switch (kind)
+	{
+		case TOKEN_ASTERISK:
+		case TOKEN_QUESTION_MARK:
+		case TOKEN_OPEN_BRACKET:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static bool IsTernaryOperator(Token_Kind kind)
 {
-	return kind == TOKEN_IF;
+	switch (kind)
+	{
+		case TOKEN_IF:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static bool IsIdentifier(Token_Kind kind)
 {
-	return kind == TOKEN_IDENTIFIER_CASUAL
-		|| kind == TOKEN_IDENTIFIER_FORMAL;
+	switch (kind)
+	{
+		case TOKEN_IDENTIFIER_CASUAL:
+		case TOKEN_IDENTIFIER_FORMAL:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static bool IsBinaryOperator(Token_Kind kind)
 {
-	return kind == TOKEN_DOT
-		// || kind == TOKEN_DOT_DOT
-		|| kind == TOKEN_EXPONENT
-		|| kind == TOKEN_ASTERISK
-		|| kind == TOKEN_DIVIDE
-		|| kind == TOKEN_PLUS
-		|| kind == TOKEN_MINUS
-		|| kind == TOKEN_AND
-		|| kind == TOKEN_OR
-		|| kind == TOKEN_MOD
-		|| kind == TOKEN_BITWISE_AND
-		|| kind == TOKEN_BITWISE_OR
-		|| kind == TOKEN_BITWISE_XOR
-		|| kind == TOKEN_LEFT_SHIFT
-		|| kind == TOKEN_RIGHT_SHIFT
-		|| kind == TOKEN_AS
-		|| kind == TOKEN_EQUAL
-		|| kind == TOKEN_NOT_EQUAL
-		|| kind == TOKEN_LESS
-		|| kind == TOKEN_LESS_OR_EQUAL
-		|| kind == TOKEN_GREATER
-		|| kind == TOKEN_GREATER_OR_EQUAL;
+	switch (kind)
+	{
+		case TOKEN_DOT:
+		case TOKEN_EXPONENT:
+		case TOKEN_ASTERISK:
+		case TOKEN_DIVIDE:
+		case TOKEN_PLUS:
+		case TOKEN_MINUS:
+		case TOKEN_AND:
+		case TOKEN_OR:
+		case TOKEN_MOD:
+		case TOKEN_BITWISE_AND:
+		case TOKEN_BITWISE_OR:
+		case TOKEN_BITWISE_XOR:
+		case TOKEN_LEFT_SHIFT:
+		case TOKEN_RIGHT_SHIFT:
+		case TOKEN_AS:
+		case TOKEN_EQUAL:
+		case TOKEN_NOT_EQUAL:
+		case TOKEN_LESS:
+		case TOKEN_LESS_OR_EQUAL:
+		case TOKEN_GREATER:
+		case TOKEN_GREATER_OR_EQUAL:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static bool IsUnaryOperator(Token_Kind kind)
 {
-	return kind == TOKEN_ASTERISK
-		|| kind == TOKEN_AMPERSAND
-		|| kind == TOKEN_PLUS
-		|| kind == TOKEN_MINUS
-		|| kind == TOKEN_BITWISE_NOT
-		|| kind == TOKEN_NOT
-		|| kind == TOKEN_EXCLAMATION_MARK;
+	switch (kind)
+	{
+		case TOKEN_ASTERISK:
+		case TOKEN_AMPERSAND:
+		case TOKEN_PLUS:
+		case TOKEN_MINUS:
+		case TOKEN_BITWISE_NOT:
+		case TOKEN_NOT:
+		case TOKEN_EXCLAMATION_MARK:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static bool IsAssignment(Token_Kind kind)
 {
-	return kind == TOKEN_EQUAL
-		|| kind == TOKEN_PLUS_EQUAL
-		|| kind == TOKEN_MINUS_EQUAL
-		|| kind == TOKEN_TIMES_EQUAL
-		|| kind == TOKEN_DIVIDE_EQUAL
-		|| kind == TOKEN_EXPONENTIAL_EQUAL;
+	switch (kind)
+	{
+		case TOKEN_EQUAL:
+		case TOKEN_PLUS_EQUAL:
+		case TOKEN_MINUS_EQUAL:
+		case TOKEN_TIMES_EQUAL:
+		case TOKEN_DIVIDE_EQUAL:
+		case TOKEN_EXPONENTIAL_EQUAL:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static bool IsPrimitive(Token_Kind kind)
 {
-	return kind == TOKEN_BYTE
-		|| kind == TOKEN_BOOL
-		|| kind == TOKEN_INT
-		|| kind == TOKEN_INT8
-		|| kind == TOKEN_INT16
-		|| kind == TOKEN_INT32
-		|| kind == TOKEN_INT64
-		|| kind == TOKEN_UINT
-		|| kind == TOKEN_UINT8
-		|| kind == TOKEN_UINT16
-		|| kind == TOKEN_UINT32
-		|| kind == TOKEN_UINT64
-		|| kind == TOKEN_FLOAT16
-		|| kind == TOKEN_FLOAT32
-		|| kind == TOKEN_FLOAT64;
+	switch (kind)
+	{
+		case TOKEN_BYTE:
+		case TOKEN_BOOL:
+		case TOKEN_INT:
+		case TOKEN_INT8:
+		case TOKEN_INT16:
+		case TOKEN_INT32:
+		case TOKEN_INT64:
+		case TOKEN_UINT:
+		case TOKEN_UINT8:
+		case TOKEN_UINT16:
+		case TOKEN_UINT32:
+		case TOKEN_UINT64:
+		case TOKEN_FLOAT16:
+		case TOKEN_FLOAT32:
+		case TOKEN_FLOAT64:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static bool IsTerm(Token_Kind kind)
 {
-	return kind == TOKEN_IDENTIFIER_CASUAL
-		|| kind == TOKEN_IDENTIFIER_FORMAL
-		|| kind == TOKEN_LITERAL_INT
-		|| kind == TOKEN_LITERAL_INT8
-		|| kind == TOKEN_LITERAL_INT16
-		|| kind == TOKEN_LITERAL_INT32
-		|| kind == TOKEN_LITERAL_INT64
-		|| kind == TOKEN_LITERAL_UINT
-		|| kind == TOKEN_LITERAL_UINT8
-		|| kind == TOKEN_LITERAL_UINT16
-		|| kind == TOKEN_LITERAL_UINT32
-		|| kind == TOKEN_LITERAL_UINT64
-		|| kind == TOKEN_LITERAL_FLOAT
-		|| kind == TOKEN_LITERAL_FLOAT16
-		|| kind == TOKEN_LITERAL_FLOAT32
-		|| kind == TOKEN_LITERAL_FLOAT64
-		|| kind == TOKEN_LITERAL_STRING
-		|| kind == TOKEN_TRUE
-		|| kind == TOKEN_FALSE
-		|| kind == TOKEN_NULL;
+	switch (kind)
+	{
+		case TOKEN_IDENTIFIER_CASUAL:
+		case TOKEN_IDENTIFIER_FORMAL:
+		case TOKEN_LITERAL_INT:
+		case TOKEN_LITERAL_INT8:
+		case TOKEN_LITERAL_INT16:
+		case TOKEN_LITERAL_INT32:
+		case TOKEN_LITERAL_INT64:
+		case TOKEN_LITERAL_UINT:
+		case TOKEN_LITERAL_UINT8:
+		case TOKEN_LITERAL_UINT16:
+		case TOKEN_LITERAL_UINT32:
+		case TOKEN_LITERAL_UINT64:
+		case TOKEN_LITERAL_FLOAT:
+		case TOKEN_LITERAL_FLOAT16:
+		case TOKEN_LITERAL_FLOAT32:
+		case TOKEN_LITERAL_FLOAT64:
+		case TOKEN_LITERAL_STRING:
+		case TOKEN_TRUE:
+		case TOKEN_FALSE:
+		case TOKEN_NULL:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static bool IsLiteral(Token_Kind kind)
 {
-	return kind == TOKEN_LITERAL_INT
-		|| kind == TOKEN_LITERAL_INT8
-		|| kind == TOKEN_LITERAL_INT16
-		|| kind == TOKEN_LITERAL_INT32
-		|| kind == TOKEN_LITERAL_INT64
-		|| kind == TOKEN_LITERAL_UINT
-		|| kind == TOKEN_LITERAL_UINT8
-		|| kind == TOKEN_LITERAL_UINT16
-		|| kind == TOKEN_LITERAL_UINT32
-		|| kind == TOKEN_LITERAL_UINT64
-		|| kind == TOKEN_LITERAL_FLOAT
-		|| kind == TOKEN_LITERAL_FLOAT16
-		|| kind == TOKEN_LITERAL_FLOAT32
-		|| kind == TOKEN_LITERAL_FLOAT64
-		|| kind == TOKEN_LITERAL_STRING
-		|| kind == TOKEN_TRUE
-		|| kind == TOKEN_FALSE
-		|| kind == TOKEN_NULL;
+	switch (kind)
+	{
+		case TOKEN_LITERAL_INT:
+		case TOKEN_LITERAL_INT8:
+		case TOKEN_LITERAL_INT16:
+		case TOKEN_LITERAL_INT32:
+		case TOKEN_LITERAL_INT64:
+		case TOKEN_LITERAL_UINT:
+		case TOKEN_LITERAL_UINT8:
+		case TOKEN_LITERAL_UINT16:
+		case TOKEN_LITERAL_UINT32:
+		case TOKEN_LITERAL_UINT64:
+		case TOKEN_LITERAL_FLOAT:
+		case TOKEN_LITERAL_FLOAT16:
+		case TOKEN_LITERAL_FLOAT32:
+		case TOKEN_LITERAL_FLOAT64:
+		case TOKEN_LITERAL_STRING:
+		case TOKEN_TRUE:
+		case TOKEN_FALSE:
+		case TOKEN_NULL:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static bool IsExpressionStarter(Token_Kind kind)
@@ -274,7 +336,7 @@ static uint32 GetOperatorPrecedence(Token_Kind kind)
 	if (IsBinaryOperator(kind))  return GetBinaryPrecedence(kind);
 	if (IsTernaryOperator(kind)) return GetTernaryPrecedence(kind);
 	if (IsPostfixOperator(kind)) return GetPostfixPrecedence(kind);
-	Unreachable();
+	AssertUnreachable();
 }
 
 static bool IsCorrectScope(Token* token, uint32 indent)
@@ -285,17 +347,7 @@ static bool IsCorrectScope(Token* token, uint32 indent)
 static void CheckScope(Token* token, uint32 indent, Ast_Module* module)
 {
 	if (!IsCorrectScope(token, indent))
-	{
 		Error(module, token->location, "Invalid indentation.\n");
-	}
-}
-
-static void SkipSemiColon(Token*& token, uint32 indent)
-{
-	if (token->kind == TOKEN_SEMICOLON && IsCorrectScope(token, indent))
-	{
-		token += 1;
-	}
 }
 
 static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module);
@@ -312,13 +364,9 @@ static Ast_Struct ParseStruct(Token*& token, uint32 indent, Ast_Module* module)
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 	{
 		if (IsIdentifier(token->kind))
-		{
 			Error(module, token->location, "Struct name must start with an uppercase letter.\n");
-		}
 		else
-		{
 			Error(module, token->location, "Struct name missing\n");
-		}
 	}
 
 	CheckScope(token, indent+1, module);
@@ -327,9 +375,7 @@ static Ast_Struct ParseStruct(Token*& token, uint32 indent, Ast_Module* module)
 	token += 1;
 
 	if (token->kind != TOKEN_COLON)
-	{
 		Error(module, token->location, "Invalid struct declaration syntax, unexpected token %, Expected ':'\n", token);
-	}
 
 	CheckScope(token, indent, module);
 	token += 1;
@@ -347,9 +393,7 @@ static Ast_Struct ParseStruct(Token*& token, uint32 indent, Ast_Module* module)
 			token += 1;
 
 			if (token->kind != TOKEN_COLON)
-			{
 				Error(module, token->location, "Expected ':', not: '%'\n", token);
-			}
 
 			CheckScope(token, indent+1, module);
 			token += 1;
@@ -358,9 +402,7 @@ static Ast_Struct ParseStruct(Token*& token, uint32 indent, Ast_Module* module)
 			members.Add(member);
 
 			if (!token->newline && token->kind != TOKEN_SEMICOLON)
-			{
 				Error(module, token->location, "Unexpected token: % after struct member.\n", token);
-			}
 
 			if (token->kind == TOKEN_SEMICOLON)
 			{
@@ -374,13 +416,9 @@ static Ast_Struct ParseStruct(Token*& token, uint32 indent, Ast_Module* module)
 			}
 		}
 		else if (token->kind == TOKEN_IDENTIFIER_FORMAL)
-		{
 			Error(module, token->location, "Struct member names must start with a lowercase letter.\n");
-		}
 		else
-		{
 			Error(module, token->location, "Unexpected token in struct: '%'\n", token);
-		}
 	}
 
 	structure.members = members.Lock();
@@ -396,13 +434,9 @@ static Ast_Enum ParseEnum(Token*& token, uint32 indent, Ast_Module* module)
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 	{
 		if (IsIdentifier(token->kind))
-		{
 			Error(module, token->location, "Enum names must start with an uppercase letter.\n");
-		}
 		else
-		{
 			Error(module, token->location, "Enum name missing.\n");
-		}
 	}
 
 	CheckScope(token, indent+1, module);
@@ -411,9 +445,7 @@ static Ast_Enum ParseEnum(Token*& token, uint32 indent, Ast_Module* module)
 	token += 1;
 
 	if (token->kind != TOKEN_COLON)
-	{
 		Error(module, token->location, "Invalid enum declaration syntax, unexpected token '%', Expected ':'\n", token);
-	}
 
 	CheckScope(token, indent, module);
 	token += 1;
@@ -431,25 +463,19 @@ static Ast_Enum ParseEnum(Token*& token, uint32 indent, Ast_Module* module)
 			token += 1;
 
 			if (token->kind != TOKEN_EQUAL)
-			{
 				Error(module, token->location, "Expected '=', not: '%'\n", token);
-			}
 
 			CheckScope(token, indent+2, module);
 			token += 1;
 
 			if (token->kind == TOKEN_SEMICOLON)
-			{
 				Error(module, token->location, "Expected expression before ';'\n");
-			}
 
 			CheckScope(token, indent+2, module);
 			member.expression = ParseExpression(token, indent+2, module);
 
 			if (!token->newline && token->kind != TOKEN_SEMICOLON)
-			{
 				Error(module, token->location, "Unexpected token: '%' after enum member.\n", token);
-			}
 
 			if (token->kind == TOKEN_SEMICOLON)
 			{
@@ -460,13 +486,9 @@ static Ast_Enum ParseEnum(Token*& token, uint32 indent, Ast_Module* module)
 			members.Add(member);
 		}
 		else if (token->kind == TOKEN_IDENTIFIER_CASUAL)
-		{
 			Error(module, token->location, "Enum member names must start with a uppercase letter.\n");
-		}
 		else
-		{
 			Error(module, token->location, "Unexpected token in enum: '%'\n", token);
-		}
 	}
 
 	enumeration.members = members.Lock();
@@ -534,43 +556,35 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 	else if (token->kind == TOKEN_OPEN_BRACKET)
 	{
 		Token* closure = GetClosure(token);
-		Ast_Expression_Dynamic_Array* array = StackAllocate<Ast_Expression_Dynamic_Array>(&module->stack);
+		Ast_Expression_Array* array = StackAllocate<Ast_Expression_Array>(&module->stack);
 		ZeroMemory(array);
 
-		array->kind = AST_EXPRESSION_DYNAMIC_ARRAY;
+		array->kind = AST_EXPRESSION_ARRAY;
 		array->span.begin = token;
 		array->span.end = closure+1;
 
 		token += 1;
 
 		if (!IsExpressionStarter(token->kind))
-		{
 			Error(module, token->location, "Expected expression after '['\n");
-		}
 
 		CheckScope(token, indent, module);
 		array->left = ParseExpression(token, indent+1, module);
 
 		if (token->kind != TOKEN_DOT_DOT)
-		{
 			Error(module, token->location, "Expected '..' operator, not: \n", token);
-		}
 
 		CheckScope(token, indent, module);
 		token += 1;
 
 		if (!IsExpressionStarter(token->kind))
-		{
 			Error(module, token->location, "Array extent not specified\n");
-		}
 
 		CheckScope(token, indent+1, module);
 		array->right = ParseExpression(token, indent+1, module);
 
 		if (token->kind != TOKEN_CLOSE_BRACKET)
-		{
 			Error(module, token->location, "End of array expression missing, expected ']', not: '%'\n", token);
-		}
 
 		CheckScope(token, indent, module);
 		token += 1;
@@ -592,9 +606,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 		Array_Buffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
 
 		if (closure[-1].kind == TOKEN_COMMA)
-		{
 			Error(module, token->location, "Expected expression after ','\n");
-		}
 
 		while (token < closure)
 		{
@@ -607,9 +619,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 				token += 1;
 			}
 			else if (token < closure)
-			{
 				Error(module, token->location, "Invalid expression, unexpected token: '%'\n", token);
-			}
 		}
 
 		tuple->elements = elements.Lock();
@@ -632,9 +642,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 		CheckScope(closure, indent, module);
 
 		if (token+1 == closure)
-		{
 			Error(module, token->location, "Empty arrays literals aren't allowed.\n");
-		}
 
 		token += 1;
 
@@ -650,9 +658,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 				token += 1;
 
 				if (token == closure)
-				{
 					Error(module, token->location, "Expected expression after ',', not: '%'\n", token);
-				}
 			}
 		}
 
@@ -688,9 +694,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 			if_else->middle = ParseExpression(token, indent, module, false);
 
 			if (token->kind != TOKEN_ELSE)
-			{
 				Error(module, token->location, "Invalid 'if' expression, missing 'else' clause. Unexpected: '%'\n", token);
-			}
 
 			if_else->ops[1] = token;
 			CheckScope(token, indent, module);
@@ -754,9 +758,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 				subscript->index = ParseExpression(token, indent+1, module);
 
 				if (token != closure)
-				{
 					Error(module, token->location, "Expected ']', not: '%'\n", token);
-				}
 			}
 			else subscript->index = null;
 
@@ -854,14 +856,19 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 		if (token->kind == TOKEN_OPEN_BRACKET)
 		{
 			specifier.kind = AST_SPECIFIER_ARRAY;
+
 			Token* closure = GetClosure(token);
 			CheckScope(closure, indent, module);
 			token += 1;
 
 			if (token != closure)
 			{
+				specifier.kind = AST_SPECIFIER_FIXED_ARRAY;
 				specifier.size_expression = ParseExpression(token, indent+1, module);
 			}
+
+			if (token != closure)
+				Error(module, token->location, "Expected ']', not: %\n", token);
 
 			token = closure + 1;
 		}
@@ -918,9 +925,7 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 				token += 1;
 
 				if (token == closure)
-				{
 					Error(module, token->location, "Expected type after ','\n");
-				}
 			}
 		}
 
@@ -972,9 +977,7 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 				token += 1;
 
 				if (token == closure)
-				{
 					Error(module, token->location, "Expected type after ','\n");
-				}
 			}
 		}
 
@@ -983,9 +986,7 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 		token = closure+1;
 	}
 	else
-	{
 		Error(module, token->location, "Expected type, not: '%'\n", token);
-	}
 
 	return type;
 }
@@ -1003,25 +1004,19 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, uint32 in
 	{
 		Ast_Variable param;
 		ZeroMemory(&param);
-		param.type = null;
+		param.type = TYPE_NULL;
 		param.ast_type = null;
 		param.flags |= AST_VARIABLE_FLAG_PARAMETER;
 
 		if (token->kind == TOKEN_COMMA)
-		{
 			Error(module, token->location, "Empty parameters not allowed. (Remove redundant ',')\n");
-		}
 
 		if (token->kind != TOKEN_IDENTIFIER_CASUAL)
 		{
 			if (token->kind == TOKEN_IDENTIFIER_FORMAL)
-			{
 				Error(module, token->location, "Parameter names must start with a lowercase letter, not: '%'\n", token);
-			}
 			else
-			{
 				Error(module, token->location, "Parameter name missing, unexpected: '%'\n", token);
-			}
 		}
 
 		CheckScope(token, indent+1, module);
@@ -1030,9 +1025,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, uint32 in
 		token += 1;
 
 		if (token->kind != TOKEN_COLON)
-		{
 			Error(module, token->location, "Parameter type missing.\n");
-		}
 
 		CheckScope(token, indent+1, module);
 		token += 1;
@@ -1043,9 +1036,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, uint32 in
 		params.Add(param);
 
 		if (token->kind != TOKEN_COMMA && token != closure)
-		{
 			Error(module, token->location, "Expected ',' or ')', not: '%'\n", token);
-		}
 
 		if (token->kind == TOKEN_COMMA)
 		{
@@ -1111,14 +1102,10 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 				token += 1;
 
 				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
-				{
 					Error(module, token->location, "Variable names must start with a lowercase letter.\n");
-				}
 
 				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_IN)
-				{
 					Error(module, token->location, "Iterator names must start with a lowercase letter.\n");
-				}
 
 
 				if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_IN)
@@ -1175,9 +1162,12 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 					CheckScope(token, indent, module);
 					token += 1;
 
-					CheckScope(token, indent+1, module);
-					variable->ast_type = StackAllocate<Ast_Type>(&module->stack);
-					*variable->ast_type = ParseType(token, indent, module);
+					if (token->kind != TOKEN_EQUAL)
+					{
+						CheckScope(token, indent+1, module);
+						variable->ast_type = StackAllocate<Ast_Type>(&module->stack);
+						*variable->ast_type = ParseType(token, indent, module);
+					}
 
 					branch.for_verbose.variable = variable;
 
@@ -1191,17 +1181,13 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 					}
 
 					if (token->kind != TOKEN_COMMA)
-					{
 						Error(module, token->location, "Expected ',' and loop condition, not: '%'\n", token);
-					}
 
 					CheckScope(token, indent, module);
 					token += 1;
 
 					if (token->kind == TOKEN_COLON)
-					{
 						Error(module, token->location, "For loop missing condition expression.\n");
-					}
 
 					CheckScope(token, indent+1, module);
 					branch.for_verbose.condition = ParseExpression(token, indent+1, module, false);
@@ -1212,9 +1198,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 						token += 1;
 
 						if (token->kind == TOKEN_COLON)
-						{
 							Error(module, token->location, "For loop stride missing\n");
-						}
 
 						CheckScope(token, indent+1, module);
 						branch.for_verbose.stride = ParseExpression(token, indent+1, module, false);
@@ -1228,9 +1212,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 		}
 
 		if (token->kind != TOKEN_COLON)
-		{
 			Error(module, token->location, "Expected ':' after branch, not: '%'\n", token);
-		}
 
 		CheckScope(token, indent, module);
 		token += 1;
@@ -1267,13 +1249,11 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 
 static Ast_Statement ParseStatement(Token*& token, uint32 indent, Ast_Module* module)
 {
-	Ast_Statement statement;
+	Ast_Statement statement = Ast_Statement();
 	ZeroMemory(&statement);
 
 	if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
-	{
 		Error(module, token->location, "Variable names must start with a lowercase letter.\n");
-	}
 
 	if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON)
 	{
@@ -1347,9 +1327,7 @@ static Ast_Statement ParseStatement(Token*& token, uint32 indent, Ast_Module* mo
 		token += 1;
 
 		if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
-		{
 			Error(module, statement.increment.token->location, "Expected expression after '%' keyword\n", statement.increment.token);
-		}
 
 		statement.increment.expression = ParseExpression(token, indent+1, module);
 
@@ -1362,9 +1340,7 @@ static Ast_Statement ParseStatement(Token*& token, uint32 indent, Ast_Module* mo
 		token += 1;
 
 		if (token->kind != TOKEN_COLON)
-		{
 			Error(module, token->location, "Invalid 'defer' statement, Expected ':', not: '%'\n", token);
-		}
 
 		CheckScope(token, indent, module);
 		token += 1;
@@ -1403,18 +1379,14 @@ static Ast_Statement ParseStatement(Token*& token, uint32 indent, Ast_Module* mo
 		token += 1;
 
 		if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
-		{
 			Error(module, statement.increment.token->location, "Expected expression after '%' keyword\n", statement.increment.token);
-		}
 
 		statement.claim.expression = ParseExpression(token, indent+1, module, false);
 
 		return statement;
 	}
 	else
-	{
 		Error(module, token->location, "Invalid statement starting with '%'\n", token);
-	}
 }
 
 static Ast_Attribute* ParseAttribute(Token*& token, uint32 indent, Ast_Module* module)
@@ -1473,9 +1445,7 @@ static Ast_Code ParseCode(Token*& token, uint32 indent, Ast_Module* module)
 			&&  (GetClosure(token+1)[1].kind == TOKEN_COLON || GetClosure(token+1)[1].kind == TOKEN_ARROW))
 		{
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
-			{
 				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
-			}
 
 			Ast_Function function = ParseFunction(token, indent, module);
 			function.attribute = attribute;
@@ -1488,9 +1458,7 @@ static Ast_Code ParseCode(Token*& token, uint32 indent, Ast_Module* module)
 			statements.Add(statement);
 
 			if (!token->newline && !IsScopeTerminator(token->kind))
-			{
 				Error(module, token->location, "Expected ';' before end of statement, not: '%'.\n", token);
-			}
 
 			if (token->kind == TOKEN_SEMICOLON && IsCorrectScope(token, indent))
 			{
@@ -1500,9 +1468,7 @@ static Ast_Code ParseCode(Token*& token, uint32 indent, Ast_Module* module)
 	}
 
 	if (token->indent > indent)
-	{
 		Error(module, token->location, "Token '%' is on the wrong indentation.\n", token);
-	}
 
 	code.statements = statements.Lock();
 	code.scope.enums = enums.Lock();
@@ -1524,9 +1490,7 @@ static Ast_Function ParseFunction(Token*& token, uint32 indent, Ast_Module* modu
 	token = GetClosure(token)+1;
 
 	if (token->kind != TOKEN_ARROW && token->kind != TOKEN_COLON)
-	{
 		Error(module, token->location, "Expected '->' or ':', not '%'\n", token);
-	}
 
 	if (token->kind == TOKEN_ARROW)
 	{
@@ -1537,9 +1501,7 @@ static Ast_Function ParseFunction(Token*& token, uint32 indent, Ast_Module* modu
 	}
 
 	if (token->kind != TOKEN_COLON)
-	{
 		Error(module, token->location, "Expected ':', not '%'\n", token);
-	}
 
 	CheckScope(token, indent, module);
 	token += 1;
@@ -1556,9 +1518,7 @@ static Ast_Import ParseImport(Token*& token, uint32 indent, Ast_Module* module)
 	token += 1;
 
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL)
-	{
 		Error(module, token->location, "Expected identifier after import token, instead got: '%'\n", token);
-	}
 
 	CheckScope(token, 1, module);
 	import.module = token;
@@ -1570,9 +1530,7 @@ static Ast_Import ParseImport(Token*& token, uint32 indent, Ast_Module* module)
 		token += 1;
 	}
 	else if (IsCorrectScope(token, 1))
-	{
 		Error(module, token->location, "Unexpected token after import statement: '%'\n", token);
-	}
 
 	CheckScope(token, 0, module);
 
@@ -1581,7 +1539,6 @@ static Ast_Import ParseImport(Token*& token, uint32 indent, Ast_Module* module)
 
 static void ParseGlobalScope(Ast_Module* module)
 {
-
 	Token* token = &module->tokens[0];
 	Token* end = module->tokens.End();
 
@@ -1619,9 +1576,7 @@ static void ParseGlobalScope(Ast_Module* module)
 		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN)
 		{
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
-			{
 				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
-			}
 
 			Ast_Function function = ParseFunction(token, 0, module);
 			function.attribute = attribute;
@@ -1629,9 +1584,7 @@ static void ParseGlobalScope(Ast_Module* module)
 			functions.Add(function);
 		}
 		else
-		{
 			Error(module, token->location, "Unexpected token in global scope: '%'\n", token);
-		}
 	}
 
 	module->imports = imports.Lock();

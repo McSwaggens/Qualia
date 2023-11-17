@@ -4,7 +4,7 @@
 #include "list.h"
 #include "token.h"
 #include "span.h"
-#include "type.h"
+#include "type_system.h"
 #include "ir.h"
 
 struct Ast_Expression;
@@ -46,6 +46,7 @@ enum Ast_Specifier_Kind
 {
 	AST_SPECIFIER_POINTER,
 	AST_SPECIFIER_OPTIONAL,
+	AST_SPECIFIER_FIXED_ARRAY,
 	AST_SPECIFIER_ARRAY
 };
 
@@ -74,7 +75,6 @@ struct Ast_BaseType
 {
 	Ast_BaseType_Kind kind;
 	Token* token;
-	// Type*  type;
 
 	union
 	{
@@ -138,12 +138,12 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_SUBSCRIPT,
 	AST_EXPRESSION_LAMBDA,
 	AST_EXPRESSION_TUPLE,
-	AST_EXPRESSION_DYNAMIC_ARRAY,
+	AST_EXPRESSION_ARRAY,
 	AST_EXPRESSION_FIXED_ARRAY,
 	AST_EXPRESSION_AS,
 };
 
-using Ast_Expression_Flags = uint8;
+typedef uint8 Ast_Expression_Flags;
 static const Ast_Expression_Flags AST_EXPRESSION_FLAG_REFERENTIAL            = (1<<0);
 static const Ast_Expression_Flags AST_EXPRESSION_FLAG_PURE                   = (1<<1);
 static const Ast_Expression_Flags AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE = (1<<2);
@@ -153,7 +153,7 @@ struct Ast_Expression
 {
 	Ast_Expression_Kind kind;
 	Ast_Expression_Flags flags;
-	Type* type;
+	TypeID type;
 	Span<Token> span;
 };
 
@@ -195,7 +195,7 @@ struct Ast_Expression_Dot_Call : Ast_Expression
 	Ast_Expression_Tuple* parameters;
 };
 
-struct Ast_Expression_Dynamic_Array : Ast_Expression
+struct Ast_Expression_Array : Ast_Expression
 {
 	Ast_Expression* left;
 	Ast_Expression* right;
@@ -365,7 +365,7 @@ enum Ast_Branch_Kind : uint8
 
 struct Ast_Branch_For_Range
 {
-	Ast_Variable* iterator;
+	Ast_Variable*   iterator;
 	Ast_Expression* range;
 	Ast_Expression* filter;
 	Ast_Expression* stride;
@@ -382,7 +382,7 @@ struct Ast_Branch
 {
 	Ast_Branch_Kind kind;
 	Ast_Branch_Clause_Kind clause;
-	IrBlockID ir;
+	Block* ir;
 
 	Span<Token> span;
 
@@ -453,13 +453,14 @@ struct Ast_Variable
 	String name;
 	Token* name_token;
 	Ast_Variable_Flags flags;
-	Type* type;
+	TypeID type;
 	Ast_Type* ast_type;
 	Ast_Expression* assignment;
 	Ast_Attribute* attribute;
-	IrValue ir;
+	Value ir;
 	uint64 offset; // @RemoveMe?
 	// @Todo: Add span
+	Ast_Variable() = default;
 };
 
 struct StackFrame
@@ -494,10 +495,12 @@ struct Ast_Statement
 		Ast_Claim       claim;
 		Ast_Break       brk;
 		Ast_Return      ret;
-		Ast_Variable    variable_declaration; // @FixMe @Optimization: Change to pointer, Ast_Variable is yuuuge!
+		Ast_Variable    variable_declaration = Ast_Variable(); // @FixMe @Optimization: Change to pointer, Ast_Variable is yuuuge!
 		Ast_Increment   increment;
 		Ast_Expression* expression;
 	};
+
+	// Ast_Statement() = defau
 };
 
 struct Ast_Function
@@ -506,16 +509,15 @@ struct Ast_Function
 	Token* name_token;
 	Array<Ast_Variable> parameters; // @Todo: Give parameters their own struct? Ast_Parameter?
 	Ast_Code code;
-	Type* type;
-	Type* return_type;
+	TypeID type;
+	TypeID return_type;
 	List<Ast_Return*> returns; // @Todo: Infer return type.
 	Ast_Type* ast_return_type;
 	Ast_Attribute* attribute;
-	IrFunction* ir;
+	Procedure* ir;
 	bool is_pure;
 	bool is_global;
 	// @Todo: Expression functions =>
-	// @Todo: Implement 'inline' keyword.
 };
 
 struct Ast_Import
@@ -530,11 +532,10 @@ struct Ast_Struct_Member
 {
 	String name;
 	Token* name_token;
-	Type* type;
+	TypeID type;
 	Ast_Type ast_type;
 	uint64 offset;
 	uint32 index;
-	Ast_Attribute* attribute;
 };
 
 struct Ast_Enum_Member
@@ -542,13 +543,13 @@ struct Ast_Enum_Member
 	String name;
 	Token* name_token;
 	Ast_Expression* expression;
+	int64 value;
 	uint32 index;
-	Ast_Attribute* attribute;
 };
 
 struct Ast_Struct
 {
-	Type type;
+	TypeID type;
 	String name;
 	Token* name_token;
 	Array<Ast_Struct_Member> members;
@@ -558,10 +559,10 @@ struct Ast_Struct
 
 struct Ast_Enum
 {
-	Type type;
+	TypeID type;
 	String name;
 	Token* name_token;
-	Type* underlying_type;
+	TypeID underlying_type;
 	Array<Ast_Enum_Member> members;
 	Ast_Attribute* attribute;
 };
@@ -603,5 +604,5 @@ static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* m
 static void GenericWrite(OutputBuffer* buffer, Ast_Expression* expression);
 static void GenericWrite(OutputBuffer* buffer, Ast_Type* type);
 static void GenericWrite(OutputBuffer* buffer, Ast_Type type);
-static void GenericWrite(OutputBuffer* buffer, Type* type);
+static void GenericWrite(OutputBuffer* buffer, TypeID type);
 

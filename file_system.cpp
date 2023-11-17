@@ -157,7 +157,7 @@ static bool FileDoesExist(String path)
 	// X = 1
 	// W = 2
 	// R = 4
-	return SystemCall(21, (int64)path.data, 0) == 0;
+	return SystemCall(21, (int64)cpath, 0) == 0;
 }
 
 static Array<byte> FileLoad(String path, uint64 left, uint64 right)

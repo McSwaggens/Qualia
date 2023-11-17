@@ -16,7 +16,7 @@ static void InitPageCache();
 static void InitGlobalArena();
 
 static byte* AllocateVirtualPage(uint64 size, PageFlags flags);
-static void  DeAllocateVirtualPage(byte* page, uint64 size, PageFlags flags);
+static void  DeAllocateVirtualPage(byte* page, uint64 size);
 
 static byte* GetPage(uint64 size);
 static void  RetirePage(byte* page, uint64 size);
@@ -24,8 +24,8 @@ static void  RetirePage(byte* page, uint64 size);
 // ------------------------------------------- //
 
 static byte* AllocateMemory(uint64 size);
-static byte* ReAllocateMemory(byte* p, uint64 old_size, uint64 new_size);
-static void  DeAllocateMemory(byte* p, uint64 size);
+static byte* ReAllocateMemory(void* p, uint64 old_size, uint64 new_size);
+static void  DeAllocateMemory(void* p, uint64 size);
 
 // ------------------------------------------- //
 

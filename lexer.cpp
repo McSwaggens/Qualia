@@ -500,12 +500,6 @@ static void LexerParse(Ast_Module* module)
 			case 'E':
 			case 'F':
 
-			case 'G':
-			case 'H':
-			case 'I':
-			case 'J':
-			case 'K':
-			case 'L':
 			case 'M':
 				if (IsKeyword(cursor, TOKEN_MOD))         { cursor += ToString(TOKEN_MOD).length;         token.kind = TOKEN_MOD;         break; }
 				goto PARSE_IDENTIFIER;
@@ -518,20 +512,9 @@ static void LexerParse(Ast_Module* module)
 				if (IsKeyword(cursor, TOKEN_BITWISE_OR))  { cursor += ToString(TOKEN_BITWISE_OR).length;  token.kind = TOKEN_BITWISE_OR;  break; }
 				goto PARSE_IDENTIFIER;
 
-			case 'P':
-			case 'Q':
-			case 'R':
-			case 'S':
-			case 'T':
-			case 'U':
-			case 'V':
-			case 'W':
 			case 'X':
 				if (IsKeyword(cursor, TOKEN_BITWISE_XOR)) { cursor += ToString(TOKEN_BITWISE_XOR).length; token.kind = TOKEN_BITWISE_XOR; break; }
 				goto PARSE_IDENTIFIER;
-
-			case 'Y':
-			case 'Z':
 
 			case 'a':
 				if (IsKeyword(cursor, TOKEN_ALIAS))       { cursor += ToString(TOKEN_ALIAS).length;       token.kind = TOKEN_ALIAS;       break; }
@@ -568,8 +551,6 @@ static void LexerParse(Ast_Module* module)
 				if (IsKeyword(cursor, TOKEN_FOR))         { cursor += ToString(TOKEN_FOR).length;         token.kind = TOKEN_FOR;         break; }
 				goto PARSE_IDENTIFIER;
 
-			case 'g':
-			case 'h':
 			case 'i':
 				if (IsKeyword(cursor, TOKEN_IF))          { cursor += ToString(TOKEN_IF).length;          token.kind = TOKEN_IF;          break; }
 				if (IsKeyword(cursor, TOKEN_IMPORT))      { cursor += ToString(TOKEN_IMPORT).length;      token.kind = TOKEN_IMPORT;      break; }
@@ -582,10 +563,6 @@ static void LexerParse(Ast_Module* module)
 				if (IsKeyword(cursor, TOKEN_INT8))        { cursor += ToString(TOKEN_INT8).length;        token.kind = TOKEN_INT8;        break; }
 				goto PARSE_IDENTIFIER;
 
-			case 'j':
-			case 'k':
-			case 'l':
-			case 'm':
 			case 'n':
 				if (IsKeyword(cursor, TOKEN_NOT))         { cursor += ToString(TOKEN_NOT).length;         token.kind = TOKEN_NOT;         break; }
 				if (IsKeyword(cursor, TOKEN_NULL))        { cursor += ToString(TOKEN_NULL).length;        token.kind = TOKEN_NULL;        break; }
@@ -595,8 +572,6 @@ static void LexerParse(Ast_Module* module)
 				if (IsKeyword(cursor, TOKEN_OR))          { cursor += ToString(TOKEN_OR).length;          token.kind = TOKEN_OR;          break; }
 				goto PARSE_IDENTIFIER;
 
-			case 'p':
-			case 'q':
 			case 'r':
 				if (IsKeyword(cursor, TOKEN_RETURN))      { cursor += ToString(TOKEN_RETURN).length;      token.kind = TOKEN_RETURN;      break; }
 				goto PARSE_IDENTIFIER;
@@ -618,12 +593,36 @@ static void LexerParse(Ast_Module* module)
 				if (IsKeyword(cursor, TOKEN_UINT8))       { cursor += ToString(TOKEN_UINT8).length;       token.kind = TOKEN_UINT8;       break; }
 				goto PARSE_IDENTIFIER;
 
-			case 'v':
 			case 'w':
 				if (IsKeyword(cursor, TOKEN_WHERE))       { cursor += ToString(TOKEN_WHERE).length;       token.kind = TOKEN_WHERE;       break; }
 				if (IsKeyword(cursor, TOKEN_WHILE))       { cursor += ToString(TOKEN_WHILE).length;       token.kind = TOKEN_WHILE;       break; }
 				goto PARSE_IDENTIFIER;
 
+			case 'P':
+			case 'Q':
+			case 'R':
+			case 'S':
+			case 'T':
+			case 'U':
+			case 'V':
+			case 'W':
+			case 'Y':
+			case 'Z':
+			case 'G':
+			case 'H':
+			case 'I':
+			case 'J':
+			case 'K':
+			case 'L':
+			case 'g':
+			case 'h':
+			case 'j':
+			case 'k':
+			case 'l':
+			case 'm':
+			case 'p':
+			case 'q':
+			case 'v':
 			case 'x':
 			case 'y':
 			case 'z':
@@ -664,10 +663,6 @@ static void LexerParse(Ast_Module* module)
 				{
 					cursor = begin;
 					ParseLiteral(module, &cursor, &token);
-				}
-				else if (IsUpperCase(*begin) && size == 1)
-				{
-					token.kind = TOKEN_IDENTIFIER_GENERIC;
 				}
 				else if (!lower)
 				{

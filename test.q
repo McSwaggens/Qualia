@@ -1,29 +1,10 @@
-Foo(a: int, b: int, c: int, d: int, e: int) -> int:
-	x := a + b * c / d MOD e
-	return x
 
-LogicalAnd(a: int, b: int, c: int, d: int) -> bool:
-	return a < 1 and b > 2 and c != 3 and d = 4
-
-LogicalOr(a : int, b : int, c : int, d : int) -> bool:
-	return a < 1 or b > 2 or c != 3 or d = 4
-
-UnaryPlus(n : int) -> int:
-	return +n
-
-AllPathsReturnTest() -> int:
-	if true:
-	else: x := 123
-	then if 1: return 1
-	else: return 1
+CopyMemory(dest: *byte, src: *byte, size: uint):
+	for i := 0, i < size:
+		dest[i] = src[i]
 
 // WhileLoop(n : int):
 	// while n: n = 111
-
-	// j := 0fffh
-	// 18446744073709551615
-	// u64_max := 123
-	// x       := 55555555555555555555
 
 	// if n = -1: if n: n = 222; n = 333;
 
@@ -77,6 +58,25 @@ AllPathsReturnTest() -> int:
 // 	b := 1
 // 	c := 2
 // 	j := a + b - c
+
+// Foo(a: int, b: int, c: int, d: int, e: int) -> int:
+// 	x := a + b * c / d MOD e
+// 	return x
+
+// LogicalAnd(a: int, b: int, c: int, d: int) -> bool:
+// 	return a < 1 and b > 2 and c != 3 and d = 4
+
+// LogicalOr(a: int, b: int, c: int, d: int) -> bool:
+// 	return a < 1 or b > 2 or c != 3 or d = 4
+
+// UnaryPlus(n: int) -> int:
+// 	return +n
+
+// AllPathsReturnTest() -> int:
+// 	if true:
+// 	else: x := 123
+// 	then if 1: return 1
+// 	else: return 1
 
 
 // Increment_Decrement_Integer():
@@ -255,3 +255,15 @@ AllPathsReturnTest() -> int:
 // 	j := p + true
 // 	k := i + true
 
+AllocateMemory(size: uint) -> *byte:
+	return null
+
+PadLeft(str: []int8, c: int8, count: int) -> []int8:
+	len := str.count+count
+	p : *int8 = AllocateMemory(len)
+
+	for i = 0, i < count:
+		result[i] = c
+
+	CopyMemory(p+count, str.data, str.length)
+	return [p, len]

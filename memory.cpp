@@ -19,7 +19,7 @@ static byte* AllocateVirtualPage(uint64 size, PageFlags flags)
 	return page;
 }
 
-static void DeAllocateVirtualPage(byte* page, uint64 size, PageFlags flags)
+static void DeAllocateVirtualPage(byte* page, uint64 size)
 {
 	Assert(size);
 	Assert((size & 4095) == 0, "Invalid page size detected.");
@@ -128,7 +128,7 @@ static void RetirePage(byte* page, uint64 size)
 	}
 	else
 	{
-		DeAllocateVirtualPage(page, size, PAGE_FLAG_WRITE);
+		DeAllocateVirtualPage(page, size);
 	}
 }
 
@@ -212,8 +212,9 @@ static byte* AllocateMemory(uint64 size)
 	return result;
 }
 
-static void DeAllocateMemory(byte* p, uint64 size)
+static void DeAllocateMemory(void* px, uint64 size)
 {
+	byte* p = (byte*)px; // Sepples
 	// Check if p is not null? Or leave that up to the caller?
 	Assert(p && size);
 
@@ -233,8 +234,9 @@ static void DeAllocateMemory(byte* p, uint64 size)
 	}
 }
 
-static byte* ReAllocateMemory(byte* p, uint64 old_size, uint64 new_size)
+static byte* ReAllocateMemory(void* px, uint64 old_size, uint64 new_size)
 {
+	byte* p = (byte*)px; // Sepples
 	// @Todo: Deal with shrinking
 	Assert(new_size > old_size); // @RemoveMe @FixMe
 	Assert(new_size);

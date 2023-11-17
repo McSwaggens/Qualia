@@ -9,7 +9,6 @@ enum Token_Kind : uint8
 	TOKEN_IDENTIFIER_FORMAL,
 	TOKEN_IDENTIFIER_CASUAL,
 	TOKEN_IDENTIFIER_CONSTANT,
-	TOKEN_IDENTIFIER_GENERIC,
 	TOKEN_LITERAL_INT,
 	TOKEN_LITERAL_INT8,
 	TOKEN_LITERAL_INT16,
@@ -116,7 +115,6 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_IDENTIFIER_FORMAL:   return "<formal_identifier>";
 		case TOKEN_IDENTIFIER_CASUAL:   return "<casual_identifier>";
 		case TOKEN_IDENTIFIER_CONSTANT: return "<constant_identifier>";
-		case TOKEN_IDENTIFIER_GENERIC:  return "<generic_identifier>";
 		case TOKEN_LITERAL_INT:         return "<literal_int>";
 		case TOKEN_LITERAL_INT8:        return "<literal_int8>";
 		case TOKEN_LITERAL_INT16:       return "<literal_int16>";

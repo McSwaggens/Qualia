@@ -291,8 +291,9 @@ static void GenericWrite(OutputBuffer* buffer, TypeID type)
 
 		case TYPE_POINTER:
 		{
+			PointerTypeInfo* ptr_info = &info->pointer_info;
 			BufferWriteByte(buffer, '*');
-			GenericWrite(buffer, info->pointer_info.subtype);
+			GenericWrite(buffer, ptr_info->subtype);
 		} return;
 
 		case TYPE_OPTIONAL:

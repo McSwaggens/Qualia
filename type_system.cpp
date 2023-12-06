@@ -1,6 +1,7 @@
 #include "type_system.h"
 #include "memory.h"
 #include "general.h"
+#include "assert.h"
 
 static TypeID GetArithmeticBackingType(TypeID id)
 {
@@ -212,8 +213,9 @@ static void AddExtensionEntry(ExtensionTable* table, ExtensionEntry entry)
 static void InitTypeSystem(void)
 {
 	ZeroMemory(&type_system);
-	type_system.count = CORE_TYPES_COUNT;
-	type_system.infos = (TypeInfo*)AllocateMemory(NextPow2(CORE_TYPES_COUNT)*sizeof(TypeInfo));
+	type_system.info_count = CORE_TYPES_COUNT;
+	type_system.info_capacity = 1<<20;
+	type_system.infos = (TypeInfo*)AllocateMemory(type_system.info_capacity*sizeof(TypeInfo));
 
 	for (int32 prim = PRIMITIVE_BEGIN; prim < PRIMITIVE_END; prim++)
 	{
@@ -238,9 +240,9 @@ static void InitTypeSystem(void)
 		optional->size = 1 + info->size;
 		array->size    = 16;
 
-		pointer->pointer_info.subtype   = CreateTypeID(TYPE_POINTER,  prim);
-		optional->optional_info.subtype = CreateTypeID(TYPE_OPTIONAL, prim);
-		array->array_info.subtype       = CreateTypeID(TYPE_ARRAY,    prim);
+		pointer->pointer_info.subtype   = (TypeID)prim;
+		optional->optional_info.subtype = (TypeID)prim;
+		array->array_info.subtype       = (TypeID)prim;
 	}
 
 	*GetTypeInfo(TYPE_BARE_FUNCTION) = {
@@ -271,81 +273,88 @@ static void InitTypeSystem(void)
 
 static TypeID CreateType(TypeKind kind, TypeInfo info)
 {
-	TypeID result = CreateTypeID(kind, type_system.count);
-	type_system.infos[type_system.count] = info;
-
-	if (IsPow2(type_system.count)) COLD
+	if (type_system.info_count == type_system.info_capacity) COLD
 	{
+		type_system.info_capacity <<= 4;
 		type_system.infos = (TypeInfo*)ReAllocateMemory(
 			type_system.infos,
-			sizeof(TypeInfo) * type_system.count,
-			sizeof(TypeInfo) * (type_system.count<<1)
+			sizeof(TypeInfo) * type_system.info_count,
+			sizeof(TypeInfo) * (type_system.info_capacity)
 		);
 	}
 
-	type_system.count += 1;
+	TypeID result = CreateTypeID(kind, type_system.info_count);
+	type_system.infos[type_system.info_count++] = info;
 
 	return result;
 }
 
 static TypeID GetPointer(TypeID subtype)
 {
-	TypeInfo* subtype_info = GetTypeInfo(subtype);
+	Assert(subtype);
 
-	if (subtype_info->pointer) HOT
-		return subtype_info->pointer;
+	TypeInfo* info = GetTypeInfo(subtype);
 
-	TypeID result = CreateType(TYPE_POINTER, {
+	if (info->pointer) HOT
+		return info->pointer;
+
+	TypeID ptr = CreateType(TYPE_POINTER, {
 		.size = 8,
 		.pointer_info.subtype = subtype,
 	});
 
-	subtype_info->pointer = result;
+	GetTypeInfo(subtype)->pointer = ptr;
 
-	return result;
+	return ptr;
 }
 
 static TypeID GetOptional(TypeID subtype)
 {
-	TypeInfo* subtype_info = GetTypeInfo(subtype);
+	Assert(subtype);
 
-	if (subtype_info->optional)
-		return subtype_info->optional;
+	TypeInfo* info = GetTypeInfo(subtype);
+
+	if (info->optional)
+		return info->optional;
 
 	TypeID result = CreateType(TYPE_OPTIONAL, {
 		.size = GetTypeSize(subtype) + 1,
 		.optional_info.subtype = subtype,
 	});
 
-	subtype_info->optional = result;
+	GetTypeInfo(subtype)->optional = result;
 
 	return result;
 }
 
 static TypeID GetArray(TypeID subtype)
 {
-	TypeInfo* subtype_info = GetTypeInfo(subtype);
+	Assert(subtype);
 
-	if (subtype_info->array)
-		return subtype_info->array;
+	TypeInfo* info = GetTypeInfo(subtype);
+
+	if (info->array)
+		return info->array;
 
 	TypeID result = CreateType(TYPE_ARRAY, {
 		.size = 16,
 		.array_info.subtype = subtype,
 	});
 
-	subtype_info->array = result;
+	GetTypeInfo(subtype)->array = result;
 
 	return result;
 }
 
 static TypeID GetFixedArray(TypeID subtype, uint64 length)
 {
-	TypeInfo* subtype_info = GetTypeInfo(subtype);
+	Assert(subtype);
 
-	for (uint32 i = 0; i < subtype_info->extensions.count; i++)
+	TypeInfo* info = GetTypeInfo(subtype);
+
+	for (uint32 i = 0; i < info->extensions.count; i++)
 	{
-		ExtensionEntry* entry = &subtype_info->extensions.entries[i];
+		ExtensionEntry* entry = &info->extensions.entries[i];
 
 		if (entry->length == length && GetTypeKind(entry->type) == TYPE_FIXED_ARRAY)
 			return entry->type;
@@ -359,7 +368,7 @@ static TypeID GetFixedArray(TypeID subtype, uint64 length)
 	});
 
 	AddExtensionEntry(
-		&subtype_info->extensions,
+		&info->extensions,
 		(ExtensionEntry){
 			.type = result,
 			.length = length,
@@ -371,6 +380,9 @@ static TypeID GetFixedArray(TypeID subtype, uint64 length)
 
 static TypeID GetFunctionType(TypeID input, TypeID output)
 {
+	Assert(input);
+	Assert(output);
+
 	TypeInfo* input_info = GetTypeInfo(input);
 
 	for (uint32 i = 0; i < input_info->extensions.count; i++)
@@ -405,6 +417,9 @@ static TypeID GetTuple(TypeID* elements, uint64 count)
 	if (!count)
 		return TYPE_EMPTY_TUPLE;
 
+	if (count == 1)
+		return elements[0];
+
 	TypeInfo* header_info = GetTypeInfo(elements[0]);
 	ExtensionTable* table = &header_info->extensions;
 
@@ -426,9 +441,7 @@ static TypeID GetTuple(TypeID* elements, uint64 count)
 
 	uint64 size = 0;
 	for (int32 i = 0; i < count; i++)
-	{
 		size += GetTypeSize(elements[i]);
-	}
 
 	TypeID* new_elements = (TypeID*)AllocateMemory(sizeof(TypeID) * count);
 	CopyMemory(new_elements, elements, count);

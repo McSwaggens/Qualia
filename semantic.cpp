@@ -532,6 +532,131 @@ static void ScanExpressionTuple(Ast_Expression_Tuple* tuple, Ast_Scope* scope, A
 	tuple->type = GetTuple(types, tuple->elements.count);
 }
 
+static void ScanExpressionCall(Ast_Expression_Call* call, Ast_Scope* scope, Ast_Module* module)
+{
+	Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)call->function;
+	Ast_Expression_Binary* dot = (Ast_Expression_Binary*)call->function;
+
+	ScanExpression(call->parameters, scope, module);
+	Print("Parameters: %\n", call->parameters->type);
+
+	if (dot->kind == AST_EXPRESSION_BINARY_DOT && dot->right->kind == AST_EXPRESSION_TERMINAL_NAME && ((Ast_Expression_Terminal*)dot->right)->token->kind == TOKEN_IDENTIFIER_FORMAL)
+	{
+		Ast_Expression_Dot_Call* dcall = (Ast_Expression_Dot_Call*)call;
+		dcall->kind = AST_EXPRESSION_DOT_CALL;
+
+		Ast_Expression_Function* function_expression = (Ast_Expression_Function*)dot->right;
+
+		ScanExpression(dot->left, scope, module);
+
+		if (dot->left->type == TYPE_EMPTY_TUPLE)
+			Error(module, dot->left->span, "Cannot call into an empty tuple.\n");
+
+		TypeID full_param_type = MergeTypeRight(dot->left->type, dcall->parameters->type);
+		Ast_Function* function = FindFunction(scope, function_expression->token->identifier_string, full_param_type);
+
+		if (!function)
+			Error(module, dcall->span, "No function exists called % with input type: %.\n", function_expression->token->identifier_string, full_param_type);
+
+		function_expression->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
+		function_expression->function = function;
+		function_expression->type = function->type;
+
+		dcall->type = function->return_type;
+		dcall->flags = 0;
+
+		Assert(dcall->parameters->elements.count == function->parameters.count-1);
+
+		dot->left = ImplicitCast(dot->left, function->parameters[0].type, module);
+
+		for (uint32 i = 0; i < dcall->parameters->elements.count; i++)
+			call->parameters->elements[i] = ImplicitCast(call->parameters->elements[i], function->parameters[i+1].type, module);
+
+		return;
+	}
+
+	if (call->function->kind == AST_EXPRESSION_TERMINAL_NAME && terminal->token->kind == TOKEN_IDENTIFIER_FORMAL)
+	{
+		if (Ast_Function* function = FindFunction(scope, terminal->token->identifier_string, call->parameters->type); function)
+		{
+			Ast_Expression_Function* function_expression = (Ast_Expression_Function*)call->function;
+			call->function->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
+			function_expression->function = function;
+			function_expression->type = function->type;
+
+			call->type = function->return_type;
+			call->flags = 0;
+
+			TypeInfo* info = GetTypeInfo(function->type);
+
+			call->parameters = (Ast_Expression_Tuple*)ImplicitCast(call->parameters, info->function_info.input, module);
+			return;
+		}
+
+		if (IntrinsicID intrinsic_id = FindIntrinsic(terminal->token->identifier_string, call->parameters->type); intrinsic_id != INTRINSIC_INVALID)
+		{
+			TypeID type = intrinsic_type_lut[intrinsic_id];
+			TypeInfo* type_info = GetTypeInfo(type);
+
+			Ast_Expression_Intrinsic* intrinsic_expression = (Ast_Expression_Intrinsic*)call->function;
+			intrinsic_expression->intrinsic = intrinsic_id;
+			intrinsic_expression->type = type;
+
+			call->function->kind = AST_EXPRESSION_TERMINAL_INTRINSIC;
+			call->type = type_info->function_info.output;
+			call->flags = 0;
+
+			call->parameters = (Ast_Expression_Tuple*)ImplicitCast(call->parameters, type_info->function_info.input, module);
+			return;
+		}
+
+		Error(module, terminal->token->location, "No function exists called % with input type: %.\n", terminal->token->identifier_string, call->parameters->type);
+		return;
+	}
+
+	ScanExpression(call->function, scope, module);
+
+	if (!IsFunctionPointer(call->function->type))
+		Error(module, call->function->span, "Expression of type % cannot be called like a function.\n", call->function->type);
+
+	TypeID function_type = GetSubType(call->function->type);
+	TypeInfo* function_type_info = GetTypeInfo(function_type);
+	call->flags = 0;
+	call->type = function_type_info->function_info.output;
+
+	if (!CanCast(CAST_IMPLICIT, call->parameters->type, GetFunctionInputType(function_type)))
+		Error(module, call->function->span, "Function of type % called with invalid arguments: %.\n", call->function->type, call->parameters->type);
+
+	call->parameters = (Ast_Expression_Tuple*)ImplicitCast(call->parameters, function_type_info->function_info.input, module);
+}
+
+static void ScanExpressionSubscript(Ast_Expression_Subscript* subscript, Ast_Scope* scope, Ast_Module* module)
+{
+	Ast_Expression* array = subscript->array;
+
+	ScanExpression(subscript->array, scope, module);
+	ScanExpression(subscript->index, scope, module);
+
+	bool fixed = GetTypeKind(subscript->array->type) == TYPE_FIXED_ARRAY;
+
+	if (GetTypeKind(subscript->array->type) != TYPE_FIXED_ARRAY &&
+		GetTypeKind(subscript->array->type) != TYPE_ARRAY &&
+		GetTypeKind(subscript->array->type) != TYPE_POINTER)
+		Error(module, subscript->array->span, "Expression with type % is not a valid array.\n", subscript->array->span);
+
+	if (!CanCast(CAST_IMPLICIT, subscript->index->type, TYPE_INT64))
+		Error(module, subscript->index->span, "Subscript index must be an integer, not: %\n", subscript->index->type);
+
+	subscript->index = ImplicitCast(subscript->index, TYPE_INT64, module);
+	subscript->flags = subscript->array->flags & subscript->index->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+	subscript->flags |= subscript->array->flags & AST_EXPRESSION_FLAG_REFERENTIAL;
+
+	if (!fixed)
+		subscript->flags |= AST_EXPRESSION_FLAG_REFERENTIAL;
+
+	subscript->type = GetSubType(subscript->array->type);
+}
+
 static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* module)
 {
 	switch (expression->kind)
@@ -974,146 +1099,23 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 				Error(module, ternary->middle->span, "Type % not convertable to bool\n", ternary->middle->type);
 
 			ternary->middle = ImplicitCast(ternary->middle, TYPE_BOOL, module);
-			ternary->left = ImplicitCast(ternary->left, dominant, module);
-			ternary->right = ImplicitCast(ternary->right, dominant, module);
+			ternary->left   = ImplicitCast(ternary->left, dominant, module);
+			ternary->right  = ImplicitCast(ternary->right, dominant, module);
 
 			if (ternary->left->type == ternary->right->type)
-			{
 				ternary->flags |= ternary->left->flags & ternary->right->flags & AST_EXPRESSION_FLAG_REFERENTIAL;
-			}
 
 			ternary->type = dominant;
 		} break;
 
-		case AST_EXPRESSION_CALL:
-		{
-			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
-
-			Ast_Expression_Terminal* terminal = (Ast_Expression_Terminal*)call->function;
-			Ast_Expression_Binary* dot = (Ast_Expression_Binary*)call->function;
-
-			ScanExpression(call->parameters, scope, module);
-
-			if (dot->kind == AST_EXPRESSION_BINARY_DOT && dot->right->kind == AST_EXPRESSION_TERMINAL_NAME &&
-				((Ast_Expression_Terminal*)dot->right)->token->kind == TOKEN_IDENTIFIER_FORMAL)
-			{
-				Ast_Expression_Dot_Call* call = (Ast_Expression_Dot_Call*)expression;
-				call->kind = AST_EXPRESSION_DOT_CALL;
-
-				Ast_Expression_Function* function_expression = (Ast_Expression_Function*)dot->right;
-
-				ScanExpression(dot->left, scope, module);
-
-				if (dot->left->type == TYPE_EMPTY_TUPLE)
-					Error(module, dot->left->span, "Cannot call into an empty tuple.\n");
-
-				TypeID full_param_type = MergeTypeRight(dot->left->type, call->parameters->type);
-				Ast_Function* function = FindFunction(scope, function_expression->token->identifier_string, full_param_type);
-
-				if (!function)
-					Error(module, call->span, "No function exists called % with input type: %.\n", function_expression->token->identifier_string, full_param_type);
-
-				function_expression->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
-				function_expression->function = function;
-				function_expression->type = function->type;
-
-				call->type = function->return_type;
-				call->flags = 0;
-
-				Assert(call->parameters->elements.count == function->parameters.count-1);
-
-				dot->left = ImplicitCast(dot->left, function->parameters[0].type, module);
-
-				for (uint32 i = 0; i < call->parameters->elements.count; i++)
-				{
-					call->parameters->elements[i] = ImplicitCast(call->parameters->elements[i], function->parameters[i+1].type, module);
-				}
-			}
-			else if (call->function->kind == AST_EXPRESSION_TERMINAL_NAME && terminal->token->kind == TOKEN_IDENTIFIER_FORMAL)
-			{
-				if (Ast_Function* function = FindFunction(scope, terminal->token->identifier_string, call->parameters->type); function)
-				{
-					Ast_Expression_Function* function_expression = (Ast_Expression_Function*)call->function;
-					call->function->kind = AST_EXPRESSION_TERMINAL_FUNCTION;
-					function_expression->function = function;
-					function_expression->type = function->type;
-
-					call->type = function->return_type;
-					call->flags = 0;
-
-					TypeInfo* info = GetTypeInfo(function->type);
-
-					call->parameters = (Ast_Expression_Tuple*)ImplicitCast(call->parameters, info->function_info.input, module);
-				}
-				else if (IntrinsicID intrinsic_id = FindIntrinsic(terminal->token->identifier_string, call->parameters->type); intrinsic_id != INTRINSIC_INVALID)
-				{
-					TypeID type = intrinsic_type_lut[intrinsic_id];
-					TypeInfo* type_info = GetTypeInfo(type);
-
-					Ast_Expression_Intrinsic* intrinsic_expression = (Ast_Expression_Intrinsic*)call->function;
-					intrinsic_expression->intrinsic = intrinsic_id;
-					intrinsic_expression->type = type;
-
-					call->function->kind = AST_EXPRESSION_TERMINAL_INTRINSIC;
-					call->type = type_info->function_info.output;
-					call->flags = 0;
-
-					call->parameters = (Ast_Expression_Tuple*)ImplicitCast(call->parameters, type_info->function_info.input, module);
-				}
-				else
-					Error(module, terminal->token->location, "No function exists called % with input type: %.\n", terminal->token->identifier_string, call->parameters->type);
-			}
-			else
-			{
-				ScanExpression(call->function, scope, module);
-
-				if (!IsFunctionPointer(call->function->type))
-					Error(module, call->function->span, "Expression of type % cannot be called like a function.\n", call->function->type);
-
-				TypeID function_type = GetSubType(call->function->type);
-				TypeInfo* function_type_info = GetTypeInfo(function_type);
-				call->flags = 0;
-				call->type = function_type_info->function_info.output;
-
-				if (!CanCast(CAST_IMPLICIT, call->parameters->type, GetFunctionInputType(function_type)))
-					Error(module, call->function->span, "Function of type % called with invalid arguments: %.\n", call->function->type, call->parameters->type);
-
-				call->parameters = (Ast_Expression_Tuple*)ImplicitCast(call->parameters, function_type_info->function_info.input, module);
-			}
-		} break;
-
+		case AST_EXPRESSION_CALL: ScanExpressionCall((Ast_Expression_Call*)expression, scope, module); break;
+		
 		case AST_EXPRESSION_LAMBDA:
 		{
 			Assert();
 		} break;
 
-		case AST_EXPRESSION_SUBSCRIPT:
-		{
-			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
-			ScanExpression(subscript->array, scope, module);
-			ScanExpression(subscript->index, scope, module);
-
-			bool fixed = GetTypeKind(subscript->array->type) == TYPE_FIXED_ARRAY;
-
-			if (GetTypeKind(subscript->array->type) != TYPE_FIXED_ARRAY &&
-				GetTypeKind(subscript->array->type) != TYPE_ARRAY &&
-				GetTypeKind(subscript->array->type) != TYPE_POINTER)
-				Error(module, subscript->array->span, "Expression with type % is not a valid array.\n", subscript->array->span);
-
-			if (!CanCast(CAST_IMPLICIT, subscript->index->type, TYPE_INT64))
-				Error(module, subscript->index->span, "Subscript index must be an integer, not: %\n", subscript->index->type);
-
-			subscript->index = ImplicitCast(subscript->index, TYPE_INT64, module);
-			subscript->flags = subscript->array->flags & subscript->index->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-			subscript->flags |= subscript->array->flags & AST_EXPRESSION_FLAG_REFERENTIAL;
-
-			if (!fixed)
-			{
-				subscript->flags |= AST_EXPRESSION_FLAG_REFERENTIAL;
-			}
-
-			subscript->type = GetSubType(subscript->array->type);
-		} break;
+		case AST_EXPRESSION_SUBSCRIPT: ScanExpressionSubscript((Ast_Expression_Subscript*)expression, scope, module); break;
 
 		case AST_EXPRESSION_AS:
 		{
@@ -1523,6 +1525,205 @@ static void SemanticParseBranchBlock(Ast_Module* module, Ast_Function* function,
 	code->all_paths_return = DoesBranchAlwaysReturn(&branch_block->branches[0]);
 }
 
+static void ScanStatement(Ast_Statement* statement, Ast_Code* code, Ast_Function* function, Ast_Module* module)
+{
+	switch (statement->kind)
+	{
+		case AST_STATEMENT_BRANCH_BLOCK:
+		{
+			Ast_BranchBlock* branch_block = (Ast_BranchBlock*)&statement->branch_block;
+			SemanticParseBranchBlock(module, function, code, branch_block);
+		} break;
+
+		case AST_STATEMENT_DEFER:
+		{
+			code->defers.Add(&statement->defer);
+			statement->defer.code.is_inside_loop = code->is_inside_loop;
+
+			ScanCode(&statement->defer.code, &code->scope, function, module);
+
+			if (statement->defer.code.all_paths_return)
+			{
+				code->has_defer_that_returns = true;
+				code->all_paths_return = true;
+			}
+		} break;
+
+		case AST_STATEMENT_CLAIM:
+		{
+			Ast_Claim* claim = &statement->claim;
+
+			ScanExpression(claim->expression, &code->scope, module);
+
+			if (!CanCast(CAST_IMPLICIT, claim->expression->type, TYPE_BOOL))
+				Error(module, claim->expression->span, "Claim expression type must be implicitly castable to bool\n");
+
+			claim->expression = ImplicitCast(claim->expression, TYPE_BOOL, module);
+		} break;
+
+		case AST_STATEMENT_INCREMENT:
+		case AST_STATEMENT_DECREMENT:
+		{
+			Ast_Increment* inc = &statement->increment;
+			ScanExpression(inc->expression, &code->scope, module);
+
+			bool direction = statement->kind == AST_STATEMENT_INCREMENT;
+
+			if (!IsInteger(inc->expression->type) && !IsFloat(inc->expression->type) && GetTypeKind(inc->expression->type) != TYPE_POINTER)
+				Error(module, inc->expression->span, "Cannot % type %, expression must be either an integer, float or pointer.\n", (direction ? "increment" : "decrement"), inc->expression->type);
+
+			if (!(inc->expression->flags & AST_EXPRESSION_FLAG_REFERENTIAL))
+				Error(module, inc->expression->span, "Expression is not a referential value.\n");
+		} break;
+
+		case AST_STATEMENT_RETURN:
+		{
+			code->contains_return = true;
+			code->all_paths_return = !code->contains_break;
+			function->returns.Add(&statement->ret);
+
+			if (code->has_defer_that_returns)
+				Error(module, statement->ret.token->location, "A defer in this scope already has a return statement. This isn't allowed.\n");
+
+			if (statement->ret.expression)
+			{
+				ScanExpression(statement->ret.expression, &code->scope, module);
+
+				if (!function->return_type)
+					Error(module, statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
+
+				if (!CanCast(CAST_IMPLICIT, function->return_type, statement->ret.expression->type))
+					Error(module, statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
+			}
+			else if (function->ast_return_type)
+				Error(module, statement->ret.token->location, "Expected return value with type: %\n", function->return_type);
+		} break;
+
+		case AST_STATEMENT_BREAK:
+		{
+			code->contains_break = true;
+			code->all_paths_break = !code->contains_return;
+
+			if (!code->is_inside_loop)
+				Error(module, statement->brk.token->location, "break statement must be inside of a loop.\n");
+		} break;
+
+		case AST_STATEMENT_EXPRESSION:
+		{
+			ScanExpression(statement->expression, &code->scope, module);
+		} break;
+
+		case AST_STATEMENT_VARIABLE_DECLARATION:
+		{
+			Ast_Variable* variable = &statement->variable_declaration;
+
+			for (Ast_Variable** other_variable = code->scope.variables.Begin(); other_variable < code->scope.variables.End(); other_variable++)
+			{
+				if (CompareString(variable->name, (*other_variable)->name))
+					Error(module, variable->name_token->location, "Variable with name '%' already declared in this scope.\n", variable->name);
+			}
+
+			if (variable->assignment)
+			{
+				ScanExpression(variable->assignment, &code->scope, module);
+
+				if (!variable->assignment->type)
+					Error(module, variable->assignment->span, "Expression does not have a type.\n");
+			}
+
+			if (variable->ast_type)
+			{
+				variable->type = GetType(variable->ast_type, &code->scope, module);
+
+				if (!variable->type)
+					Error(module, variable->name_token->location, "Unknown type %\n", variable->ast_type->basetype.token);
+
+				if (variable->assignment && !CanCast(CAST_IMPLICIT, variable->assignment->type, variable->type))
+					Error(module, variable->name_token->location, "Variable '%' with type % cannot be assign to type %\n", variable->name, variable->type, variable->assignment->type);
+			}
+			else
+			{
+				variable->type = variable->assignment->type;
+			}
+
+			if (variable->type == TYPE_EMPTY_TUPLE)
+				Error(module, variable->assignment->span, "Cannot declare variable with type %\n", variable->type);
+
+			Assert(variable->type != TYPE_EMPTY_TUPLE);
+			Print("Variable '%', type = %\n", variable->name, variable->type);
+
+			code->scope.variables.Add(variable);
+		} break;
+
+		case AST_STATEMENT_ASSIGNMENT:
+		{
+			Ast_Assignment* assignment = &statement->assignment;
+
+			ScanExpression(assignment->right, &code->scope, module);
+			ScanExpression(assignment->left,  &code->scope, module);
+
+			if (!IsAssignable(assignment->left))
+				Error(module, assignment->left->span, "Expression is not assignable.\n");
+
+			if (!CanCast(CAST_IMPLICIT, assignment->right->type, assignment->left->type))
+				Error(module, assignment->token->location, "Cannot cast % to %.\n", assignment->right->type, assignment->left->type);
+
+			assignment->right = ImplicitCast(assignment->right, assignment->left->type, module);
+		} break;
+
+		case AST_STATEMENT_ASSIGNMENT_ADD:
+		case AST_STATEMENT_ASSIGNMENT_SUBTRACT:
+		case AST_STATEMENT_ASSIGNMENT_MULTIPLY:
+		case AST_STATEMENT_ASSIGNMENT_DIVIDE:
+		case AST_STATEMENT_ASSIGNMENT_EXPONENTIAL:
+		{
+			Ast_Assignment* assignment = &statement->assignment;
+
+			ScanExpression(assignment->right, &code->scope, module);
+			ScanExpression(assignment->left,  &code->scope, module);
+
+			if (!(assignment->left->flags & AST_EXPRESSION_FLAG_REFERENTIAL))
+				Error(module, assignment->left->span, "Expression is not assignable.\n");
+
+			if (!IsInteger(assignment->left->type) &&
+				!IsFloat(assignment->left->type) &&
+				GetTypeKind(assignment->left->type) != TYPE_POINTER)
+				Error(module, assignment->left->span, "Arithmetic assignment type must be to an integer, float or pointer, not: '%'\n", assignment->left->type);
+
+			// ptr += int
+			// ptr -= int
+
+			// int += int
+			// int -= int
+			// int *= int
+			// int /= int
+
+			// float += float
+			// float -= float
+			// float *= float
+			// float /= float
+
+			if (IsPointer(assignment->left->type))
+			{
+				if (statement->kind != AST_STATEMENT_ASSIGNMENT_ADD && statement->kind != AST_STATEMENT_ASSIGNMENT_SUBTRACT)
+					Error(module, assignment->left->span, "Arithmetic assignment to pointer only allows '+=' and '-='.\n");
+
+				if (!CanCast(CAST_IMPLICIT, assignment->right->type, TYPE_INT64))
+					Error(module, assignment->right->span, "Expression type must be an integer.\n");
+
+				assignment->right = ImplicitCast(assignment->right, TYPE_INT64, module);
+			}
+			else
+			{
+				if (!CanCast(CAST_IMPLICIT, assignment->right->type, assignment->left->type))
+					Error(module, assignment->right->span, "Cannot implicitly cast '%' to '%'.\n", assignment->right->type, assignment->left->type);
+
+				assignment->right = ImplicitCast(assignment->right, assignment->left->type, module);
+			}
+		} break;
+	}
+}
+
 static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Module* module)
 {
 	code->scope.parent = scope;
@@ -1530,198 +1731,7 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, A
 
 	for (Ast_Statement* statement = code->statements.Begin(); statement < code->statements.End(); statement++)
 	{
-		switch (statement->kind)
-		{
-			case AST_STATEMENT_BRANCH_BLOCK:
-			{
-				Ast_BranchBlock* branch_block = (Ast_BranchBlock*)&statement->branch_block;
-				SemanticParseBranchBlock(module, function, code, branch_block);
-			} break;
-
-			case AST_STATEMENT_DEFER:
-			{
-				code->defers.Add(&statement->defer);
-				statement->defer.code.is_inside_loop = code->is_inside_loop;
-
-				ScanCode(&statement->defer.code, &code->scope, function, module);
-
-				if (statement->defer.code.all_paths_return)
-				{
-					code->has_defer_that_returns = true;
-					code->all_paths_return = true;
-				}
-			} break;
-
-			case AST_STATEMENT_CLAIM:
-			{
-				Ast_Claim* claim = &statement->claim;
-
-				ScanExpression(claim->expression, &code->scope, module);
-
-				if (!CanCast(CAST_IMPLICIT, claim->expression->type, TYPE_BOOL))
-					Error(module, claim->expression->span, "Claim expression type must be implicitly castable to bool\n");
-
-				claim->expression = ImplicitCast(claim->expression, TYPE_BOOL, module);
-			} break;
-
-			case AST_STATEMENT_INCREMENT:
-			case AST_STATEMENT_DECREMENT:
-			{
-				Ast_Increment* inc = &statement->increment;
-				ScanExpression(inc->expression, &code->scope, module);
-
-				bool direction = statement->kind == AST_STATEMENT_INCREMENT;
-
-				if (!IsInteger(inc->expression->type) && !IsFloat(inc->expression->type) && GetTypeKind(inc->expression->type) != TYPE_POINTER)
-					Error(module, inc->expression->span, "Cannot % type %, expression must be either an integer, float or pointer.\n", (direction ? "increment" : "decrement"), inc->expression->type);
-
-				if (!(inc->expression->flags & AST_EXPRESSION_FLAG_REFERENTIAL))
-					Error(module, inc->expression->span, "Expression is not a referential value.\n");
-			} break;
-
-			case AST_STATEMENT_RETURN:
-			{
-				code->contains_return = true;
-				code->all_paths_return = !code->contains_break;
-				function->returns.Add(&statement->ret);
-
-				if (code->has_defer_that_returns)
-					Error(module, statement->ret.token->location, "A defer in this scope already has a return statement. This isn't allowed.\n");
-
-				if (statement->ret.expression)
-				{
-					ScanExpression(statement->ret.expression, &code->scope, module);
-
-					if (!function->return_type)
-						Error(module, statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
-
-					if (!CanCast(CAST_IMPLICIT, function->return_type, statement->ret.expression->type))
-						Error(module, statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
-				}
-				else if (function->ast_return_type)
-					Error(module, statement->ret.token->location, "Expected return value with type: %\n", function->return_type);
-			} break;
-
-			case AST_STATEMENT_BREAK:
-			{
-				code->contains_break = true;
-				code->all_paths_break = !code->contains_return;
-
-				if (!code->is_inside_loop)
-					Error(module, statement->brk.token->location, "break statement must be inside of a loop.\n");
-			} break;
-
-			case AST_STATEMENT_EXPRESSION:
-			{
-				ScanExpression(statement->expression, &code->scope, module);
-			} break;
-
-			case AST_STATEMENT_VARIABLE_DECLARATION:
-			{
-				Ast_Variable* variable = &statement->variable_declaration;
-
-				for (Ast_Variable** other_variable = code->scope.variables.Begin(); other_variable < code->scope.variables.End(); other_variable++)
-				{
-					if (CompareString(variable->name, (*other_variable)->name))
-						Error(module, variable->name_token->location, "Variable with name '%' already declared in this scope.\n", variable->name);
-				}
-
-				if (variable->assignment)
-				{
-					ScanExpression(variable->assignment, &code->scope, module);
-
-					if (!variable->assignment->type)
-						Error(module, variable->assignment->span, "Expression does not have a type.\n");
-				}
-
-				if (variable->ast_type)
-				{
-					variable->type = GetType(variable->ast_type, &code->scope, module);
-
-					if (!variable->type)
-						Error(module, variable->name_token->location, "Unknown type %\n", variable->ast_type->basetype.token);
-
-					if (variable->assignment && !CanCast(CAST_IMPLICIT, variable->assignment->type, variable->type))
-						Error(module, variable->name_token->location, "Cannot assign expression with type % to variable with type %\n", variable->assignment->type, variable->type);
-				}
-				else
-				{
-					variable->type = variable->assignment->type;
-				}
-
-				if (variable->type == TYPE_EMPTY_TUPLE)
-					Error(module, variable->assignment->span, "Cannot declare variable with type %\n", variable->type);
-
-				code->scope.variables.Add(variable);
-			} break;
-
-			case AST_STATEMENT_ASSIGNMENT:
-			{
-				Ast_Assignment* assignment = &statement->assignment;
-
-				ScanExpression(assignment->right, &code->scope, module);
-				ScanExpression(assignment->left,  &code->scope, module);
-
-				if (!IsAssignable(assignment->left))
-					Error(module, assignment->left->span, "Expression is not assignable.\n");
-
-				if (!CanCast(CAST_IMPLICIT, assignment->right->type, assignment->left->type))
-					Error(module, assignment->token->location, "Cannot cast % to %.\n", assignment->right->type, assignment->left->type);
-
-				assignment->right = ImplicitCast(assignment->right, assignment->left->type, module);
-			} break;
-
-			case AST_STATEMENT_ASSIGNMENT_ADD:
-			case AST_STATEMENT_ASSIGNMENT_SUBTRACT:
-			case AST_STATEMENT_ASSIGNMENT_MULTIPLY:
-			case AST_STATEMENT_ASSIGNMENT_DIVIDE:
-			case AST_STATEMENT_ASSIGNMENT_EXPONENTIAL:
-			{
-				Ast_Assignment* assignment = &statement->assignment;
-
-				ScanExpression(assignment->right, &code->scope, module);
-				ScanExpression(assignment->left,  &code->scope, module);
-
-				if (!(assignment->left->flags & AST_EXPRESSION_FLAG_REFERENTIAL))
-					Error(module, assignment->left->span, "Expression is not assignable.\n");
-
-				if (!IsInteger(assignment->left->type) &&
-					!IsFloat(assignment->left->type) &&
-					GetTypeKind(assignment->left->type) != TYPE_POINTER)
-					Error(module, assignment->left->span, "Arithmetic assignment type must be to an integer, float or pointer, not: '%'\n", assignment->left->type);
-
-				// ptr += int
-				// ptr -= int
-
-				// int += int
-				// int -= int
-				// int *= int
-				// int /= int
-
-				// float += float
-				// float -= float
-				// float *= float
-				// float /= float
-
-				if (IsPointer(assignment->left->type))
-				{
-					if (statement->kind != AST_STATEMENT_ASSIGNMENT_ADD && statement->kind != AST_STATEMENT_ASSIGNMENT_SUBTRACT)
-						Error(module, assignment->left->span, "Arithmetic assignment to pointer only allows '+=' and '-='.\n");
-
-					if (!CanCast(CAST_IMPLICIT, assignment->right->type, TYPE_INT64))
-						Error(module, assignment->right->span, "Expression type must be an integer.\n");
-
-					assignment->right = ImplicitCast(assignment->right, TYPE_INT64, module);
-				}
-				else
-				{
-					if (!CanCast(CAST_IMPLICIT, assignment->right->type, assignment->left->type))
-						Error(module, assignment->right->span, "Cannot implicitly cast '%' to '%'.\n", assignment->right->type, assignment->left->type);
-
-					assignment->right = ImplicitCast(assignment->right, assignment->left->type, module);
-				}
-			} break;
-		}
+		ScanStatement(statement, code, function, module);
 	}
 }
 

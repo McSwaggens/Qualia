@@ -19,20 +19,20 @@ enum TypeKind : uint32
 	TYPE_FIXED_ARRAY = 8,
 };
 
-static const int32 TYPE_BITCOUNT       = sizeof(uint32)*8;
-static const int32 TYPE_KIND_BITCOUNT  = 4;
-static const int32 TYPE_INDEX_BITCOUNT = TYPE_BITCOUNT - TYPE_KIND_BITCOUNT;
+static const uint32 TYPE_BITCOUNT       = sizeof(uint32)*8;
+static const uint32 TYPE_KIND_BITCOUNT  = 4;
+static const uint32 TYPE_INDEX_BITCOUNT = TYPE_BITCOUNT - TYPE_KIND_BITCOUNT;
 
-static const int32 PRIMITIVE_COUNT = 13;
-static const int32 PRIMITIVE_BEGIN = 1;
-static const int32 PRIMITIVE_END   = PRIMITIVE_BEGIN + PRIMITIVE_COUNT;
-static const int32 TYPE_POINTER_TO_PRIMITIVE_OFFSET  = PRIMITIVE_COUNT*1;
-static const int32 TYPE_OPTIONAL_TO_PRIMITIVE_OFFSET = PRIMITIVE_COUNT*2;
-static const int32 TYPE_ARRAY_TO_PRIMITIVE_OFFSET    = PRIMITIVE_COUNT*3;
-static const int32 TYPE_EXTRA_OFFSET                 = PRIMITIVE_COUNT*4 + 1;
-static const int32 CORE_TYPES_COUNT                  = TYPE_EXTRA_OFFSET + 2 + 1;
+static const uint32 PRIMITIVE_COUNT = 13;
+static const uint32 PRIMITIVE_BEGIN = 1;
+static const uint32 PRIMITIVE_END   = PRIMITIVE_BEGIN + PRIMITIVE_COUNT;
+static const uint32 TYPE_POINTER_TO_PRIMITIVE_OFFSET  = PRIMITIVE_COUNT*1;
+static const uint32 TYPE_OPTIONAL_TO_PRIMITIVE_OFFSET = PRIMITIVE_COUNT*2;
+static const uint32 TYPE_ARRAY_TO_PRIMITIVE_OFFSET    = PRIMITIVE_COUNT*3;
+static const uint32 TYPE_EXTRA_OFFSET                 = PRIMITIVE_COUNT*4 + 1;
+static const uint32 CORE_TYPES_COUNT                  = TYPE_EXTRA_OFFSET + 2 + 1;
 
-enum TypeID : int32
+enum TypeID : uint32
 {
 
 	TYPE_NULL    = 0,
@@ -184,7 +184,8 @@ struct TypeInfo
 struct TypeSystem
 {
 	TypeInfo* infos;
-	uint32 count;
+	uint64 info_count;
+	uint64 info_capacity;
 };
 
 static TypeSystem type_system;
@@ -207,6 +208,7 @@ static inline int32 GetTypeIndex(TypeID id)
 
 static inline TypeInfo* GetTypeInfo(TypeID type)
 {
+	Assert(GetTypeIndex(type) < type_system.info_count);
 	return &type_system.infos[GetTypeIndex(type)];
 }
 
@@ -243,7 +245,7 @@ static inline uint64 GetTypeSize(TypeID type)
 {
 	switch (GetTypeKind(type))
 	{
-		case TYPE_PRIMITIVE:   return PRIMITIVE_SIZE_LUT[GetTypeIndex(type)];
+		case TYPE_PRIMITIVE:   return PRIMITIVE_SIZE_LUT[type];
 		case TYPE_TUPLE:       return GetTypeInfo(type)->size;
 		case TYPE_FUNCTION:    return 0;
 		case TYPE_STRUCT:      return GetTypeInfo(type)->size;

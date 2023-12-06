@@ -1,3 +1,8 @@
+FooBar():
+	
+	abc : int = 123
+
+
 
 CopyMemory(dest: *byte, src: *byte, size: uint):
 	for i := 0, i < size:
@@ -255,15 +260,15 @@ CopyMemory(dest: *byte, src: *byte, size: uint):
 // 	j := p + true
 // 	k := i + true
 
-AllocateMemory(size: uint) -> *byte:
-	return null
+// AllocateMemory(size: uint) -> *byte:
+// 	return null
 
-PadLeft(str: []int8, c: int8, count: int) -> []int8:
-	len := str.count+count
-	p : *int8 = AllocateMemory(len)
+// PadLeft(str: []int8, c: int8, count: int) -> []int8:
+// 	len := str.count+count
+// 	p : *int8 = AllocateMemory(len)
 
-	for i = 0, i < count:
-		result[i] = c
+// 	for i := 0, i < count:
+// 		p[i] = c
 
-	CopyMemory(p+count, str.data, str.length)
-	return [p, len]
+// 	CopyMemory(p+count, str.data, str.length)
+// 	return [p .. len]

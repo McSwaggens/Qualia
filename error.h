@@ -1,7 +1,6 @@
 #pragma once
 
 #include "token.h"
-#include "span.h"
 #include "string.h"
 
 template<typename ...Args>
@@ -14,4 +13,4 @@ static void Error(struct Ast_Module* module, struct SourceLocation where, struct
 
 template<typename ...Args>
 [[noreturn]]
-static void Error(Ast_Module* module, Span<Token> where, String format, Args&&... message_args);
+static void Error(Ast_Module* module, struct Ast_Expression* expr, String format, Args&&... message_args);

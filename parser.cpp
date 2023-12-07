@@ -505,6 +505,8 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 {
 	Ast_Expression* left;
 
+	Token* begin = token;
+
 	if (IsUnaryOperator(token->kind))
 	{
 		Ast_Expression_Unary* unary = StackAllocate<Ast_Expression_Unary>(&module->stack);
@@ -522,12 +524,10 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 			default: Assert();
 		}
 
-		unary->span.begin = token;
 		unary->op = token;
 		token += 1;
 		CheckScope(token, indent, module);
 		unary->subexpression = ParseExpression(token, indent, module, assignment_break, GetUnaryPrecedence(unary->op->kind));
-		unary->span.end = token;
 		left = unary;
 	}
 	else if (IsLiteral(token->kind))
@@ -535,9 +535,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 		Ast_Expression_Literal* literal = StackAllocate<Ast_Expression_Literal>(&module->stack);
 		ZeroMemory(literal);
 		literal->kind  = AST_EXPRESSION_TERMINAL_LITERAL;
-		literal->flags |= AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
-		literal->flags |= AST_EXPRESSION_FLAG_PURE;
-		literal->span = Span(token, token+1);
+		literal->flags |= AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | AST_EXPRESSION_FLAG_PURE;
 		literal->token = token;
 		token += 1;
 		left = literal;
@@ -547,10 +545,8 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 		Ast_Expression_Terminal* term = StackAllocate<Ast_Expression_Terminal>(&module->stack);
 		ZeroMemory(term);
 		term->kind = AST_EXPRESSION_TERMINAL_NAME;
-		term->span.begin = token;
 		term->token = token;
 		token += 1;
-		term->span.end = token;
 		left = term;
 	}
 	else if (token->kind == TOKEN_OPEN_BRACKET)
@@ -560,9 +556,6 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 		ZeroMemory(array);
 
 		array->kind = AST_EXPRESSION_ARRAY;
-		array->span.begin = token;
-		array->span.end = closure+1;
-
 		token += 1;
 
 		if (!IsExpressionStarter(token->kind))
@@ -599,7 +592,6 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 		Token* closure = GetClosure(token);
 
 		tuple->kind  = AST_EXPRESSION_TUPLE;
-		tuple->span = Span(token, closure+1);
 
 		token += 1;
 
@@ -634,7 +626,6 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 		ZeroMemory(fixed_array);
 
 		fixed_array->kind = AST_EXPRESSION_FIXED_ARRAY;
-		fixed_array->span = Span(token, GetClosure(token));
 
 		Token* closure = GetClosure(token);
 		Array_Buffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
@@ -686,7 +677,6 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 			ZeroMemory(if_else);
 
 			if_else->kind = AST_EXPRESSION_IF_ELSE;
-			if_else->span.begin = left->span.begin;
 			if_else->ops[0] = token;
 			token += 1;
 			if_else->left = left;
@@ -702,7 +692,6 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 
 			CheckScope(token, indent, module);
 			if_else->right = ParseExpression(token, indent, module, assignment_break, GetTernaryPrecedence(TOKEN_IF));
-			if_else->span.end = token;
 			left = if_else;
 		}
 		else if (token->kind == TOKEN_AS)
@@ -714,9 +703,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 			as->op = token++;
 
 			as->kind = AST_EXPRESSION_AS;
-			as->span.begin = left->span.begin;
 			as->ast_type = ParseType(token, indent, module);
-			as->span.end = token;
 			as->expression = left;
 
 			left = as;
@@ -736,7 +723,6 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 			token = closure + 1;
 
 			call->kind  = AST_EXPRESSION_CALL;
-			call->span = Span(left->span.begin, token);
 			call->function = left;
 			left = call;
 		}
@@ -749,7 +735,6 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 			ZeroMemory(subscript);
 
 			subscript->kind  = AST_EXPRESSION_SUBSCRIPT;
-			subscript->span = Span(left->span.begin, closure+1);
 			subscript->array = left;
 
 			if (token != closure)
@@ -799,14 +784,15 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 				default: Assert(); Unreachable();
 			}
 
-			binary->span.begin = left->span.begin;
 			binary->op = token++;
 			binary->left  = left;
 			CheckScope(token, indent, module);
 			binary->right = ParseExpression(token, indent, module, assignment_break, GetBinaryPrecedence(binary->op->kind));
-			binary->span.end = token;
 			left = binary;
 		}
+
+		left->begin = begin;
+		left->end = token;
 	}
 
 	return left;
@@ -1218,13 +1204,11 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 		token += 1;
 
 		branch.code = ParseCode(token, indent+1, module);
-		branch.span = Span(clause_token, token);
 
 		branches.Add(branch);
 	} while ((token->kind == TOKEN_ELSE || token->kind == TOKEN_THEN) && IsCorrectScope(token, indent));
 
 	branch_block.branches = branches.Lock();
-	branch_block.span = Span(branch_block_begin_token, token);
 
 	Ast_Branch* else_branch = null;
 	Ast_Branch* then_branch = null;

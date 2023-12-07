@@ -1,7 +1,6 @@
 #pragma once
 
 #include "memory.h"
-#include "span.h"
 // #include "initlist.h"
 
 template<typename T>

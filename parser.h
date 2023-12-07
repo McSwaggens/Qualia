@@ -3,7 +3,6 @@
 #include "string.h"
 #include "list.h"
 #include "token.h"
-#include "span.h"
 #include "type_system.h"
 #include "ir.h"
 
@@ -154,7 +153,8 @@ struct Ast_Expression
 	Ast_Expression_Kind kind;
 	Ast_Expression_Flags flags;
 	TypeID type;
-	Span<Token> span;
+	Token* begin;
+	Token* end;
 };
 
 struct Ast_Expression_Implicit_Cast : Ast_Expression
@@ -384,8 +384,6 @@ struct Ast_Branch
 	Ast_Branch_Clause_Kind clause;
 	Block* ir;
 
-	Span<Token> span;
-
 	union
 	{
 		Ast_Expression* if_condition;
@@ -403,7 +401,6 @@ struct Ast_Branch
 struct Ast_BranchBlock
 {
 	Array<Ast_Branch> branches;
-	Span<Token> span;
 };
 
 struct Ast_Defer

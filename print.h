@@ -3,7 +3,6 @@
 #include "general.h"
 #include "string.h"
 #include "file_system.h"
-#include "span.h"
 #include "list.h"
 #include "ascii.h"
 
@@ -37,16 +36,6 @@ static void GenericWrite(OutputBuffer* buffer, IntFormat format);
 
 static void GenericWrite(OutputBuffer* buffer, void* p);
 static void GenericWrite(OutputBuffer* buffer, String str);
-
-template<typename T>
-static void GenericWrite(OutputBuffer* buffer, Span<T> span)
-{
-	for (uint64 i = 0; i < span.Length(); i++)
-	{
-		if (i != 0) BufferWriteString(buffer, " ");
-		GenericWrite(buffer, span[i]);
-	}
-}
 
 template<typename T>
 static void GenericWrite(OutputBuffer* buffer, List<T> list)

@@ -5,7 +5,6 @@
 #include "memory.h"
 #include "file_system.h"
 #include "print.h"
-#include "span.h"
 #include "string.h"
 #include "ascii.h"
 

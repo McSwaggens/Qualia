@@ -51,12 +51,15 @@ static void Error(Ast_Module* module, SourceLocation where, String format, Args&
 
 template<typename ...Args>
 [[noreturn]]
-static void Error(Ast_Module* module, Span<Token> where, String format, Args&&... message_args)
+static void Error(Ast_Module* module, Ast_Expression* expr, String format, Args&&... message_args)
 {
+	Token* begin = expr->begin;
+	Token* end = expr->end;
+
 	int64 margin = 2;
-	int64 line_begin = where[0].location.line;
-	SourceLocation pos_begin = where.begin->location;
-	SourceLocation pos_end = where.end[-1].location; // @Bug: What if begin = end. Is this invalid input? IDK
+	int64 line_begin = begin->location.line;
+	SourceLocation pos_begin = begin->location;
+	SourceLocation pos_end = end[-1].location; // @Bug: What if begin = end. Is this invalid input? IDK
 	int64 number_of_lines = pos_end.line - pos_begin.line + margin + 1;
 
 	Print(&unix_error_buffer, "%:%:%: error: ", module->file_path, (pos_begin.line+1), (pos_begin.offset+1));

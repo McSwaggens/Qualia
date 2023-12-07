@@ -1,7 +1,6 @@
 #pragma once
 
 #include "string.h"
-#include "span.h"
 
 enum Token_Kind : uint8
 {

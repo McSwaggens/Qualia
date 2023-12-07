@@ -1,9 +1,10 @@
-#pragma once
+#ifndef LINUX_H
+#define LINUX_H
 
 // Ahh yes, classic unix "simplicity"
 // @Todo: Fill in all linux syscall names.
 // @Note: Linux x32 syscalls are different from x64 syscalls.
-//        The old and crusty x32 syscalls start at 512.
+//        The old and crusty x32 syscalls start at 0x200.
 //        We won't be needing them tho
 //
 //                    :^)
@@ -248,7 +249,7 @@ static const uint64 LINUX_SYSCALL_252             = 252;
 static const uint64 LINUX_SYSCALL_253             = 253;
 static const uint64 LINUX_SYSCALL_254             = 254;
 static const uint64 LINUX_SYSCALL_255             = 255;
-static const uint64 LINUX_SYSCALL_256             = 256;
+static const uint64 LINUX_SYSCALL_256             = 0x100;
 static const uint64 LINUX_SYSCALL_257             = 257;
 static const uint64 LINUX_SYSCALL_258             = 258;
 static const uint64 LINUX_SYSCALL_259             = 259;
@@ -304,28 +305,29 @@ static const uint64 LINUX_SYSCALL_308             = 308;
 static const uint64 LINUX_SYSCALL_GET_CPU         = 309;
 static const uint64 LINUX_SYSCALL_CLONE3          = 435;
 
-static const uint64 LINUX_CLONE_FLAG_VM              = Bit(8);
-static const uint64 LINUX_CLONE_FLAG_FS              = Bit(9);
-static const uint64 LINUX_CLONE_FLAG_FILES           = Bit(10);
-static const uint64 LINUX_CLONE_FLAG_SIGHAND         = Bit(11);
-static const uint64 LINUX_CLONE_FLAG_PID_FD          = Bit(12);
-static const uint64 LINUX_CLONE_FLAG_PTRACE          = Bit(13);
-static const uint64 LINUX_CLONE_FLAG_VFORK           = Bit(14);
-static const uint64 LINUX_CLONE_FLAG_PARENT          = Bit(15);
-static const uint64 LINUX_CLONE_FLAG_THREAD          = Bit(16);
-static const uint64 LINUX_CLONE_FLAG_NEW_NS          = Bit(17);
-static const uint64 LINUX_CLONE_FLAG_SYSVSEM         = Bit(18);
-static const uint64 LINUX_CLONE_FLAG_SET_TLS         = Bit(19);
-static const uint64 LINUX_CLONE_FLAG_PARENT_SET_TID  = Bit(20);
-static const uint64 LINUX_CLONE_FLAG_CHILD_CLEAR_TID = Bit(21);
-static const uint64 LINUX_CLONE_FLAG_DETACHED        = Bit(22);
-static const uint64 LINUX_CLONE_FLAG_UNTRACED        = Bit(23);
-static const uint64 LINUX_CLONE_FLAG_CHILD_SET_TID   = Bit(24);
-static const uint64 LINUX_CLONE_FLAG_NEW_C_GROUP     = Bit(25);
-static const uint64 LINUX_CLONE_FLAG_NEW_UTS         = Bit(26);
-static const uint64 LINUX_CLONE_FLAG_NEW_IPC         = Bit(27);
-static const uint64 LINUX_CLONE_FLAG_NEW_USER        = Bit(28);
-static const uint64 LINUX_CLONE_FLAG_NEW_PID         = Bit(29);
-static const uint64 LINUX_CLONE_FLAG_NEW_NET         = Bit(30);
-static const uint64 LINUX_CLONE_FLAG_IO              = Bit(31);
+static const uint64 LINUX_CLONE_FLAG_VM              = 0x100;
+static const uint64 LINUX_CLONE_FLAG_FS              = 0x200;
+static const uint64 LINUX_CLONE_FLAG_FILES           = 0x400;
+static const uint64 LINUX_CLONE_FLAG_SIGHAND         = 0x800;
+static const uint64 LINUX_CLONE_FLAG_PID_FD          = 0x1000;
+static const uint64 LINUX_CLONE_FLAG_PTRACE          = 0x2000;
+static const uint64 LINUX_CLONE_FLAG_VFORK           = 0x4000;
+static const uint64 LINUX_CLONE_FLAG_PARENT          = 0x8000;
+static const uint64 LINUX_CLONE_FLAG_THREAD          = 0x10000;
+static const uint64 LINUX_CLONE_FLAG_NEW_NS          = 0x20000;
+static const uint64 LINUX_CLONE_FLAG_SYSVSEM         = 0x40000;
+static const uint64 LINUX_CLONE_FLAG_SET_TLS         = 0x80000;
+static const uint64 LINUX_CLONE_FLAG_PARENT_SET_TID  = 0x100000;
+static const uint64 LINUX_CLONE_FLAG_CHILD_CLEAR_TID = 0x200000;
+static const uint64 LINUX_CLONE_FLAG_DETACHED        = 0x400000;
+static const uint64 LINUX_CLONE_FLAG_UNTRACED        = 0x800000;
+static const uint64 LINUX_CLONE_FLAG_CHILD_SET_TID   = 0x1000000;
+static const uint64 LINUX_CLONE_FLAG_NEW_C_GROUP     = 0x2000000;
+static const uint64 LINUX_CLONE_FLAG_NEW_UTS         = 0x4000000;
+static const uint64 LINUX_CLONE_FLAG_NEW_IPC         = 0x8000000;
+static const uint64 LINUX_CLONE_FLAG_NEW_USER        = 0x10000000;
+static const uint64 LINUX_CLONE_FLAG_NEW_PID         = 0x20000000;
+static const uint64 LINUX_CLONE_FLAG_NEW_NET         = 0x40000000;
+static const uint64 LINUX_CLONE_FLAG_IO              = 0x80000000;
 
+#endif // LINUX_H

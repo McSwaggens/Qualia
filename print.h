@@ -6,23 +6,6 @@
 #include "list.h"
 #include "ascii.h"
 
-static void GenericWrite(OutputBuffer* buffer, char   c);
-static void GenericWrite(OutputBuffer* buffer, uint8  n);
-static void GenericWrite(OutputBuffer* buffer, uint16 n);
-static void GenericWrite(OutputBuffer* buffer, uint32 n);
-static void GenericWrite(OutputBuffer* buffer, uint64 n);
-
-static void GenericWrite(OutputBuffer* buffer, int8  n);
-static void GenericWrite(OutputBuffer* buffer, int16 n);
-static void GenericWrite(OutputBuffer* buffer, int32 n);
-static void GenericWrite(OutputBuffer* buffer, int64 n);
-
-static void GenericWrite(OutputBuffer* buffer, float32 n);
-static void GenericWrite(OutputBuffer* buffer, float64 n);
-
-// Need this, otherwise sizeof won't work...
-static void GenericWrite(OutputBuffer* buffer, unsigned long int n);
-
 struct IntFormat
 {
 	Base base;
@@ -32,26 +15,42 @@ struct IntFormat
 static inline IntFormat Hex(uint64 n) { return (IntFormat){ .base = BASE_HEX,    .value = n }; }
 static inline IntFormat Bin(uint64 n) { return (IntFormat){ .base = BASE_BINARY, .value = n }; }
 
-static void GenericWrite(OutputBuffer* buffer, IntFormat format);
+static void Write(OutputBuffer* buffer, IntFormat format);
 
-static void GenericWrite(OutputBuffer* buffer, void* p);
-static void GenericWrite(OutputBuffer* buffer, String str);
+static void Write(OutputBuffer* buffer, char   c);
+static void Write(OutputBuffer* buffer, uint8  n);
+static void Write(OutputBuffer* buffer, uint16 n);
+static void Write(OutputBuffer* buffer, uint32 n);
+static void Write(OutputBuffer* buffer, uint64 n);
+
+static void Write(OutputBuffer* buffer, int8  n);
+static void Write(OutputBuffer* buffer, int16 n);
+static void Write(OutputBuffer* buffer, int32 n);
+static void Write(OutputBuffer* buffer, int64 n);
+
+static void Write(OutputBuffer* buffer, float32 n);
+static void Write(OutputBuffer* buffer, float64 n);
+
+static void Write(OutputBuffer* buffer, unsigned long int n); // Need this, otherwise sizeof won't work...
+static void Write(OutputBuffer* buffer, void* p);
+
+static void Write(OutputBuffer* buffer, String str);
 
 template<typename T>
-static void GenericWrite(OutputBuffer* buffer, List<T> list)
+static void Write(OutputBuffer* buffer, List<T> list)
 {
-	GenericWrite(buffer, list.ToSpan());
+	Write(buffer, list.ToSpan());
 }
 
 template<typename T>
-static void GenericWrite(OutputBuffer* buffer, Array<T> array)
+static void Write(OutputBuffer* buffer, Array<T> array)
 {
 	BufferWriteString(buffer, "{ ");
 
 	for (uint64 i = 0; i < array.count; i++)
 	{
 		if (i != 0) BufferWriteString(buffer, ", ");
-		GenericWrite(buffer, array[i]);
+		Write(buffer, array[i]);
 	}
 
 	BufferWriteString(buffer, " }");
@@ -76,7 +75,7 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args)
 
 		if (p < end)
 		{
-			GenericWrite(buffer, t);
+			Write(buffer, t);
 			p++;
 		}
 	};
@@ -95,7 +94,7 @@ static void Print(String format, Args&&... args)
 	Print(&unix_output_buffer, format, args...);
 }
 
-static inline void GenericWrite(OutputBuffer* buffer, bool b)
+static void Write(OutputBuffer* buffer, bool b)
 {
 	if (b) BufferWriteString(buffer, "true");
 	else   BufferWriteString(buffer, "false");

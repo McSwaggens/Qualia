@@ -22,7 +22,7 @@ static Array_Buffer_Entry GetArrayBufferEntry(uint64 min_size)
 
 	if (min_size >= new_size) COLD
 	{
-		new_size = NextPow2(min_size << 2);
+		new_size = RaisePow2(min_size << 2);
 	}
 
 	Array_Buffer_Entry entry;

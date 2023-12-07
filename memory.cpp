@@ -5,11 +5,12 @@
 static byte* AllocateVirtualPage(uint64 size, PageFlags flags)
 {
 	Assert(size && (size & 4095) == 0, "Invalid page size detected.");
+	size = (size+4095) & -4096;
 
 	uint64 protection = 1; // Pages are always readable on x86.
-	if (flags & PAGE_FLAG_WRITE)   protection |= Bit(1);
-	if (flags & PAGE_FLAG_STACK)   protection |= Bit(17);
-	if (flags & PAGE_FLAG_EXECUTE) protection |= Bit(2);
+	if (flags & PAGE_FLAG_WRITE)   protection |= 2;
+	if (flags & PAGE_FLAG_STACK)   protection |= 0x20000;
+	if (flags & PAGE_FLAG_EXECUTE) protection |= 4;
 
 	byte* page = (byte*)SystemCall(9, 0, size, protection, 0x22, -1, 0);
 	page = (byte*)AssumeAligned(page, 4096);
@@ -61,10 +62,7 @@ static void InitPageCache()
 	uint64 sum = 0;
 
 	for (uint64 i = 0; i < PAGE_CACHE_BITS; i++)
-	{
 		sum += page_cache.counts[i] << (i + 12);
-		Assert(page_cache.counts[i] <= PAGE_CACHE_SIZE);
-	}
 
 	byte* p = (byte*)AllocateVirtualPage(sum, PAGE_FLAG_WRITE);
 
@@ -82,7 +80,7 @@ static byte* GetPage(uint64 size)
 {
 	Assert(size && (size & 4095) == 0, "Invalid page size detected.");
 
-	size = NextPow2(size);
+	size = RaisePow2(size);
 	int64 index = CountTrailingZeroes64(size >> 12);
 
 	if (index < PAGE_CACHE_BITS) HOT
@@ -93,21 +91,19 @@ static byte* GetPage(uint64 size)
 			page_cache.counts[index]--;
 			return page;
 		}
-		else
+
+		StaticAssert(PAGE_CACHE_SIZE >= PAGE_CACHE_BITS);
+
+		byte* pages = (byte*)AllocateVirtualPage(size * (PAGE_CACHE_SIZE - index), PAGE_FLAG_WRITE);
+		page_cache.counts[index] = PAGE_CACHE_SIZE-index;
+
+		for (uint32 i = 0; i < PAGE_CACHE_SIZE-index; i++)
 		{
-			StaticAssert(PAGE_CACHE_SIZE >= PAGE_CACHE_BITS);
-
-			byte* pages = (byte*)AllocateVirtualPage(size * (PAGE_CACHE_SIZE - index), PAGE_FLAG_WRITE);
-			page_cache.counts[index] = PAGE_CACHE_SIZE-index;
-
-			for (uint32 i = 0; i < PAGE_CACHE_SIZE-index; i++)
-			{
-				page_cache.pages[index * PAGE_CACHE_SIZE + i] = pages;
-				pages += size;
-			}
-
-			return pages;
+			page_cache.pages[index * PAGE_CACHE_SIZE + i] = pages;
+			pages += size;
 		}
+
+		return pages;
 	}
 
 	return AllocateVirtualPage(size, PAGE_FLAG_WRITE);
@@ -118,7 +114,7 @@ static void RetirePage(byte* page, uint64 size)
 	Assert(page && size);
 	Assert((size & 4095) == 0, "Invalid page size detected.");
 
-	size = NextPow2(size);
+	size = RaisePow2(size);
 	int64 index = CountTrailingZeroes64(size >> 12);
 
 	if (index < PAGE_CACHE_BITS && page_cache.counts[index] < PAGE_CACHE_SIZE) HOT
@@ -169,7 +165,7 @@ static void InitGlobalArena()
 
 static uint64 GetArenaEffectiveSize(uint64 size)
 {
-	return NextPow2(size-1 | ARENA_MIN_SIZE-1);
+	return RaisePow2(size-1 | ARENA_MIN_SIZE-1);
 }
 
 static byte* AllocateMemory(uint64 size)
@@ -208,7 +204,7 @@ static byte* AllocateMemory(uint64 size)
 		result = (byte*)GetPage(size);
 	}
 
-	result = (byte*)AssumeAligned(result, Bit(ARENA_MIN_POW));
+	result = (byte*)AssumeAligned(result, 1ll << ARENA_MIN_POW);
 	return result;
 }
 

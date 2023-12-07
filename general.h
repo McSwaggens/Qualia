@@ -1,27 +1,25 @@
 #pragma once
 
-#define COLD [[unlikely]]
-#define HOT [[likely]]
-
 #if defined(DEBUG)
-#define DebugBreak() __builtin_debugtrap()
-#define DebugAssert(condition) if (!(condition)) __builtin_debugtrap()
-#define IsDebug() true
+	#define DebugBreak() __builtin_debugtrap()
+	#define DebugAssert(condition) if (!(condition)) __builtin_debugtrap()
+	#define IsDebug() true
 #else
-#define IsDebug() false
-#define DebugBreak() { }
-#define DebugAssert(condition) { }
+	#define IsDebug() false
+	#define DebugAssert(condition) { }
+	#define DebugBreak() { }
 #endif
 
 #define COUNT(a) (sizeof(a)/sizeof((a)[0]))
 
-#define Bit(n) (1ll << (int64)(n))
-#define CEEEE_FUNCTION extern "C"
+#define CFUNC extern "C"
 
-static inline uint64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc
+#define COLD [[unlikely]]
+#define HOT [[likely]]
 
-static inline bool IsConstEval()  { return __builtin_is_constant_evaluated(); }
+// static inline bool IsConstEval()  { return __builtin_is_constant_evaluated(); }
 static inline void Assume(bool b) { __builtin_assume(b); }
+
 #define AssumeAligned(p, alignment) __builtin_assume_aligned(p, alignment)
 #define Unreachable() __builtin_unreachable()
 #define AssertUnreachable() { Assert(); Unreachable(); }
@@ -90,8 +88,8 @@ static inline uint32 CountBits32(uint32 n) { return __builtin_popcount(n); }
 static inline uint16 CountBits16(uint16 n) { return __builtin_popcount((uint32)n); }
 static inline uint8  CountBits8(uint8 n)   { return __builtin_popcount((uint32)n); }
 
-CEEEE_FUNCTION uint64 TzCnt(uint64 rax); // tzcnt 0 = 64
-CEEEE_FUNCTION uint64 LzCnt(uint64 rax); // lzcnt 0 = 64
+CFUNC uint64 TzCnt(uint64 rax); // tzcnt 0 = 64
+CFUNC uint64 LzCnt(uint64 rax); // lzcnt 0 = 64
 
 // lzcnt
 // `n == 0` check is here to prevent clang from braking the program. Branch is removed.
@@ -108,79 +106,24 @@ static inline uint32 CountTrailingZeroes8(uint8 n)   { return n == 0 ? 8  : Coun
 
 static inline uint64 BitsOfInformation64(uint64 n) { return 64llu-CountLeadingZeroes64(n); }
 static inline uint32 BitsOfInformation32(uint32 n) { return 32-CountLeadingZeroes32(n); }
-static inline uint32 BitsOfInformation16(uint16 n) { return 16-CountLeadingZeroes32(n); }
+static inline uint32 BitsOfInformation16(uint16 n) { return 16-CountLeadingZeroes16(n); }
 static inline uint32 BitsOfInformation8(uint8 n)   { return 8-CountLeadingZeroes8(n); }
 
-static inline bool IsPow2(uint64 n)
-{
-	return CountBits64(n) == 1; // @Todo @Speed: Measure performance of both.
-	// return n != 0 && (n & n-1) == 0;
-}
-
-// @Note: NextPow2(2^n) = 2^n
-static uint64 NextPow2(uint8 n)
-{
-	n--;
-	n |= n >> 1;
-	n |= n >> 2;
-	n |= n >> 4;
-	n++;
-	return n;
-}
-
-static uint64 NextPow2(uint16 n)
-{
-	n--;
-	n |= n >> 1;
-	n |= n >> 2;
-	n |= n >> 4;
-	n |= n >> 8;
-	n++;
-	return n;
-}
-
-static uint64 NextPow2(uint32 n)
-{
-	n--;
-	n |= n >> 1;
-	n |= n >> 2;
-	n |= n >> 4;
-	n |= n >> 8;
-	n |= n >> 16;
-	n++;
-	return n;
-}
-
-static uint64 NextPow2(uint64 n)
-{
-	n--;
-	n |= n >> 1;
-	n |= n >> 2;
-	n |= n >> 4;
-	n |= n >> 8;
-	n |= n >> 16;
-	n |= n >> 32;
-	n++;
-	return n;
-}
-
-static int64 NextPow2(int8 n)  { return NextPow2((uint8)n);  }
-static int64 NextPow2(int16 n) { return NextPow2((uint16)n); }
-static int64 NextPow2(int32 n) { return NextPow2((uint32)n); }
-static int64 NextPow2(int64 n) { return NextPow2((uint64)n); }
+static inline bool IsPow2(uint64 n) { return CountBits64(n) == 1; }
 
 // @Note: 2^n -> 2^(n+1)
-// @Todo: Test performance of NextPow2 and NextPow2_Fast
-static inline uint64 NextPow2_Fast(uint64 n) { return 1 << BitsOfInformation64(n); }
+static inline uint64 NextPow2(uint64 n) { return 1 << BitsOfInformation64(n); }
+
+// @Note: NextPow2(2^n) = 2^n
+static uint64 RaisePow2(uint64 n)
+{
+	return IsPow2(n) ? n : NextPow2(n);
+}
 
 [[noreturn]]
 static void ExitProcess(bool success);
 
 extern "C" int64 SystemCall(int64 rax, int64 rdi = 0, int64 rsi = 0, int64 rdx = 0, int64 r10 = 0, int64 r8 = 0, int64 r9 = 0);
 
-static void InitRandom();
-static uint8  Random8();
-static uint16 Random16();
-static uint32 Random32();
-static uint64 Random64();
+static inline uint64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc
 

@@ -246,7 +246,7 @@ static inline Token* GetClosure(Token* token)
 	return token + token->next;
 }
 
-static void GenericWrite(OutputBuffer* buffer, Token_Kind kind);
-static void GenericWrite(OutputBuffer* buffer, Token* token);
-static void GenericWrite(OutputBuffer* buffer, Token token);
+static void Write(OutputBuffer* buffer, Token_Kind kind);
+static void Write(OutputBuffer* buffer, Token* token);
+static void Write(OutputBuffer* buffer, Token token);
 

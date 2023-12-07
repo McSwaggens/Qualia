@@ -197,17 +197,16 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to)
 
 static void AddExtensionEntry(ExtensionTable* table, ExtensionEntry entry)
 {
-	if (!table->count || CountBits64(table->count & -16) == 1)
+	if (!table->count || IsPow2(table->count & -16))
 	{
 		table->entries = (ExtensionEntry*)ReAllocateMemory(
 			table->entries,
 			sizeof(ExtensionEntry) * table->count,
-			sizeof(ExtensionEntry) * NextPow2(table->count|15)
+			sizeof(ExtensionEntry) * RaisePow2(table->count|16)
 		);
 	}
 
-	table->entries[table->count] = entry;
-	table->count += 1;
+	table->entries[table->count++] = entry;
 }
 
 static void InitTypeSystem(void)

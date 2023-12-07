@@ -1,7 +1,6 @@
 #pragma once
 
 #include "memory.h"
-// #include "initlist.h"
 
 template<typename T>
 struct List
@@ -10,24 +9,21 @@ struct List
 	uint32 count;
 	uint32 capacity;
 
-	constexpr List() = default;
-	// constexpr List(InitList<T> initlist) : data(initlist.begin()), count(initlist.size()), capacity(0) { }
-	constexpr List(Null) : data(null), count(0), capacity(0) { }
-	// constexpr operator T*() { return data; }
-	// constexpr operator bool() { return static_cast<bool>(data); }
-	constexpr T& operator[](uint32 n) { return data[n]; }
-	constexpr T  operator[](uint32 n) const { return data[n]; }
+	List() = default;
+	List(Null) : data(null), count(0), capacity(0) { }
+	T& operator[](uint32 n) { return data[n]; }
+	T  operator[](uint32 n) const { return data[n]; }
 
-	constexpr T* Begin() { return data; }
-	constexpr T* End() { return data + count; }
+	T* Begin() { return data; }
+	T* End() { return data + count; }
 
-	constexpr T& Last() { return data[count-1]; }
+	T& Last() { return data[count-1]; }
 
 	T& Force(uint32 n)
 	{
 		if (capacity <= n)
 		{
-			uint32 new_capacity = NextPow2(n+1);
+			uint32 new_capacity = NextPow2(n);
 			data = ReAllocate(data, capacity, new_capacity);
 			ZeroMemory(data+count, new_capacity - capacity);
 			capacity = new_capacity;
@@ -53,16 +49,13 @@ struct List
 
 	void Add(T item)
 	{
-		uint32 amount = 1;
-		if (count + amount >= capacity)
+		if (count == capacity)
 		{
-			uint32 old_capacity = capacity;
-			capacity = (count + amount) * 2;
-			data = ReAllocate(data, old_capacity, capacity);
+			capacity = NextPow2(count+8);
+			data = ReAllocate(data, count, capacity);
 		}
 
-		FillMemory(data + count, amount, item);
-		count += amount;
+		data[count++] = item;
 	}
 
 	bool AddIfUnique(T item)
@@ -170,7 +163,7 @@ struct List
 		count = 0;
 	}
 
-	constexpr Array<T> ToArray()
+	Array<T> ToArray()
 	{
 		return Array<T>(data, count);
 	}

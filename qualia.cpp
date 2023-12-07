@@ -5,12 +5,7 @@
 
 struct Ast_Module;
 
-struct Qualia
-{
-	// Settings
-	// Target
-	List<Ast_Module*> modules;
-} qualia;
+static List<Ast_Module*> modules;
 
 #include "thread.cpp"
 #include "file_system.cpp"
@@ -38,7 +33,7 @@ static void CompileFile(String file_path)
 	Ast_Module* module = StackAllocate<Ast_Module>(&stack);
 	ZeroMemory(module);
 
-	qualia.modules.Add(module);
+	modules.Add(module);
 
 	module->stack = stack;
 	module->file_path = file_path;
@@ -60,7 +55,7 @@ struct Linux_Booty
 
 int main(int argc, char** args)
 {
-	ZeroMemory(&qualia);
+	modules = null;
 
 	InitPageCache();
 	InitGlobalArena();

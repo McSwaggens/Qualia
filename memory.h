@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MEMORY_H
+#define MEMORY_H
 
 #include "general.h"
 #include "array.h"
@@ -7,9 +8,9 @@
 
 enum PageFlags
 {
-	PAGE_FLAG_WRITE   = Bit(0),
-	PAGE_FLAG_EXECUTE = Bit(1),
-	PAGE_FLAG_STACK   = Bit(2),
+	PAGE_FLAG_WRITE   = 0x01,
+	PAGE_FLAG_EXECUTE = 0x02,
+	PAGE_FLAG_STACK   = 0x04,
 };
 
 static void InitPageCache();
@@ -107,11 +108,7 @@ static Array<T> StackAllocateArray(Stack* stack, uint64 count)
 template<typename T>
 static void CopyMemory(T* dest, const T* src, uint64 count = 1)
 {
-	if (IsConstEval())
-	{
-		for (uint64 i = 0; i < count; i++) dest[i] = src[i];
-	}
-	else __builtin_memcpy(dest, src, sizeof(T) * count);
+	__builtin_memcpy(dest, src, sizeof(T) * count);
 }
 
 template<typename T>
@@ -146,11 +143,7 @@ static inline bool Compare(const T* a, const T* b, uint64 count = 1)
 template<typename T>
 static inline void ZeroMemory(T* begin, T* end)
 {
-	if (IsConstEval())
-	{
-		for (char* p = (char*)begin; p < (char*)end; p++) *p = 0;
-	}
-	else __builtin_memset((char*)begin, 0, (char*)end - (char*)begin);
+	__builtin_memset((char*)begin, 0, (char*)end - (char*)begin);
 }
 
 template<typename T>
@@ -165,3 +158,4 @@ static inline void ZeroArray(Array<T> array)
 	ZeroMemory(array.data, array.count);
 }
 
+#endif // MEMORY_H

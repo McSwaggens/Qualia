@@ -213,6 +213,8 @@ static constexpr String ToString(Token_Kind kind)
 	}
 }
 
+typedef uint16 Indent16;
+
 struct SourceLocation
 {
 	// Signed because of error printing. 64-bit is overkill anyways.
@@ -227,11 +229,16 @@ struct Token
 {
 	Token_Kind kind;
 	bool newline;
-	uint16 indent;
+	Indent16 indent;
 
 	union
 	{
-		int64   next;
+		struct
+		{
+			Token* closure; // Used as linked list during lexing
+			uint64 comma_count;
+		};
+
 		String  identifier_string;
 		String  literal_string;
 		int64   literal_int;
@@ -240,11 +247,6 @@ struct Token
 
 	SourceLocation location;
 };
-
-static inline Token* GetClosure(Token* token)
-{
-	return token + token->next;
-}
 
 static void Write(OutputBuffer* buffer, Token_Kind kind);
 static void Write(OutputBuffer* buffer, Token* token);

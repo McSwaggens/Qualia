@@ -1,4 +1,7 @@
-#pragma once
+#ifndef GENERAL_H
+#define GENERAL_H
+
+#include "int.h"
 
 #if defined(DEBUG)
 	#define DebugBreak() __builtin_debugtrap()
@@ -39,11 +42,31 @@ static inline void Swap(T* a, T* b)
 	*b = tmp;
 }
 
-template<typename T>
-static inline T Max(T a, T b) { return a >= b ? a : b; }
+static inline int8  Min(int8 a,  int8 b)        { return a <= b ? a : b; }
+static inline int16 Min(int16 a, int16 b)       { return a <= b ? a : b; }
+static inline int32 Min(int32 a, int32 b)       { return a <= b ? a : b; }
+static inline int64 Min(int64 a, int64 b)       { return a <= b ? a : b; }
 
-template<typename T>
-static inline T Min(T a, T b) { return a <= b ? a : b; }
+static inline uint8  Min(uint8 a,  uint8 b)     { return a <= b ? a : b; }
+static inline uint16 Min(uint16 a, uint16 b)    { return a <= b ? a : b; }
+static inline uint32 Min(uint32 a, uint32 b)    { return a <= b ? a : b; }
+static inline uint64 Min(uint64 a, uint64 b)    { return a <= b ? a : b; }
+
+static inline float32 Min(float32 a, float32 b) { return a <= b ? a : b; }
+static inline float64 Min(float64 a, float64 b) { return a <= b ? a : b; }
+
+static inline int8  Max(int8 a,  int8 b)        { return a <= b ? a : b; }
+static inline int16 Max(int16 a, int16 b)       { return a <= b ? a : b; }
+static inline int32 Max(int32 a, int32 b)       { return a <= b ? a : b; }
+static inline int64 Max(int64 a, int64 b)       { return a <= b ? a : b; }
+
+static inline uint8  Max(uint8 a,  uint8 b)     { return a <= b ? a : b; }
+static inline uint16 Max(uint16 a, uint16 b)    { return a <= b ? a : b; }
+static inline uint32 Max(uint32 a, uint32 b)    { return a <= b ? a : b; }
+static inline uint64 Max(uint64 a, uint64 b)    { return a <= b ? a : b; }
+
+static inline float32 Max(float32 a, float32 b) { return a <= b ? a : b; }
+static inline float64 Max(float64 a, float64 b) { return a <= b ? a : b; }
 
 template<typename T>
 static inline T Clamp(T v, T min, T max) { return v < min ? min : v > max ? max : v; }
@@ -88,8 +111,8 @@ static inline uint32 CountBits32(uint32 n) { return __builtin_popcount(n); }
 static inline uint16 CountBits16(uint16 n) { return __builtin_popcount((uint32)n); }
 static inline uint8  CountBits8(uint8 n)   { return __builtin_popcount((uint32)n); }
 
-CFUNC uint64 TzCnt(uint64 rax); // tzcnt 0 = 64
 CFUNC uint64 LzCnt(uint64 rax); // lzcnt 0 = 64
+CFUNC uint64 TzCnt(uint64 rax); // tzcnt 0 = 64
 
 // lzcnt
 // `n == 0` check is here to prevent clang from braking the program. Branch is removed.
@@ -123,7 +146,8 @@ static uint64 RaisePow2(uint64 n)
 [[noreturn]]
 static void ExitProcess(bool success);
 
-extern "C" int64 SystemCall(int64 rax, int64 rdi = 0, int64 rsi = 0, int64 rdx = 0, int64 r10 = 0, int64 r8 = 0, int64 r9 = 0);
+CFUNC int64 SystemCall(int64 rax, int64 rdi = 0, int64 rsi = 0, int64 rdx = 0, int64 r10 = 0, int64 r8 = 0, int64 r9 = 0);
 
 static inline uint64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc
 
+#endif // GENERAL_H

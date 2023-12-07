@@ -551,7 +551,8 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 	}
 	else if (token->kind == TOKEN_OPEN_BRACKET)
 	{
-		Token* closure = GetClosure(token);
+		Token* closure = token->closure;
+
 		Ast_Expression_Array* array = StackAllocate<Ast_Expression_Array>(&module->stack);
 		ZeroMemory(array);
 
@@ -589,7 +590,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 		Ast_Expression_Tuple* tuple = StackAllocate<Ast_Expression_Tuple>(&module->stack);
 		ZeroMemory(tuple);
 
-		Token* closure = GetClosure(token);
+		Token* closure = token->closure;
 
 		tuple->kind  = AST_EXPRESSION_TUPLE;
 
@@ -627,7 +628,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 
 		fixed_array->kind = AST_EXPRESSION_FIXED_ARRAY;
 
-		Token* closure = GetClosure(token);
+		Token* closure = token->closure;
 		Array_Buffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
 
 		CheckScope(closure, indent, module);
@@ -714,7 +715,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 			ZeroMemory(call);
 
 			Token* open = token;
-			Token* closure = GetClosure(open);
+			Token* closure = open->closure;
 			List<Ast_Expression*> arguments = null;
 
 			CheckScope(token, indent, module);
@@ -729,7 +730,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 		else if (token->kind == TOKEN_OPEN_BRACKET)
 		{
 			Token* open = token++;
-			Token* closure = GetClosure(open);
+			Token* closure = open->closure;
 
 			Ast_Expression_Subscript* subscript = StackAllocate<Ast_Expression_Subscript>(&module->stack);
 			ZeroMemory(subscript);
@@ -802,7 +803,7 @@ static Token* GetEndOfTypeIfValid(Token* token)
 {
 	while (IsSpecifier(token->kind))
 	{
-		if (token->kind == TOKEN_OPEN_BRACKET) token = GetClosure(token);
+		if (token->kind == TOKEN_OPEN_BRACKET) token = token->closure;
 		token += 1;
 	}
 
@@ -812,7 +813,7 @@ static Token* GetEndOfTypeIfValid(Token* token)
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN)
 	{
-		token = GetClosure(token) + 1;
+		token = token->closure + 1;
 
 		if (token->kind == TOKEN_ARROW)
 		{
@@ -843,7 +844,7 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 		{
 			specifier.kind = AST_SPECIFIER_ARRAY;
 
-			Token* closure = GetClosure(token);
+			Token* closure = token->closure;
 			CheckScope(closure, indent, module);
 			token += 1;
 
@@ -887,9 +888,9 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 		type.basetype.kind = AST_BASETYPE_USERTYPE;
 		token += 1;
 	}
-	else if (token->kind == TOKEN_OPEN_PAREN && GetClosure(token)[1].kind == TOKEN_ARROW)
+	else if (token->kind == TOKEN_OPEN_PAREN && token->closure[1].kind == TOKEN_ARROW)
 	{
-		Token* closure = GetClosure(token);
+		Token* closure = token->closure;
 		CheckScope(token, indent, module);
 		CheckScope(closure, indent, module);
 		CheckScope(closure+1, indent, module);
@@ -930,10 +931,10 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 		}
 
 		// () -> () -> XXX
-		if (token->kind == TOKEN_OPEN_PAREN && token[1].kind == TOKEN_CLOSE_PAREN && GetClosure(token)[1].kind != TOKEN_ARROW)
+		if (token->kind == TOKEN_OPEN_PAREN && token[1].kind == TOKEN_CLOSE_PAREN && token->closure[1].kind != TOKEN_ARROW)
 		{
 			type.basetype.function.output = null;
-			token = GetClosure(token)+1;
+			token = token->closure+1;
 		}
 		else
 		{
@@ -944,7 +945,7 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN)
 	{
-		Token* closure = GetClosure(token);
+		Token* closure = token->closure;
 		CheckScope(token, indent, module);
 		CheckScope(closure, indent, module);
 		type.basetype.kind = AST_BASETYPE_TUPLE;
@@ -979,7 +980,7 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 
 static void ParseParameters(Ast_Function* function, Token* open_paren, uint32 indent, Ast_Module* module)
 {
-	Token* closure = GetClosure(open_paren);
+	Token* closure = open_paren->closure;
 	Token* token = open_paren+1;
 	Array_Buffer<Ast_Variable> params = CreateArrayBuffer<Ast_Variable>(); // @Todo: Get lexer to count commas in parens?
 
@@ -1376,7 +1377,7 @@ static Ast_Statement ParseStatement(Token*& token, uint32 indent, Ast_Module* mo
 static Ast_Attribute* ParseAttribute(Token*& token, uint32 indent, Ast_Module* module)
 {
 	Ast_Attribute* attribute = StackAllocate<Ast_Attribute>(&module->stack);
-	Token* closure = GetClosure(token);
+	Token* closure = token->closure;
 	CheckScope(token, indent, module);
 	CheckScope(closure, indent, module);
 	attribute->expression = ParseExpression(token, indent+1, module);
@@ -1426,7 +1427,7 @@ static Ast_Code ParseCode(Token*& token, uint32 indent, Ast_Module* module)
 			enums.Add(enumeration);
 		}
 		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN
-			&&  (GetClosure(token+1)[1].kind == TOKEN_COLON || GetClosure(token+1)[1].kind == TOKEN_ARROW))
+			&&  (token[1].closure[1].kind == TOKEN_COLON || token[1].closure[1].kind == TOKEN_ARROW))
 		{
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
@@ -1471,7 +1472,7 @@ static Ast_Function ParseFunction(Token*& token, uint32 indent, Ast_Module* modu
 	function.name_token = token;
 	token += 1;
 	ParseParameters(&function, token, indent, module);
-	token = GetClosure(token)+1;
+	token = token->closure+1;
 
 	if (token->kind != TOKEN_ARROW && token->kind != TOKEN_COLON)
 		Error(module, token->location, "Expected '->' or ':', not '%'\n", token);
@@ -1524,14 +1525,13 @@ static Ast_Import ParseImport(Token*& token, uint32 indent, Ast_Module* module)
 static void ParseGlobalScope(Ast_Module* module)
 {
 	Token* token = &module->tokens[0];
-	Token* end = module->tokens.End();
 
 	Array_Buffer<Ast_Import>   imports    = CreateArrayBuffer<Ast_Import>();
 	Array_Buffer<Ast_Struct>   structs    = CreateArrayBuffer<Ast_Struct>();
 	Array_Buffer<Ast_Enum>     enums      = CreateArrayBuffer<Ast_Enum>();
 	Array_Buffer<Ast_Function> functions  = CreateArrayBuffer<Ast_Function>();
 
-	while (token < end)
+	while (token->kind != TOKEN_EOF)
 	{
 		Ast_Attribute* attribute = null;
 
@@ -1567,8 +1567,7 @@ static void ParseGlobalScope(Ast_Module* module)
 			function.is_global = true;
 			functions.Add(function);
 		}
-		else
-			Error(module, token->location, "Unexpected token in global scope: '%'\n", token);
+		else Error(module, token->location, "Unexpected token in global scope: '%'\n", token);
 	}
 
 	module->imports = imports.Lock();

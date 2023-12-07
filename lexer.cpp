@@ -283,7 +283,7 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 			qualifier && (fractional.qualifier & QUALIFIER_H) && !IsAlpha(fractional.end[0]))
 		{
 			qualifier = fractional.qualifier;
-			base = Max(base, fractional.base);
+			base = (Base)Max(base, fractional.base);
 			whole.count += CountBits64(whole.qualifier);
 			has_fractional = true;
 		}
@@ -416,10 +416,37 @@ static bool CheckIfHexadecimal(char* p)
 // @Todo: Hash Literals
 // @Todo: Error continuation
 
-static inline bool IsKeyword(const char* p, Token_Kind kind)
+static inline bool IsKeyword(char* p, Token_Kind kind)
 {
-	const char* post = p + ToString(kind).length;
-	return CompareMemory(p, ToString(kind).data, ToString(kind).length) && !IsAlpha(*post) && !IsDigit(*post, BASE_DECIMAL) && *post != '_';
+	char post = p[ToString(kind).length];
+
+	if (!CompareMemory(p, ToString(kind).data, ToString(kind).length))
+		return false;
+
+	if (IsAlpha(post))
+		return false;
+
+	if (IsDigit(post, BASE_DECIMAL))
+		return false;
+
+	if (post == '_')
+		return false;
+
+	return true;
+}
+
+static Token_Kind GetMatchingParen(Token_Kind kind)
+{
+	switch (kind)
+	{
+		case TOKEN_OPEN_PAREN:    return TOKEN_OPEN_PAREN;
+		case TOKEN_OPEN_BRACE:    return TOKEN_OPEN_BRACE;
+		case TOKEN_OPEN_BRACKET:  return TOKEN_OPEN_BRACKET;
+		case TOKEN_CLOSE_PAREN:   return TOKEN_CLOSE_PAREN;
+		case TOKEN_CLOSE_BRACE:   return TOKEN_CLOSE_BRACE;
+		case TOKEN_CLOSE_BRACKET: return TOKEN_CLOSE_BRACKET;
+		default: AssertUnreachable();
+	}
 }
 
 static void LexerParse(Ast_Module* module)
@@ -427,8 +454,8 @@ static void LexerParse(Ast_Module* module)
 	Array<char> data = FileLoad(module->file_path, 16, 64);
 	String code = String(data.elements, data.count);
 
-	List<Token> tokens = AllocateList<Token>(4096); // @Todo: min(2 * average_tokens / file_size, chars)
-	List<Line>  lines  = AllocateList<Line>(1024);  // @Todo: min(2 * average_loc    / file_size, chars)
+	Token* tokens = (Token*)AllocateMemory(sizeof(Token) * (data.count+1));
+	List<Line> lines = AllocateList<Line>(Min(code.length, 4096u));
 
 	int64 line_number = 0;
 	int64 indent = 0;
@@ -438,7 +465,11 @@ static void LexerParse(Ast_Module* module)
 	char* end = code.data + code.length;
 	char* line_begin = cursor;
 
-	int64 line_token_begin = 0;
+	Token* tokens_begin = tokens;
+	Token* token = tokens_begin;
+	Token* line_begin_token = token;
+
+	Token* open_token = null;
 
 	while (cursor < end)
 	{
@@ -462,11 +493,11 @@ static void LexerParse(Ast_Module* module)
 
 				line.indent = indent;
 				line.string = String(line_begin, cursor-line_begin);
-				line.tokens_begin_index = line_token_begin;
-				line.tokens_count = tokens.count - line_token_begin;
+				line.tokens_begin = line_begin_token;
+				line.tokens_end   = token;
 				lines.Add(line);
 
-				line_token_begin = tokens.count;
+				line_begin_token = token;
 				line_number++;
 				line_begin = cursor+1;
 				cursor++;
@@ -475,128 +506,138 @@ static void LexerParse(Ast_Module* module)
 			else cursor++;
 		}
 
-		bool newline = line_number != old_line && tokens.count;
+		bool newline = line_number != old_line || token == tokens_begin;
 		char* token_begin = cursor;
 
-		Token token;
-		ZeroMemory(&token);
-		token.indent = indent;
-		token.location.line = line_number;
-		token.location.offset = cursor - line_begin;
-		token.newline = newline;
+		ZeroMemory(token);
+		token->indent = indent;
+		token->location.line = line_number;
+		token->location.offset = cursor - line_begin;
+		token->newline = newline;
 
 		if (cursor >= end) break;
 
 		switch (*cursor)
 		{
 			case 'A':
-				if (IsKeyword(cursor, TOKEN_BITWISE_AND)) { cursor += ToString(TOKEN_BITWISE_AND).length; token.kind = TOKEN_BITWISE_AND; break; }
-				goto PARSE_IDENTIFIER;
+				if (IsKeyword(cursor, TOKEN_BITWISE_AND)) { cursor += ToString(TOKEN_BITWISE_AND).length; token->kind = TOKEN_BITWISE_AND; break; }
 
 			case 'B':
 			case 'C':
 			case 'D':
 			case 'E':
 			case 'F':
+			{
+				if (!CheckIfHexadecimal(cursor))
+					goto PARSE_IDENTIFIER;
+
+				ParseLiteral(module, &cursor, token);
+			} break;
 
 			case 'M':
-				if (IsKeyword(cursor, TOKEN_MOD))         { cursor += ToString(TOKEN_MOD).length;         token.kind = TOKEN_MOD;         break; }
+				if (IsKeyword(cursor, TOKEN_MOD))         { cursor += ToString(TOKEN_MOD).length;         token->kind = TOKEN_MOD;         break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'N':
-				if (IsKeyword(cursor, TOKEN_BITWISE_NOT)) { cursor += ToString(TOKEN_BITWISE_NOT).length; token.kind = TOKEN_BITWISE_NOT; break; }
+				if (IsKeyword(cursor, TOKEN_BITWISE_NOT)) { cursor += ToString(TOKEN_BITWISE_NOT).length; token->kind = TOKEN_BITWISE_NOT; break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'O':
-				if (IsKeyword(cursor, TOKEN_BITWISE_OR))  { cursor += ToString(TOKEN_BITWISE_OR).length;  token.kind = TOKEN_BITWISE_OR;  break; }
+				if (IsKeyword(cursor, TOKEN_BITWISE_OR))  { cursor += ToString(TOKEN_BITWISE_OR).length;  token->kind = TOKEN_BITWISE_OR;  break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'X':
-				if (IsKeyword(cursor, TOKEN_BITWISE_XOR)) { cursor += ToString(TOKEN_BITWISE_XOR).length; token.kind = TOKEN_BITWISE_XOR; break; }
+				if (IsKeyword(cursor, TOKEN_BITWISE_XOR)) { cursor += ToString(TOKEN_BITWISE_XOR).length; token->kind = TOKEN_BITWISE_XOR; break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'a':
-				if (IsKeyword(cursor, TOKEN_ALIAS))       { cursor += ToString(TOKEN_ALIAS).length;       token.kind = TOKEN_ALIAS;       break; }
-				if (IsKeyword(cursor, TOKEN_AND))         { cursor += ToString(TOKEN_AND).length;         token.kind = TOKEN_AND;         break; }
-				if (IsKeyword(cursor, TOKEN_AS))          { cursor += ToString(TOKEN_AS).length;          token.kind = TOKEN_AS;          break; }
-				if (IsKeyword(cursor, TOKEN_ASM))         { cursor += ToString(TOKEN_ASM).length;         token.kind = TOKEN_ASM;         break; }
+				if (IsKeyword(cursor, TOKEN_ALIAS))       { cursor += ToString(TOKEN_ALIAS).length;       token->kind = TOKEN_ALIAS;       break; }
+				if (IsKeyword(cursor, TOKEN_AND))         { cursor += ToString(TOKEN_AND).length;         token->kind = TOKEN_AND;         break; }
+				if (IsKeyword(cursor, TOKEN_AS))          { cursor += ToString(TOKEN_AS).length;          token->kind = TOKEN_AS;          break; }
+				if (IsKeyword(cursor, TOKEN_ASM))         { cursor += ToString(TOKEN_ASM).length;         token->kind = TOKEN_ASM;         break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'b':
-				if (IsKeyword(cursor, TOKEN_BOOL))        { cursor += ToString(TOKEN_BOOL).length;        token.kind = TOKEN_BOOL;        break; }
-				if (IsKeyword(cursor, TOKEN_BREAK))       { cursor += ToString(TOKEN_BREAK).length;       token.kind = TOKEN_BREAK;       break; }
-				if (IsKeyword(cursor, TOKEN_BYTE))        { cursor += ToString(TOKEN_BYTE).length;        token.kind = TOKEN_BYTE;        break; }
+				if (IsKeyword(cursor, TOKEN_BOOL))        { cursor += ToString(TOKEN_BOOL).length;        token->kind = TOKEN_BOOL;        break; }
+				if (IsKeyword(cursor, TOKEN_BREAK))       { cursor += ToString(TOKEN_BREAK).length;       token->kind = TOKEN_BREAK;       break; }
+				if (IsKeyword(cursor, TOKEN_BYTE))        { cursor += ToString(TOKEN_BYTE).length;        token->kind = TOKEN_BYTE;        break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'c':
-				if (IsKeyword(cursor, TOKEN_CLAIM))       { cursor += ToString(TOKEN_CLAIM).length;       token.kind = TOKEN_CLAIM;       break; }
+				if (IsKeyword(cursor, TOKEN_CLAIM))       { cursor += ToString(TOKEN_CLAIM).length;       token->kind = TOKEN_CLAIM;       break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'd':
-				if (IsKeyword(cursor, TOKEN_DEC))         { cursor += ToString(TOKEN_DEC).length;         token.kind = TOKEN_DEC;         break; }
-				if (IsKeyword(cursor, TOKEN_DEFER))       { cursor += ToString(TOKEN_DEFER).length;       token.kind = TOKEN_DEFER;       break; }
+				if (IsKeyword(cursor, TOKEN_DEC))         { cursor += ToString(TOKEN_DEC).length;         token->kind = TOKEN_DEC;         break; }
+				if (IsKeyword(cursor, TOKEN_DEFER))       { cursor += ToString(TOKEN_DEFER).length;       token->kind = TOKEN_DEFER;       break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'e':
-				if (IsKeyword(cursor, TOKEN_ELSE))        { cursor += ToString(TOKEN_ELSE).length;        token.kind = TOKEN_ELSE;        break; }
-				if (IsKeyword(cursor, TOKEN_ENUM))        { cursor += ToString(TOKEN_ENUM).length;        token.kind = TOKEN_ENUM;        break; }
+				if (IsKeyword(cursor, TOKEN_ELSE))        { cursor += ToString(TOKEN_ELSE).length;        token->kind = TOKEN_ELSE;        break; }
+				if (IsKeyword(cursor, TOKEN_ENUM))        { cursor += ToString(TOKEN_ENUM).length;        token->kind = TOKEN_ENUM;        break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'f':
-				if (IsKeyword(cursor, TOKEN_FALSE))       { cursor += ToString(TOKEN_FALSE).length;       token.kind = TOKEN_FALSE;       break; }
-				if (IsKeyword(cursor, TOKEN_FLOAT16))     { cursor += ToString(TOKEN_FLOAT16).length;     token.kind = TOKEN_FLOAT16;     break; }
-				if (IsKeyword(cursor, TOKEN_FLOAT32))     { cursor += ToString(TOKEN_FLOAT32).length;     token.kind = TOKEN_FLOAT32;     break; }
-				if (IsKeyword(cursor, TOKEN_FLOAT64))     { cursor += ToString(TOKEN_FLOAT64).length;     token.kind = TOKEN_FLOAT64;     break; }
-				if (IsKeyword(cursor, TOKEN_FOR))         { cursor += ToString(TOKEN_FOR).length;         token.kind = TOKEN_FOR;         break; }
+				if (IsKeyword(cursor, TOKEN_FALSE))       { cursor += ToString(TOKEN_FALSE).length;       token->kind = TOKEN_FALSE;       break; }
+				if (IsKeyword(cursor, TOKEN_FLOAT16))     { cursor += ToString(TOKEN_FLOAT16).length;     token->kind = TOKEN_FLOAT16;     break; }
+				if (IsKeyword(cursor, TOKEN_FLOAT32))     { cursor += ToString(TOKEN_FLOAT32).length;     token->kind = TOKEN_FLOAT32;     break; }
+				if (IsKeyword(cursor, TOKEN_FLOAT64))     { cursor += ToString(TOKEN_FLOAT64).length;     token->kind = TOKEN_FLOAT64;     break; }
+				if (IsKeyword(cursor, TOKEN_FOR))         { cursor += ToString(TOKEN_FOR).length;         token->kind = TOKEN_FOR;         break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'i':
-				if (IsKeyword(cursor, TOKEN_IF))          { cursor += ToString(TOKEN_IF).length;          token.kind = TOKEN_IF;          break; }
-				if (IsKeyword(cursor, TOKEN_IMPORT))      { cursor += ToString(TOKEN_IMPORT).length;      token.kind = TOKEN_IMPORT;      break; }
-				if (IsKeyword(cursor, TOKEN_IN))          { cursor += ToString(TOKEN_IN).length;          token.kind = TOKEN_IN;          break; }
-				if (IsKeyword(cursor, TOKEN_INC))         { cursor += ToString(TOKEN_INC).length;         token.kind = TOKEN_INC;         break; }
-				if (IsKeyword(cursor, TOKEN_INT))         { cursor += ToString(TOKEN_INT).length;         token.kind = TOKEN_INT;         break; }
-				if (IsKeyword(cursor, TOKEN_INT16))       { cursor += ToString(TOKEN_INT16).length;       token.kind = TOKEN_INT16;       break; }
-				if (IsKeyword(cursor, TOKEN_INT32))       { cursor += ToString(TOKEN_INT32).length;       token.kind = TOKEN_INT32;       break; }
-				if (IsKeyword(cursor, TOKEN_INT64))       { cursor += ToString(TOKEN_INT64).length;       token.kind = TOKEN_INT64;       break; }
-				if (IsKeyword(cursor, TOKEN_INT8))        { cursor += ToString(TOKEN_INT8).length;        token.kind = TOKEN_INT8;        break; }
+				if (IsKeyword(cursor, TOKEN_IF))          { cursor += ToString(TOKEN_IF).length;          token->kind = TOKEN_IF;          break; }
+				if (IsKeyword(cursor, TOKEN_IMPORT))      { cursor += ToString(TOKEN_IMPORT).length;      token->kind = TOKEN_IMPORT;      break; }
+				if (IsKeyword(cursor, TOKEN_IN))          { cursor += ToString(TOKEN_IN).length;          token->kind = TOKEN_IN;          break; }
+				if (IsKeyword(cursor, TOKEN_INC))         { cursor += ToString(TOKEN_INC).length;         token->kind = TOKEN_INC;         break; }
+				if (IsKeyword(cursor, TOKEN_INT))         { cursor += ToString(TOKEN_INT).length;         token->kind = TOKEN_INT;         break; }
+				if (IsKeyword(cursor, TOKEN_INT16))       { cursor += ToString(TOKEN_INT16).length;       token->kind = TOKEN_INT16;       break; }
+				if (IsKeyword(cursor, TOKEN_INT32))       { cursor += ToString(TOKEN_INT32).length;       token->kind = TOKEN_INT32;       break; }
+				if (IsKeyword(cursor, TOKEN_INT64))       { cursor += ToString(TOKEN_INT64).length;       token->kind = TOKEN_INT64;       break; }
+				if (IsKeyword(cursor, TOKEN_INT8))        { cursor += ToString(TOKEN_INT8).length;        token->kind = TOKEN_INT8;        break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'n':
-				if (IsKeyword(cursor, TOKEN_NOT))         { cursor += ToString(TOKEN_NOT).length;         token.kind = TOKEN_NOT;         break; }
-				if (IsKeyword(cursor, TOKEN_NULL))        { cursor += ToString(TOKEN_NULL).length;        token.kind = TOKEN_NULL;        break; }
+				if (IsKeyword(cursor, TOKEN_NOT))         { cursor += ToString(TOKEN_NOT).length;         token->kind = TOKEN_NOT;         break; }
+				if (IsKeyword(cursor, TOKEN_NULL))        { cursor += ToString(TOKEN_NULL).length;        token->kind = TOKEN_NULL;        break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'o':
-				if (IsKeyword(cursor, TOKEN_OR))          { cursor += ToString(TOKEN_OR).length;          token.kind = TOKEN_OR;          break; }
+				if (IsKeyword(cursor, TOKEN_OR))          { cursor += ToString(TOKEN_OR).length;          token->kind = TOKEN_OR;          break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'r':
-				if (IsKeyword(cursor, TOKEN_RETURN))      { cursor += ToString(TOKEN_RETURN).length;      token.kind = TOKEN_RETURN;      break; }
+				if (IsKeyword(cursor, TOKEN_RETURN))      { cursor += ToString(TOKEN_RETURN).length;      token->kind = TOKEN_RETURN;      break; }
 				goto PARSE_IDENTIFIER;
 
 			case 's':
-				if (IsKeyword(cursor, TOKEN_STRUCT))      { cursor += ToString(TOKEN_STRUCT).length;      token.kind = TOKEN_STRUCT;      break; }
+				if (IsKeyword(cursor, TOKEN_STRUCT))      { cursor += ToString(TOKEN_STRUCT).length;      token->kind = TOKEN_STRUCT;      break; }
 				goto PARSE_IDENTIFIER;
 
 			case 't':
-				if (IsKeyword(cursor, TOKEN_THEN))        { cursor += ToString(TOKEN_THEN).length;        token.kind = TOKEN_THEN;        break; }
-				if (IsKeyword(cursor, TOKEN_TRUE))        { cursor += ToString(TOKEN_TRUE).length;        token.kind = TOKEN_TRUE;        break; }
+				if (IsKeyword(cursor, TOKEN_THEN))        { cursor += ToString(TOKEN_THEN).length;        token->kind = TOKEN_THEN;        break; }
+				if (IsKeyword(cursor, TOKEN_TRUE))        { cursor += ToString(TOKEN_TRUE).length;        token->kind = TOKEN_TRUE;        break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'u':
-				if (IsKeyword(cursor, TOKEN_UINT))        { cursor += ToString(TOKEN_UINT).length;        token.kind = TOKEN_UINT;        break; }
-				if (IsKeyword(cursor, TOKEN_UINT16))      { cursor += ToString(TOKEN_UINT16).length;      token.kind = TOKEN_UINT16;      break; }
-				if (IsKeyword(cursor, TOKEN_UINT32))      { cursor += ToString(TOKEN_UINT32).length;      token.kind = TOKEN_UINT32;      break; }
-				if (IsKeyword(cursor, TOKEN_UINT64))      { cursor += ToString(TOKEN_UINT64).length;      token.kind = TOKEN_UINT64;      break; }
-				if (IsKeyword(cursor, TOKEN_UINT8))       { cursor += ToString(TOKEN_UINT8).length;       token.kind = TOKEN_UINT8;       break; }
+				if (IsKeyword(cursor, TOKEN_UINT))        { cursor += ToString(TOKEN_UINT).length;        token->kind = TOKEN_UINT;        break; }
+				if (IsKeyword(cursor, TOKEN_UINT16))      { cursor += ToString(TOKEN_UINT16).length;      token->kind = TOKEN_UINT16;      break; }
+				if (IsKeyword(cursor, TOKEN_UINT32))      { cursor += ToString(TOKEN_UINT32).length;      token->kind = TOKEN_UINT32;      break; }
+				if (IsKeyword(cursor, TOKEN_UINT64))      { cursor += ToString(TOKEN_UINT64).length;      token->kind = TOKEN_UINT64;      break; }
+				if (IsKeyword(cursor, TOKEN_UINT8))       { cursor += ToString(TOKEN_UINT8).length;       token->kind = TOKEN_UINT8;       break; }
 				goto PARSE_IDENTIFIER;
 
 			case 'w':
-				if (IsKeyword(cursor, TOKEN_WHERE))       { cursor += ToString(TOKEN_WHERE).length;       token.kind = TOKEN_WHERE;       break; }
-				if (IsKeyword(cursor, TOKEN_WHILE))       { cursor += ToString(TOKEN_WHILE).length;       token.kind = TOKEN_WHILE;       break; }
+				if (IsKeyword(cursor, TOKEN_WHERE))       { cursor += ToString(TOKEN_WHERE).length;       token->kind = TOKEN_WHERE;       break; }
+				if (IsKeyword(cursor, TOKEN_WHILE))       { cursor += ToString(TOKEN_WHILE).length;       token->kind = TOKEN_WHILE;       break; }
 				goto PARSE_IDENTIFIER;
 
+			case 'G':
+			case 'H':
+			case 'I':
+			case 'J':
+			case 'K':
+			case 'L':
 			case 'P':
 			case 'Q':
 			case 'R':
@@ -607,12 +648,7 @@ static void LexerParse(Ast_Module* module)
 			case 'W':
 			case 'Y':
 			case 'Z':
-			case 'G':
-			case 'H':
-			case 'I':
-			case 'J':
-			case 'K':
-			case 'L':
+			case '_':
 			case 'g':
 			case 'h':
 			case 'j':
@@ -625,7 +661,6 @@ static void LexerParse(Ast_Module* module)
 			case 'x':
 			case 'y':
 			case 'z':
-			case '_':
 			PARSE_IDENTIFIER:
 			{
 				char* begin = cursor;
@@ -639,7 +674,7 @@ static void LexerParse(Ast_Module* module)
 					else if (IsUpperCase(*cursor)) upper++;
 					else if (CompareStringRaw(cursor, "__"))
 					{
-						LexerError(module, token.location, "Consecutive underscores aren't allowed.\n");
+						LexerError(module, token->location, "Consecutive underscores aren't allowed.\n");
 					}
 				}
 
@@ -647,49 +682,41 @@ static void LexerParse(Ast_Module* module)
 				String str  = String(begin, size);
 
 				if (*begin == '_') COLD
-					LexerError(module, token.location, "Identifier beginning with an underscore.\n");
+					LexerError(module, token->location, "Identifier beginning with an underscore.\n");
 
 				if (cursor[-1] == '_') COLD
-					LexerError(module, token.location, "Identifier with trailing underscore: '%'\n", str);
+					LexerError(module, token->location, "Identifier with trailing underscore: '%'\n", str);
 
 				if (CompareStringRaw(cursor-2, "_t") || CompareStringRaw(cursor-2, "_T")) COLD
-					LexerError(module, token.location, "Identifier with '_t' is banned.\n", str);
+					LexerError(module, token->location, "Identifier with '_t' is banned.\n", str);
 
-				token.kind = TOKEN_IDENTIFIER_CASUAL;
-				token.identifier_string = String(begin, size);
+				token->kind = TOKEN_IDENTIFIER_CASUAL;
+				token->identifier_string = String(begin, size);
 
 				if (IsHexAlphaLut(*begin) && CheckIfHexadecimal(begin)) COLD
 				{
 					cursor = begin;
-					ParseLiteral(module, &cursor, &token);
+					ParseLiteral(module, &cursor, token);
 				}
 				else if (!lower)
 				{
-					token.kind = TOKEN_IDENTIFIER_CONSTANT;
+					token->kind = TOKEN_IDENTIFIER_CONSTANT;
 				}
 				else if (IsUpperCase(*begin))
 				{
-					token.kind = TOKEN_IDENTIFIER_FORMAL;
+					token->kind = TOKEN_IDENTIFIER_FORMAL;
 				}
 			} break;
 
-			case '0':
-			case '1':
-			case '2':
-			case '3':
-			case '4':
-			case '5':
-			case '6':
-			case '7':
-			case '8':
-			case '9':
+			case '0': case '1': case '2': case '3': case '4':
+			case '5': case '6': case '7': case '8': case '9':
 			{
-				ParseLiteral(module, &cursor, &token);
+				ParseLiteral(module, &cursor, token);
 			} break;
 
 			case '"':
 			{
-				token.kind = TOKEN_LITERAL_STRING;
+				token->kind = TOKEN_LITERAL_STRING;
 
 				char* start = ++cursor;
 				uint64 escapes = 0;
@@ -697,7 +724,7 @@ static void LexerParse(Ast_Module* module)
 				for (; cursor < end && *cursor != '"'; cursor++)
 				{
 					if (*cursor == '\n')
-						LexerError(module, token.location, "String literal not completed before end of the line.\n");
+						LexerError(module, token->location, "String literal not completed before end of the line.\n");
 
 					if (*cursor == '\\' && IsEscapeCharacter(cursor[1]))
 					{
@@ -707,17 +734,17 @@ static void LexerParse(Ast_Module* module)
 				}
 
 				if (cursor >= end || *cursor != '"')
-					LexerError(module, token.location, "String literal not completed before end of the file.\n");
+					LexerError(module, token->location, "String literal not completed before end of the file.\n");
 
 				char* end = cursor++;
 
 				if (escapes)
 				{
 					uint64 length = end - start - escapes;
-					token.literal_string = AllocateString(length, 0);
+					token->literal_string = AllocateString(length, 0);
 
 					char* c = start;
-					char* s = token.literal_string.data;
+					char* s = token->literal_string.data;
 
 					while (c < end)
 					{
@@ -741,224 +768,180 @@ static void LexerParse(Ast_Module* module)
 							case '\"': *s = '\"'; break;
 
 							default:
-								LexerError(module, token.location, "Invalid escape character: \\%\n", *c);
+								LexerError(module, token->location, "Invalid escape character: \\%\n", *c);
 						}
 					}
 				}
-				else token.literal_string = String(start, end - start);
+				else token->literal_string = String(start, end - start);
 			} break;
 
 
-			case '(':
+			case '(': token->kind = TOKEN_OPEN_PAREN;   goto PARSE_OPEN;
+			case '{': token->kind = TOKEN_OPEN_BRACE;   goto PARSE_OPEN;
+			case '[': token->kind = TOKEN_OPEN_BRACKET; goto PARSE_OPEN;
+			PARSE_OPEN:
 			{
-				cursor += 1;
-				token.kind = TOKEN_OPEN_PAREN;
-				token.next = prev_region_index;
-				prev_region_index = tokens.count;
+				cursor++;
+				token->closure = open_token;
+				open_token = token;
 			} break;
 
-			case '{':
+			Token_Kind doppelganger;
+			case ')': doppelganger = TOKEN_OPEN_PAREN;   token->kind = TOKEN_CLOSE_PAREN;   goto PARSE_CLOSE;
+			case '}': doppelganger = TOKEN_OPEN_BRACE;   token->kind = TOKEN_CLOSE_BRACE;   goto PARSE_CLOSE;
+			case ']': doppelganger = TOKEN_OPEN_BRACKET; token->kind = TOKEN_CLOSE_BRACKET; goto PARSE_CLOSE;
+			PARSE_CLOSE:
 			{
-				cursor += 1;
-				token.kind = TOKEN_OPEN_BRACE;
-				token.next = prev_region_index;
-				prev_region_index = tokens.count;
-			} break;
+				cursor++;
 
-			case '[':
-			{
-				cursor += 1;
-				token.kind = TOKEN_OPEN_BRACKET;
-				token.next = prev_region_index;
-				prev_region_index = tokens.count;
-			} break;
+				if (!open_token)
+					break;
 
-			case ')':
-			{
-				cursor += 1;
-				token.kind = TOKEN_CLOSE_PAREN;
-
-				if (prev_region_index == -1)
-					LexerError(module, token.location, "Unmatched closing parenthesis '%'\n", &token);
-
-				Token* open = &tokens[prev_region_index];
-				if (open->kind != TOKEN_OPEN_PAREN)
-					LexerError(module, open->location, "'%' wasn't closed.\n", open);
-
-				uint64 offset = tokens.count - prev_region_index;
-				prev_region_index = open->next;
-				open->next = offset;
-			} break;
-
-			case '}':
-			{
-				cursor += 1;
-				token.kind = TOKEN_CLOSE_BRACE;
-
-				if (prev_region_index == -1)
+				if (open_token->kind != doppelganger)
 				{
-					LexerError(module, token.location, "Unmatched closing brace: '%'\n", &token);
+					LexerError(
+						module, token->location,
+						"Expected closure '%', not: '%'\n",
+						GetMatchingParen(open_token->kind), token->kind
+					);
 				}
 
-				Token* open = &tokens[prev_region_index];
-				if (open->kind != TOKEN_OPEN_BRACE)
-					LexerError(module, open->location, "'%' wasn't closed.\n", open);
-
-				uint64 offset = tokens.count - prev_region_index;
-				prev_region_index = open->next;
-				open->next = offset;
-			} break;
-
-			case ']':
-			{
-				cursor += 1;
-				token.kind = TOKEN_CLOSE_BRACKET;
-
-				if (prev_region_index == -1)
-					LexerError(module, token.location, "Unmatched closing bracket '%'\n", &token);
-
-				Token* open = &tokens[prev_region_index];
-				if (open->kind != TOKEN_OPEN_BRACKET)
-					LexerError(module, open->location, "'%' wasn't closed.\n", open);
-
-				uint64 offset = tokens.count - prev_region_index;
-				prev_region_index = open->next;
-				open->next = offset;
+				Token* prev = open_token->closure;
+				open_token->closure = token;
+				open_token = prev;
 			} break;
 
 			case '.':
 			{
-				token.kind = TOKEN_DOT;
+				token->kind = TOKEN_DOT;
 
 				if (cursor[1] == '.')
 				{
-					token.kind = TOKEN_DOT_DOT;
+					token->kind = TOKEN_DOT_DOT;
 					cursor += 2;
+					break;
 				}
-				else if (IsDecimal(cursor[1]) || IsHexAlpha(cursor[1]) && !IsAlpha(cursor[-1]) && CheckIfHexadecimal(cursor+1))
+
+				if (IsDecimal(cursor[1]) || IsHexAlpha(cursor[1]) && !IsAlpha(cursor[-1]) && CheckIfHexadecimal(cursor+1))
 				{
-					ParseLiteral(module, &cursor, &token);
+					ParseLiteral(module, &cursor, token);
+					break;
 				}
-				else
-				{
-					cursor += 1;
-				}
+
+				cursor += 1;
 			} break;
 
 			case '=':
-				cursor++, token.kind = TOKEN_EQUAL;
-				if (*cursor == '>') cursor++, token.kind = TOKEN_FAT_ARROW;
+				cursor++, token->kind = TOKEN_EQUAL;
+				if (*cursor == '>') cursor++, token->kind = TOKEN_FAT_ARROW;
 				break;
 
 			case '!':
-				cursor++, token.kind = TOKEN_EXCLAMATION_MARK;
-				if (*cursor == '=') cursor++, token.kind = TOKEN_NOT_EQUAL;
+				cursor++, token->kind = TOKEN_EXCLAMATION_MARK;
+				if (*cursor == '=') cursor++, token->kind = TOKEN_NOT_EQUAL;
 				break;
 
 			case '-':
-				cursor++, token.kind = TOKEN_MINUS;
-				if      (*cursor == '>') cursor++, token.kind = TOKEN_ARROW;
-				else if (*cursor == '=') cursor++, token.kind = TOKEN_MINUS_EQUAL;
+				cursor++, token->kind = TOKEN_MINUS;
+				if      (*cursor == '>') cursor++, token->kind = TOKEN_ARROW;
+				else if (*cursor == '=') cursor++, token->kind = TOKEN_MINUS_EQUAL;
 				break;
 
 
 			case '<':
-				cursor++, token.kind = TOKEN_LESS;
-				if      (*cursor == '<') cursor++, token.kind = TOKEN_LEFT_SHIFT;
-				else if (*cursor == '=') cursor++, token.kind = TOKEN_LESS_OR_EQUAL;
+				cursor++, token->kind = TOKEN_LESS;
+				if      (*cursor == '<') cursor++, token->kind = TOKEN_LEFT_SHIFT;
+				else if (*cursor == '=') cursor++, token->kind = TOKEN_LESS_OR_EQUAL;
 				break;
 
 			case '>':
-				cursor++, token.kind = TOKEN_GREATER;
-				if      (*cursor == '>') cursor++, token.kind = TOKEN_RIGHT_SHIFT;
-				else if (*cursor == '=') cursor++, token.kind = TOKEN_GREATER_OR_EQUAL;
+				cursor++, token->kind = TOKEN_GREATER;
+				if      (*cursor == '>') cursor++, token->kind = TOKEN_RIGHT_SHIFT;
+				else if (*cursor == '=') cursor++, token->kind = TOKEN_GREATER_OR_EQUAL;
 				break;
 
 			case '+':
-				cursor++, token.kind = TOKEN_PLUS;
-				if (*cursor == '=') cursor++, token.kind = TOKEN_PLUS_EQUAL;
+				cursor++, token->kind = TOKEN_PLUS;
+				if (*cursor == '=') cursor++, token->kind = TOKEN_PLUS_EQUAL;
 				break;
 
 			case '*':
-				cursor++, token.kind = TOKEN_ASTERISK;
-				if (*cursor == '=') cursor++, token.kind = TOKEN_TIMES_EQUAL;
+				cursor++, token->kind = TOKEN_ASTERISK;
+				if (*cursor == '=') cursor++, token->kind = TOKEN_TIMES_EQUAL;
 				break;
 
 			case '/':
-				cursor++, token.kind = TOKEN_DIVIDE;
-				if (*cursor == '=') cursor++, token.kind = TOKEN_DIVIDE_EQUAL;
+				cursor++, token->kind = TOKEN_DIVIDE;
+				if (*cursor == '=') cursor++, token->kind = TOKEN_DIVIDE_EQUAL;
 				break;
 
 			case '^':
-				cursor++, token.kind = TOKEN_EXPONENT;
-				if (*cursor == '=') cursor++, token.kind = TOKEN_EXPONENTIAL_EQUAL;
+				cursor++, token->kind = TOKEN_EXPONENT;
+				if (*cursor == '=') cursor++, token->kind = TOKEN_EXPONENTIAL_EQUAL;
 				break;
 
 			case '?':
-				cursor++, token.kind = TOKEN_QUESTION_MARK;
-				if (*cursor == '.') cursor++, token.kind = TOKEN_QUESTION_MARK_DOT;
+				cursor++, token->kind = TOKEN_QUESTION_MARK;
+				if (*cursor == '.') cursor++, token->kind = TOKEN_QUESTION_MARK_DOT;
 				break;
 
 			case ';':
-				cursor++, token.kind = TOKEN_SEMICOLON;
+				cursor++, token->kind = TOKEN_SEMICOLON;
 				break;
 
 			case ':':
-				cursor++, token.kind = TOKEN_COLON;
+				cursor++, token->kind = TOKEN_COLON;
 				break;
 
 			case ',':
-				cursor++, token.kind = TOKEN_COMMA;
+				cursor++, token->kind = TOKEN_COMMA;
 				break;
 
 			case '&':
-				cursor++, token.kind = TOKEN_AMPERSAND;
+				cursor++, token->kind = TOKEN_AMPERSAND;
 				break;
 
 			case '|':
-				cursor++, token.kind = TOKEN_BAR;
+				cursor++, token->kind = TOKEN_BAR;
 				break;
 
 			default:
 			{
-				LexerError(module, token.location, "Invalid character: '%', %\n", *cursor, Hex(*cursor));
+				LexerError(module, token->location, "Invalid character: '%', %\n", *cursor, Hex(*cursor));
 			} break;
 		}
 
-		char* token_end = cursor;
-		token.location.extent = token_end-token_begin;
-		tokens.Add(token);
+		token->location.extent = cursor-token_begin;
+
+		token++;
 	}
 
 	Line line;
 	line.indent = indent;
 	line.string = String(line_begin, cursor-line_begin);
-	line.tokens_begin_index = line_token_begin;
-	line.tokens_count = tokens.count - line_token_begin;
+	line.tokens_begin = line_begin_token;
+	line.tokens_end   = token;
 	lines.Add(line);
 
+	ZeroMemory(token);
+	token->kind = TOKEN_EOF;
+	token->location.line = line_number;
+	token->location.offset = 0;
+	token->indent = 0;
+	token->newline = true;
+	token++;
 
-	Token eof_token;
-	ZeroMemory(&eof_token);
-	eof_token.kind = TOKEN_EOF;
-	eof_token.location.line = line_number;
-	eof_token.location.offset = 0;
-	eof_token.indent = 0;
-	eof_token.newline = true;
+	Token* token_end = token;
+	uint64 token_count = token_end - tokens_begin;
 
-	tokens.Pad(16, eof_token);
-
-	module->tokens = ToArray(tokens);
+	module->tokens = Array(tokens, token_count);
 	module->code   = code;
-	module->lines  = ToArray(lines);
+	module->lines  = lines.ToArray();
 
-	if (prev_region_index != -1) COLD
+	while (open_token)
 	{
-		while (prev_region_index != -1)
-		{
-			Token* token = &tokens[prev_region_index];
-			LexerError(module, token->location, "'%' wasn't closed.\n", token);
-			prev_region_index = token->next;
-		}
+		Token* next = open_token->closure;
+		open_token->closure = null;
+		open_token = next;
 	}
 }

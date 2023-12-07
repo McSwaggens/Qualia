@@ -496,8 +496,6 @@ struct Ast_Statement
 		Ast_Increment   increment;
 		Ast_Expression* expression;
 	};
-
-	// Ast_Statement() = defau
 };
 
 struct Ast_Function
@@ -514,7 +512,6 @@ struct Ast_Function
 	Procedure* ir;
 	bool is_pure;
 	bool is_global;
-	// @Todo: Expression functions =>
 };
 
 struct Ast_Import
@@ -566,10 +563,10 @@ struct Ast_Enum
 
 struct Line
 {
-	int16 indent;
-	String string;
-	int64 tokens_begin_index;
-	int64 tokens_count;
+	Indent16 indent;
+	String   string;
+	Token*   tokens_begin;
+	Token*   tokens_end;
 };
 
 struct Ast_Module

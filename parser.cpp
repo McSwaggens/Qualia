@@ -1374,18 +1374,6 @@ static Ast_Statement ParseStatement(Token*& token, uint32 indent, Ast_Module* mo
 		Error(module, token->location, "Invalid statement starting with '%'\n", token);
 }
 
-static Ast_Attribute* ParseAttribute(Token*& token, uint32 indent, Ast_Module* module)
-{
-	Ast_Attribute* attribute = StackAllocate<Ast_Attribute>(&module->stack);
-	Token* closure = token->closure;
-	CheckScope(token, indent, module);
-	CheckScope(closure, indent, module);
-	attribute->expression = ParseExpression(token, indent+1, module);
-	token = closure+1;
-	// @Todo: Actually parse attributes.
-	return attribute;
-}
-
 static bool IsScopeTerminator(Token_Kind kind)
 {
 	return kind == TOKEN_SEMICOLON || kind == TOKEN_ELSE || kind == TOKEN_THEN;
@@ -1407,23 +1395,14 @@ static Ast_Code ParseCode(Token*& token, uint32 indent, Ast_Module* module)
 
 	while (IsCorrectScope(token, indent) && !IsScopeTerminator(token->kind))
 	{
-		Ast_Attribute* attribute = null;
-
-		if (token->kind == TOKEN_OPEN_BRACKET)
-		{
-			attribute = ParseAttribute(token, indent, module);
-		}
-
 		if (token->kind == TOKEN_STRUCT)
 		{
 			Ast_Struct structure = ParseStruct(token, indent, module);
-			structure.attribute = attribute;
 			structs.Add(structure);
 		}
 		else if (token->kind == TOKEN_ENUM)
 		{
 			Ast_Enum enumeration = ParseEnum(token, indent, module);
-			enumeration.attribute = attribute;
 			enums.Add(enumeration);
 		}
 		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN
@@ -1433,7 +1412,6 @@ static Ast_Code ParseCode(Token*& token, uint32 indent, Ast_Module* module)
 				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
 
 			Ast_Function function = ParseFunction(token, indent, module);
-			function.attribute = attribute;
 			function.is_global = false;
 			functions.Add(function);
 		}
@@ -1533,13 +1511,6 @@ static void ParseGlobalScope(Ast_Module* module)
 
 	while (token->kind != TOKEN_EOF)
 	{
-		Ast_Attribute* attribute = null;
-
-		if (token->kind == TOKEN_OPEN_BRACKET)
-		{
-			attribute = ParseAttribute(token, 0, module);
-		}
-
 		if (token->kind == TOKEN_IMPORT)
 		{
 			Ast_Import import = ParseImport(token, 0, module);
@@ -1548,13 +1519,11 @@ static void ParseGlobalScope(Ast_Module* module)
 		else if (token->kind == TOKEN_STRUCT)
 		{
 			Ast_Struct structure = ParseStruct(token, 0, module);
-			structure.attribute = attribute;
 			structs.Add(structure);
 		}
 		else if (token->kind == TOKEN_ENUM)
 		{
 			Ast_Enum enumeration = ParseEnum(token, 0, module);
-			enumeration.attribute = attribute;
 			enums.Add(enumeration);
 		}
 		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN)
@@ -1563,7 +1532,6 @@ static void ParseGlobalScope(Ast_Module* module)
 				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
 
 			Ast_Function function = ParseFunction(token, 0, module);
-			function.attribute = attribute;
 			function.is_global = true;
 			functions.Add(function);
 		}

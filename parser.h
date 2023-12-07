@@ -24,8 +24,6 @@ struct Ast_Code;
 struct Ast_Scope;
 struct Ast_Return;
 struct Ast_Break;
-struct Ast_Attribute;
-struct StackFrame;
 
 enum IntrinsicID
 {
@@ -33,12 +31,6 @@ enum IntrinsicID
 
 	INTRINSIC_COUNT,
 	INTRINSIC_INVALID = INTRINSIC_COUNT
-};
-
-struct Ast_Attribute
-{
-	Token* token;
-	Ast_Expression* expression;
 };
 
 enum Ast_Specifier_Kind
@@ -294,7 +286,6 @@ struct Ast_Scope
 	Array<Ast_Struct> structs;
 	Array<Ast_Enum> enums;
 	List<Ast_Variable*> variables;
-	List<StackFrame> stack_frames;
 };
 
 struct Ast_Code
@@ -453,7 +444,6 @@ struct Ast_Variable
 	TypeID type;
 	Ast_Type* ast_type;
 	Ast_Expression* assignment;
-	Ast_Attribute* attribute;
 	Value ir;
 	uint64 offset; // @RemoveMe?
 	// @Todo: Add span
@@ -508,7 +498,6 @@ struct Ast_Function
 	TypeID return_type;
 	List<Ast_Return*> returns; // @Todo: Infer return type.
 	Ast_Type* ast_return_type;
-	Ast_Attribute* attribute;
 	Procedure* ir;
 	bool is_pure;
 	bool is_global;
@@ -548,7 +537,6 @@ struct Ast_Struct
 	Token* name_token;
 	Array<Ast_Struct_Member> members;
 	List<Ast_Struct*> closure;
-	Ast_Attribute* attribute;
 };
 
 struct Ast_Enum
@@ -558,7 +546,6 @@ struct Ast_Enum
 	Token* name_token;
 	TypeID underlying_type;
 	Array<Ast_Enum_Member> members;
-	Ast_Attribute* attribute;
 };
 
 struct Line

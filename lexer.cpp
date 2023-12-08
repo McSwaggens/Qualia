@@ -895,6 +895,10 @@ static void LexerParse(Ast_Module* module)
 
 			case ',':
 				cursor++, token->kind = TOKEN_COMMA;
+
+				if (open_token)
+					open_token->comma_count++;
+
 				break;
 
 			case '&':

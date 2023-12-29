@@ -6,7 +6,7 @@ bin/qualia: *.cpp *.h *.asm
 
 	clang -o bin/qualia\
 		-march=znver3\
-		-std=c++20 -Wno-c99-designator\
+		-std=c++20 -Wno-c99-designator -Wno-reorder-init-list\
 		-nostdinc -nostdinc++\
 		-fno-rtti -fno-exceptions\
 		qualia.cpp bin/general.o -lm\

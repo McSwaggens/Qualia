@@ -444,7 +444,7 @@ struct Ast_Variable
 	TypeID type;
 	Ast_Type* ast_type;
 	Ast_Expression* assignment;
-	Value ir;
+	Value ir_stack;
 	uint64 offset; // @RemoveMe?
 	// @Todo: Add span
 	Ast_Variable() = default;

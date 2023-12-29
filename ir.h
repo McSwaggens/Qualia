@@ -197,17 +197,26 @@ struct Value
 		Instruction* instruction;
 		Block* block;
 		Procedure* procedure;
-		int64 const_int;
+		int64   const_int;
 		float32 const_f32;
 		float64 const_f64;
 	};
 
-	// Value() = default;
 	Value()               : kind(IR_NONE),          const_int(0)   { }
 	Value(Instruction* i) : kind(IR_INSTRUCTION),   instruction(i) { }
 	Value(Block*       b) : kind(IR_BLOCK),         block(b)       { }
 	Value(Procedure*   p) : kind(IR_PROCEDURE),     procedure(p)   { }
+
 	Value(int64        n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(int32        n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(int16        n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(int8         n) : kind(IR_CONST_INT),     const_int(n)   { }
+
+	Value(uint64       n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(uint32       n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(uint16       n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(uint8        n) : kind(IR_CONST_INT),     const_int(n)   { }
+
 	Value(float32      f) : kind(IR_CONST_FLOAT32), const_f32(f)   { }
 	Value(float64      f) : kind(IR_CONST_FLOAT64), const_f64(f)   { }
 };
@@ -216,6 +225,7 @@ struct Procedure
 {
 	Ast_Function* function;
 	List<Block*> blocks;
+	Block* entry;
 
 	Block* NewBlock();
 };
@@ -233,11 +243,19 @@ struct Block
 	List<Block*> users;
 
 	Instruction* NewInstruction(Instruction instruction);
+	Instruction* Param(uint64 n);
+	Instruction* Stack(Value size);
+	Instruction* Load(Value addr);
+	Instruction* Store(Value dest, Value value);
+	Instruction* Add(Value a, Value b);
+	Instruction* Sub(Value a, Value b);
 	Instruction* Jump(Block* to);
 	Instruction* Branch(Value condition, Block* btrue, Block* bfalse);
 	Instruction* Return(Value value);
 	Instruction* Return();
 	Value Cast(Value value, TypeID from, TypeID to);
+
+	void Remove();
 };
 
 struct PhiEntry
@@ -271,8 +289,6 @@ struct Instruction
 		return ((uint64)opcode >> IR_OPCODE_BITCNT) & ((1<<IR_AUX_OPCNT_BITCNT)-1);
 	}
 };
-
-static inline Value None() { return Value(); }
 
 static void Write(OutputBuffer* buffer, Procedure* function);
 static void GenerateIR(Ast_Module* module);

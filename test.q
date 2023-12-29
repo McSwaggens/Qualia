@@ -1,12 +1,11 @@
 FooBar():
-	
-	abc : int = 123
+	a := 1
+	b := 2
+	c := a + b
 
-
-
-CopyMemory(dest: *byte, src: *byte, size: uint):
-	for i := 0, i < size:
-		dest[i] = src[i]
+// CopyMemory(dest: *byte, src: *byte, size: uint):
+// 	for i := 0, i < size:
+// 		dest[i] = src[i]
 
 // WhileLoop(n : int):
 	// while n: n = 111

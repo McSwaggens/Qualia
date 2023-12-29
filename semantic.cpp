@@ -1275,12 +1275,6 @@ static void CheckForStructMemberDuplicates(Ast_Module* module, Ast_Struct* ast)
 // @Yuck: This function is *disgusting*, all of this should be implicit when we try to use a type for the first time or something... Also, what about multi-threading?
 static void ScanScope(Ast_Scope* scope, Ast_Module* module)
 {
-	for (uint32 i = 0; i < scope->variables.count; i++) // @RemoveMe?
-	{
-		Ast_Variable* var = scope->variables[i];
-		var->ir = None();
-	}
-
 	for (Ast_Struct* ast_struct = scope->structs; ast_struct < scope->structs.End(); ast_struct++)
 	{
 		ast_struct->type = CreateStructType(ast_struct, 0);
@@ -1651,7 +1645,6 @@ static void ScanStatement(Ast_Statement* statement, Ast_Code* code, Ast_Function
 				Error(module, variable->assignment, "Cannot declare variable with type %\n", variable->type);
 
 			Assert(variable->type != TYPE_EMPTY_TUPLE);
-			Print("Variable '%', type = %\n", variable->name, variable->type);
 
 			code->scope.variables.Add(variable);
 		} break;

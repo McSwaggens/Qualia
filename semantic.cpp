@@ -902,7 +902,6 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 		case AST_EXPRESSION_BINARY_MULTIPLY:
 		case AST_EXPRESSION_BINARY_DIVIDE:
 		case AST_EXPRESSION_BINARY_MODULO:
-		case AST_EXPRESSION_BINARY_EXPONENTIAL:
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
@@ -1669,7 +1668,7 @@ static void ScanStatement(Ast_Statement* statement, Ast_Code* code, Ast_Function
 		case AST_STATEMENT_ASSIGNMENT_SUBTRACT:
 		case AST_STATEMENT_ASSIGNMENT_MULTIPLY:
 		case AST_STATEMENT_ASSIGNMENT_DIVIDE:
-		case AST_STATEMENT_ASSIGNMENT_EXPONENTIAL:
+		case AST_STATEMENT_ASSIGNMENT_XOR:
 		{
 			Ast_Assignment* assignment = &statement->assignment;
 

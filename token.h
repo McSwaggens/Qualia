@@ -78,7 +78,7 @@ enum Token_Kind : uint8
 	TOKEN_MINUS,
 	TOKEN_ASTERISK,
 	TOKEN_DIVIDE,
-	TOKEN_EXPONENT,
+	TOKEN_CARET,
 	TOKEN_AMPERSAND,
 	TOKEN_BAR,
 	TOKEN_EXCLAMATION_MARK,
@@ -90,7 +90,7 @@ enum Token_Kind : uint8
 	TOKEN_MINUS_EQUAL,
 	TOKEN_TIMES_EQUAL,
 	TOKEN_DIVIDE_EQUAL,
-	TOKEN_EXPONENTIAL_EQUAL,
+	TOKEN_CARET_EQUAL,
 	TOKEN_OPEN_PAREN,
 	TOKEN_CLOSE_PAREN,
 	TOKEN_OPEN_BRACE,
@@ -186,7 +186,7 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_MINUS:               return "-";
 		case TOKEN_ASTERISK:            return "*";
 		case TOKEN_DIVIDE:              return "/";
-		case TOKEN_EXPONENT:            return "^";
+		case TOKEN_CARET:               return "^";
 		case TOKEN_AMPERSAND:           return "&";
 		case TOKEN_BAR:                 return "|";
 		case TOKEN_EXCLAMATION_MARK:    return "!";
@@ -196,7 +196,7 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_MINUS_EQUAL:         return "-=";
 		case TOKEN_TIMES_EQUAL:         return "*=";
 		case TOKEN_DIVIDE_EQUAL:        return "/=";
-		case TOKEN_EXPONENTIAL_EQUAL:   return "^=";
+		case TOKEN_CARET_EQUAL:         return "^=";
 		case TOKEN_OPEN_PAREN:          return "(";
 		case TOKEN_CLOSE_PAREN:         return ")";
 		case TOKEN_OPEN_BRACE:          return "{";

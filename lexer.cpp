@@ -876,8 +876,8 @@ static void LexerParse(Ast_Module* module)
 				break;
 
 			case '^':
-				cursor++, token->kind = TOKEN_EXPONENT;
-				if (*cursor == '=') cursor++, token->kind = TOKEN_EXPONENTIAL_EQUAL;
+				cursor++, token->kind = TOKEN_CARET;
+				if (*cursor == '=') cursor++, token->kind = TOKEN_CARET_EQUAL;
 				break;
 
 			case '?':

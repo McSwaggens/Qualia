@@ -50,13 +50,13 @@ static bool IsBinaryOperator(Token_Kind kind)
 	switch (kind)
 	{
 		case TOKEN_DOT:
-		case TOKEN_EXPONENT:
 		case TOKEN_ASTERISK:
 		case TOKEN_DIVIDE:
 		case TOKEN_PLUS:
 		case TOKEN_MINUS:
 		case TOKEN_AND:
 		case TOKEN_OR:
+		case TOKEN_CARET:
 		case TOKEN_MOD:
 		case TOKEN_BITWISE_AND:
 		case TOKEN_BITWISE_OR:
@@ -104,7 +104,7 @@ static bool IsAssignment(Token_Kind kind)
 		case TOKEN_MINUS_EQUAL:
 		case TOKEN_TIMES_EQUAL:
 		case TOKEN_DIVIDE_EQUAL:
-		case TOKEN_EXPONENTIAL_EQUAL:
+		case TOKEN_CARET_EQUAL:
 			return true;
 
 		default:
@@ -227,9 +227,6 @@ static uint32 GetBinaryPrecedence(Token_Kind kind)
 		case TOKEN_DOT:
 			return 0;
 
-		case TOKEN_EXPONENT:
-			return 1;
-
 		case TOKEN_ASTERISK:
 		case TOKEN_DIVIDE:
 		case TOKEN_MOD:
@@ -239,6 +236,7 @@ static uint32 GetBinaryPrecedence(Token_Kind kind)
 		case TOKEN_MINUS:
 			return 4;
 
+		case TOKEN_CARET:
 		case TOKEN_BITWISE_AND:
 		case TOKEN_BITWISE_OR:
 		case TOKEN_BITWISE_XOR:
@@ -280,13 +278,10 @@ static uint32 GetUnaryPrecedence(Token_Kind kind)
 		case TOKEN_ASTERISK:
 		case TOKEN_AMPERSAND:
 		case TOKEN_EXCLAMATION_MARK:
-			return 1;
-			// Make sure *a^n = (*a)^n
-
-		case TOKEN_PLUS:  // I totally forgot why these are on 2 and not 1...
-		case TOKEN_MINUS: //    it isn't because of exponentials...
+		case TOKEN_PLUS:
+		case TOKEN_MINUS:
 		case TOKEN_BITWISE_NOT:
-			return 2;
+			return 1;
 
 		case TOKEN_NOT:
 			return 10;
@@ -315,7 +310,7 @@ static uint32 GetPostfixPrecedence(Token_Kind kind)
 
 static bool IsOperatorRightToLeft(Token_Kind kind)
 {
-	return kind == TOKEN_EXPONENT;
+	return false;
 }
 
 static bool IsPostfixOperator(Token_Kind kind)
@@ -776,7 +771,7 @@ static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module*
 				case TOKEN_ASTERISK:         binary->kind = AST_EXPRESSION_BINARY_MULTIPLY;                 break;
 				case TOKEN_DIVIDE:           binary->kind = AST_EXPRESSION_BINARY_DIVIDE;                   break;
 				case TOKEN_MOD:              binary->kind = AST_EXPRESSION_BINARY_MODULO;                   break;
-				case TOKEN_EXPONENT:         binary->kind = AST_EXPRESSION_BINARY_EXPONENTIAL;              break;
+				case TOKEN_CARET:            binary->kind = AST_EXPRESSION_BINARY_BITWISE_XOR;              break;
 				case TOKEN_BITWISE_OR:       binary->kind = AST_EXPRESSION_BINARY_BITWISE_OR;               break;
 				case TOKEN_BITWISE_XOR:      binary->kind = AST_EXPRESSION_BINARY_BITWISE_XOR;              break;
 				case TOKEN_BITWISE_AND:      binary->kind = AST_EXPRESSION_BINARY_BITWISE_AND;              break;
@@ -1273,12 +1268,12 @@ static Ast_Statement ParseStatement(Token*& token, uint32 indent, Ast_Module* mo
 
 		if (IsAssignment(token->kind))
 		{
-			if      (token->kind == TOKEN_EQUAL)             statement.kind = AST_STATEMENT_ASSIGNMENT;
-			else if (token->kind == TOKEN_PLUS_EQUAL)        statement.kind = AST_STATEMENT_ASSIGNMENT_ADD;
-			else if (token->kind == TOKEN_MINUS_EQUAL)       statement.kind = AST_STATEMENT_ASSIGNMENT_SUBTRACT;
-			else if (token->kind == TOKEN_TIMES_EQUAL)       statement.kind = AST_STATEMENT_ASSIGNMENT_MULTIPLY;
-			else if (token->kind == TOKEN_DIVIDE_EQUAL)      statement.kind = AST_STATEMENT_ASSIGNMENT_DIVIDE;
-			else if (token->kind == TOKEN_EXPONENTIAL_EQUAL) statement.kind = AST_STATEMENT_ASSIGNMENT_EXPONENTIAL;
+			if      (token->kind == TOKEN_EQUAL)        statement.kind = AST_STATEMENT_ASSIGNMENT;
+			else if (token->kind == TOKEN_PLUS_EQUAL)   statement.kind = AST_STATEMENT_ASSIGNMENT_ADD;
+			else if (token->kind == TOKEN_MINUS_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_SUBTRACT;
+			else if (token->kind == TOKEN_TIMES_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_MULTIPLY;
+			else if (token->kind == TOKEN_DIVIDE_EQUAL) statement.kind = AST_STATEMENT_ASSIGNMENT_DIVIDE;
+			else if (token->kind == TOKEN_CARET_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_XOR;
 
 			CheckScope(token, indent+1, module);
 			token += 1;

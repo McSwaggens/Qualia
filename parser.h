@@ -218,7 +218,6 @@ struct Ast_Expression_Literal : Ast_Expression
 	{
 		bool    value_bool;
 		int64   value_int;
-		float16 value_f16;
 		float32 value_f32;
 		float64 value_f64;
 	};

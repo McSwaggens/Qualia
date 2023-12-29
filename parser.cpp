@@ -128,7 +128,6 @@ static bool IsPrimitive(Token_Kind kind)
 		case TOKEN_UINT16:
 		case TOKEN_UINT32:
 		case TOKEN_UINT64:
-		case TOKEN_FLOAT16:
 		case TOKEN_FLOAT32:
 		case TOKEN_FLOAT64:
 			return true;
@@ -155,7 +154,6 @@ static bool IsTerm(Token_Kind kind)
 		case TOKEN_LITERAL_UINT32:
 		case TOKEN_LITERAL_UINT64:
 		case TOKEN_LITERAL_FLOAT:
-		case TOKEN_LITERAL_FLOAT16:
 		case TOKEN_LITERAL_FLOAT32:
 		case TOKEN_LITERAL_FLOAT64:
 		case TOKEN_LITERAL_STRING:
@@ -184,7 +182,6 @@ static bool IsLiteral(Token_Kind kind)
 		case TOKEN_LITERAL_UINT32:
 		case TOKEN_LITERAL_UINT64:
 		case TOKEN_LITERAL_FLOAT:
-		case TOKEN_LITERAL_FLOAT16:
 		case TOKEN_LITERAL_FLOAT32:
 		case TOKEN_LITERAL_FLOAT64:
 		case TOKEN_LITERAL_STRING:

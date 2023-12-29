@@ -69,32 +69,36 @@ enum OpCode : uint16
 	IR_ULSH   = 15 | IR_OPCNT2 | IR_RETBIT,
 	IR_URSH   = 16 | IR_OPCNT2 | IR_RETBIT,
 
-	IR_FADD   = 17 | IR_OPCNT2 | IR_RETBIT,
-	IR_FSUB   = 18 | IR_OPCNT2 | IR_RETBIT,
-	IR_FMUL   = 19 | IR_OPCNT2 | IR_RETBIT,
-	IR_FDIV   = 20 | IR_OPCNT2 | IR_RETBIT,
+	IR_ADD_F32   = 18 | IR_OPCNT2 | IR_RETBIT,
+	IR_ADD_F64   = 19 | IR_OPCNT2 | IR_RETBIT,
+	IR_SUB_F32   = 21 | IR_OPCNT2 | IR_RETBIT,
+	IR_SUB_F64   = 22 | IR_OPCNT2 | IR_RETBIT,
+	IR_MUL_F32   = 24 | IR_OPCNT2 | IR_RETBIT,
+	IR_MUL_F64   = 25 | IR_OPCNT2 | IR_RETBIT,
+	IR_DIV_F32   = 27 | IR_OPCNT2 | IR_RETBIT,
+	IR_DIV_F64   = 28 | IR_OPCNT2 | IR_RETBIT,
 
-	IR_OR     = 21 | IR_OPCNT2 | IR_RETBIT,
-	IR_AND    = 22 | IR_OPCNT2 | IR_RETBIT,
-	IR_XOR    = 23 | IR_OPCNT2 | IR_RETBIT,
+	IR_OR     = 29 | IR_OPCNT2 | IR_RETBIT,
+	IR_AND    = 30 | IR_OPCNT2 | IR_RETBIT,
+	IR_XOR    = 31 | IR_OPCNT2 | IR_RETBIT,
 
-	IR_CMP    = 24 | IR_OPCNT2 | IR_RETBIT,
-	IR_CMPNE  = 25 | IR_OPCNT2 | IR_RETBIT,
+	IR_CMP    = 32 | IR_OPCNT2 | IR_RETBIT,
+	IR_CMPNE  = 33 | IR_OPCNT2 | IR_RETBIT,
 
-	IR_SCMPL  = 26 | IR_OPCNT2 | IR_RETBIT,
-	IR_SCMPLE = 27 | IR_OPCNT2 | IR_RETBIT,
-	IR_SCMPG  = 28 | IR_OPCNT2 | IR_RETBIT,
-	IR_SCMPGE = 29 | IR_OPCNT2 | IR_RETBIT,
+	IR_SCMPL  = 34 | IR_OPCNT2 | IR_RETBIT,
+	IR_SCMPLE = 35 | IR_OPCNT2 | IR_RETBIT,
+	IR_SCMPG  = 36 | IR_OPCNT2 | IR_RETBIT,
+	IR_SCMPGE = 37 | IR_OPCNT2 | IR_RETBIT,
 
-	IR_UCMPL  = 30 | IR_OPCNT2 | IR_RETBIT,
-	IR_UCMPLE = 31 | IR_OPCNT2 | IR_RETBIT,
-	IR_UCMPG  = 32 | IR_OPCNT2 | IR_RETBIT,
-	IR_UCMPGE = 33 | IR_OPCNT2 | IR_RETBIT,
+	IR_UCMPL  = 38 | IR_OPCNT2 | IR_RETBIT,
+	IR_UCMPLE = 39 | IR_OPCNT2 | IR_RETBIT,
+	IR_UCMPG  = 40 | IR_OPCNT2 | IR_RETBIT,
+	IR_UCMPGE = 41 | IR_OPCNT2 | IR_RETBIT,
 
-	IR_FCMPL  = 34 | IR_OPCNT2 | IR_RETBIT,
-	IR_FCMPLE = 35 | IR_OPCNT2 | IR_RETBIT,
-	IR_FCMPG  = 36 | IR_OPCNT2 | IR_RETBIT,
-	IR_FCMPGE = 37 | IR_OPCNT2 | IR_RETBIT,
+	IR_FCMPL  = 42 | IR_OPCNT2 | IR_RETBIT,
+	IR_FCMPLE = 43 | IR_OPCNT2 | IR_RETBIT,
+	IR_FCMPG  = 44 | IR_OPCNT2 | IR_RETBIT,
+	IR_FCMPGE = 45 | IR_OPCNT2 | IR_RETBIT,
 
 	// ---------------- 3 Operands ---------------- //
 	IR_SELECT = 0  | IR_OPCNT3 | IR_RETBIT,
@@ -119,61 +123,65 @@ static String ToString(OpCode opcode)
 {
 	switch (opcode)
 	{
-		case IR_NOP:    return "nop";
-		case IR_PHI:    return "phi";
-		case IR_STACK:  return "stack";
-		case IR_PARAM:  return "param";
-		case IR_MEMBER: return "member";
-		case IR_INDEX:  return "index";
-		case IR_SELECT: return "select";
-		case IR_LOAD:   return "load";
-		case IR_STORE:  return "store";
-		case IR_COPY:   return "copy";
-		case IR_CALL:   return "call";
-		case IR_BRANCH: return "branch";
-		case IR_JUMP:   return "jump";
-		case IR_RET:    return "ret";
-		case IR_RETV:   return "retv";
-		case IR_ADD:    return "add";
-		case IR_SUB:    return "sub";
-		case IR_SMUL:   return "smul";
-		case IR_UMUL:   return "umul";
-		case IR_SDIV:   return "sdiv";
-		case IR_UDIV:   return "udiv";
-		case IR_SMOD:   return "smod";
-		case IR_UMOD:   return "umod";
-		case IR_FADD:   return "fadd";
-		case IR_FSUB:   return "fsub";
-		case IR_FMUL:   return "fmul";
-		case IR_FDIV:   return "fdiv";
-		case IR_SEXT:   return "sext";
-		case IR_ZEXT:   return "zext";
-		case IR_TRUNC:  return "trunc";
-		case IR_ITOF:   return "itof";
-		case IR_FTOI:   return "ftoi";
-		case IR_FTOF:   return "ftof";
-		case IR_NOT:    return "not";
-		case IR_OR:     return "or";
-		case IR_AND:    return "and";
-		case IR_XOR:    return "xor";
-		case IR_SLSH:   return "slsh";
-		case IR_SRSH:   return "srsh";
-		case IR_ULSH:   return "ulsh";
-		case IR_URSH:   return "ursh";
-		case IR_CMP:    return "cmp";
-		case IR_CMPNE:  return "cmpne";
-		case IR_SCMPL:  return "scmpl";
-		case IR_SCMPLE: return "scmple";
-		case IR_SCMPG:  return "scmpg";
-		case IR_SCMPGE: return "scmpge";
-		case IR_UCMPL:  return "ucmpl";
-		case IR_UCMPLE: return "ucmple";
-		case IR_UCMPG:  return "ucmpg";
-		case IR_UCMPGE: return "ucmpge";
-		case IR_FCMPL:  return "fcmpl";
-		case IR_FCMPLE: return "fcmple";
-		case IR_FCMPG:  return "fcmpg";
-		case IR_FCMPGE: return "fcmpge";
+		case IR_NOP:     return "nop";
+		case IR_PHI:     return "phi";
+		case IR_STACK:   return "stack";
+		case IR_PARAM:   return "param";
+		case IR_MEMBER:  return "member";
+		case IR_INDEX:   return "index";
+		case IR_SELECT:  return "select";
+		case IR_LOAD:    return "load";
+		case IR_STORE:   return "store";
+		case IR_COPY:    return "copy";
+		case IR_CALL:    return "call";
+		case IR_BRANCH:  return "branch";
+		case IR_JUMP:    return "jump";
+		case IR_RET:     return "ret";
+		case IR_RETV:    return "retv";
+		case IR_ADD:     return "add";
+		case IR_SUB:     return "sub";
+		case IR_SMUL:    return "smul";
+		case IR_UMUL:    return "umul";
+		case IR_SDIV:    return "sdiv";
+		case IR_UDIV:    return "udiv";
+		case IR_SMOD:    return "smod";
+		case IR_UMOD:    return "umod";
+		case IR_ADD_F32: return "fadd32";
+		case IR_ADD_F64: return "fadd64";
+		case IR_SUB_F32: return "fsub32";
+		case IR_SUB_F64: return "fsub64";
+		case IR_MUL_F32: return "fmul32";
+		case IR_MUL_F64: return "fmul64";
+		case IR_DIV_F32: return "fdiv32";
+		case IR_DIV_F64: return "fdiv64";
+		case IR_SEXT:    return "sext";
+		case IR_ZEXT:    return "zext";
+		case IR_TRUNC:   return "trunc";
+		case IR_ITOF:    return "itof";
+		case IR_FTOI:    return "ftoi";
+		case IR_FTOF:    return "ftof";
+		case IR_NOT:     return "not";
+		case IR_OR:      return "or";
+		case IR_AND:     return "and";
+		case IR_XOR:     return "xor";
+		case IR_SLSH:    return "slsh";
+		case IR_SRSH:    return "srsh";
+		case IR_ULSH:    return "ulsh";
+		case IR_URSH:    return "ursh";
+		case IR_CMP:     return "cmp";
+		case IR_CMPNE:   return "cmpne";
+		case IR_SCMPL:   return "scmpl";
+		case IR_SCMPLE:  return "scmple";
+		case IR_SCMPG:   return "scmpg";
+		case IR_SCMPGE:  return "scmpge";
+		case IR_UCMPL:   return "ucmpl";
+		case IR_UCMPLE:  return "ucmple";
+		case IR_UCMPG:   return "ucmpg";
+		case IR_UCMPGE:  return "ucmpge";
+		case IR_FCMPL:   return "fcmpl";
+		case IR_FCMPLE:  return "fcmple";
+		case IR_FCMPG:   return "fcmpg";
+		case IR_FCMPGE:  return "fcmpge";
 	}
 }
 
@@ -247,8 +255,17 @@ struct Block
 	Instruction* Stack(Value size);
 	Instruction* Load(Value addr);
 	Instruction* Store(Value dest, Value value);
+
 	Instruction* Add(Value a, Value b);
+	Instruction* AddF16(Value a, Value b);
+	Instruction* AddF32(Value a, Value b);
+	Instruction* AddF64(Value a, Value b);
+
 	Instruction* Sub(Value a, Value b);
+	Instruction* SubF16(Value a, Value b);
+	Instruction* SubF32(Value a, Value b);
+	Instruction* SubF64(Value a, Value b);
+
 	Instruction* Jump(Block* to);
 	Instruction* Branch(Value condition, Block* btrue, Block* bfalse);
 	Instruction* Return(Value value);

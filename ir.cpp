@@ -87,6 +87,30 @@ Instruction* Block::Add(Value a, Value b)
 	return result;
 }
 
+Instruction* Block::AddF32(Value a, Value b)
+{
+	Instruction* result = this->NewInstruction((Instruction){
+		.opcode = IR_ADD_F32,
+		.op0 = a,
+		.op1 = b,
+		.type = TYPE_FLOAT32,
+	});
+
+	return result;
+}
+
+Instruction* Block::AddF64(Value a, Value b)
+{
+	Instruction* result = this->NewInstruction((Instruction){
+		.opcode = IR_ADD_F64,
+		.op0 = a,
+		.op1 = b,
+		.type = TYPE_FLOAT64,
+	});
+
+	return result;
+}
+
 Instruction* Block::Sub(Value a, Value b)
 {
 	Instruction* result = this->NewInstruction((Instruction){
@@ -99,6 +123,29 @@ Instruction* Block::Sub(Value a, Value b)
 	return result;
 }
 
+Instruction* Block::SubF32(Value a, Value b)
+{
+	Instruction* result = this->NewInstruction((Instruction){
+		.opcode = IR_ADD_F32,
+		.op0 = a,
+		.op1 = b,
+		.type = TYPE_FLOAT32,
+	});
+
+	return result;
+}
+
+Instruction* Block::SubF64(Value a, Value b)
+{
+	Instruction* result = this->NewInstruction((Instruction){
+		.opcode = IR_ADD_F64,
+		.op0 = a,
+		.op1 = b,
+		.type = TYPE_FLOAT64,
+	});
+
+	return result;
+}
 
 Instruction* Block::Jump(Block* to)
 {
@@ -229,9 +276,6 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 				case TYPE_UINT8:
 					result = literal->value_int;
 
-				case TYPE_FLOAT16:
-					result = literal->value_f16;
-
 				case TYPE_FLOAT32:
 					result = literal->value_f32;
 
@@ -274,10 +318,29 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 			Ast_Expression_Binary* bin = (Ast_Expression_Binary*)expr;
 			Value vleft  = ExpressionToIR(bin->left,  block, true);
 			Value vright = ExpressionToIR(bin->right, block, true);
-			result = block->Add(vleft, vright);
+
+			if (IsInteger(bin->left->type))
+			{
+				result = block->Add(vleft, vright);
+				break;
+			}
+
+			if (bin->left->type == TYPE_FLOAT32)
+			{
+				result = block->AddF32(vleft, vright);
+				break;
+			}
+
 		} break;
 
 		case AST_EXPRESSION_BINARY_SUBTRACT:
+		{
+			Ast_Expression_Binary* bin = (Ast_Expression_Binary*)expr;
+			Value vleft  = ExpressionToIR(bin->left,  block, true);
+			Value vright = ExpressionToIR(bin->right, block, true);
+			result = block->Sub(vleft, vright);
+		} break;
+
 		case AST_EXPRESSION_BINARY_MULTIPLY:
 		case AST_EXPRESSION_BINARY_DIVIDE:
 		case AST_EXPRESSION_BINARY_MODULO:

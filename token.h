@@ -19,7 +19,6 @@ enum Token_Kind : uint8
 	TOKEN_LITERAL_UINT32,
 	TOKEN_LITERAL_UINT64,
 	TOKEN_LITERAL_FLOAT,
-	TOKEN_LITERAL_FLOAT16,
 	TOKEN_LITERAL_FLOAT32,
 	TOKEN_LITERAL_FLOAT64,
 	TOKEN_LITERAL_STRING,
@@ -60,7 +59,6 @@ enum Token_Kind : uint8
 	TOKEN_UINT16,
 	TOKEN_UINT32,
 	TOKEN_UINT64,
-	TOKEN_FLOAT16,
 	TOKEN_FLOAT32,
 	TOKEN_FLOAT64,
 	TOKEN_BITWISE_OR,
@@ -125,7 +123,6 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_LITERAL_UINT32:      return "<literal_uint32>";
 		case TOKEN_LITERAL_UINT64:      return "<literal_uint64>";
 		case TOKEN_LITERAL_FLOAT:       return "<literal_float>";
-		case TOKEN_LITERAL_FLOAT16:     return "<literal_float16>";
 		case TOKEN_LITERAL_FLOAT32:     return "<literal_float32>";
 		case TOKEN_LITERAL_FLOAT64:     return "<literal_float64>";
 		case TOKEN_LITERAL_STRING:      return "<literal_string>";
@@ -166,7 +163,6 @@ static constexpr String ToString(Token_Kind kind)
 		case TOKEN_UINT16:              return "uint16";
 		case TOKEN_UINT32:              return "uint32";
 		case TOKEN_UINT64:              return "uint64";
-		case TOKEN_FLOAT16:             return "float16";
 		case TOKEN_FLOAT32:             return "float32";
 		case TOKEN_FLOAT64:             return "float64";
 		case TOKEN_BITWISE_OR:          return "OR";

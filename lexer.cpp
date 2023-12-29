@@ -309,13 +309,13 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 		switch (qualifier & QUALIFIER_SIZE_MASK)
 		{
 			default:           token->kind = TOKEN_LITERAL_FLOAT;   break;
-			case QUALIFIER_16: token->kind = TOKEN_LITERAL_FLOAT16; break;
 			case QUALIFIER_32: token->kind = TOKEN_LITERAL_FLOAT32; break;
 			case QUALIFIER_64: token->kind = TOKEN_LITERAL_FLOAT64; break;
+			case QUALIFIER_16:
+				LexerError(module, token->location, "Invalid float literal qualifier: float16 is not a valid type.\n");
+
 			case QUALIFIER_8:
-			{
 				LexerError(module, token->location, "Invalid float literal qualifier: float8 is not a valid type.\n");
-			}
 		}
 
 		float64 value = AsciiToFloat(whole.begin, whole.count, base);
@@ -579,7 +579,6 @@ static void LexerParse(Ast_Module* module)
 
 			case 'f':
 				if (IsKeyword(cursor, TOKEN_FALSE))       { cursor += ToString(TOKEN_FALSE).length;       token->kind = TOKEN_FALSE;       break; }
-				if (IsKeyword(cursor, TOKEN_FLOAT16))     { cursor += ToString(TOKEN_FLOAT16).length;     token->kind = TOKEN_FLOAT16;     break; }
 				if (IsKeyword(cursor, TOKEN_FLOAT32))     { cursor += ToString(TOKEN_FLOAT32).length;     token->kind = TOKEN_FLOAT32;     break; }
 				if (IsKeyword(cursor, TOKEN_FLOAT64))     { cursor += ToString(TOKEN_FLOAT64).length;     token->kind = TOKEN_FLOAT64;     break; }
 				if (IsKeyword(cursor, TOKEN_FOR))         { cursor += ToString(TOKEN_FOR).length;         token->kind = TOKEN_FOR;         break; }

@@ -195,7 +195,6 @@ static void Write(OutputBuffer* buffer, Token token)
 		} break;
 
 		case TOKEN_LITERAL_FLOAT:
-		case TOKEN_LITERAL_FLOAT16:
 		case TOKEN_LITERAL_FLOAT32:
 		case TOKEN_LITERAL_FLOAT64:
 		{

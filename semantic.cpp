@@ -100,7 +100,6 @@ static TypeID GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Ast_Module* m
 				case TOKEN_UINT32:  result = TYPE_UINT32;  break;
 				case TOKEN_UINT64:  result = TYPE_UINT64;  break;
 
-				case TOKEN_FLOAT16: result = TYPE_FLOAT16; break;
 				case TOKEN_FLOAT32: result = TYPE_FLOAT32; break;
 				case TOKEN_FLOAT64: result = TYPE_FLOAT64; break;
 
@@ -452,13 +451,6 @@ static void ScanExpressionLiteral(Ast_Expression_Literal* literal, Ast_Scope* sc
 		{
 			literal->type = TYPE_FLOAT32; // @Fixme?
 			literal->value_f32 = literal->token->literal_float;
-		} break;
-
-		case TOKEN_LITERAL_FLOAT16:
-		{
-			literal->type = TYPE_FLOAT16;
-			literal->value_f32 = literal->token->literal_float; // @Bug
-			Assert();
 		} break;
 
 		case TOKEN_LITERAL_FLOAT32:

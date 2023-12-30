@@ -496,7 +496,7 @@ struct Ast_Function
 	TypeID return_type;
 	List<Ast_Return*> returns; // @Todo: Infer return type.
 	Ast_Type* ast_return_type;
-	Procedure* ir;
+	Procedure* procedure;
 	bool is_pure;
 	bool is_global;
 };

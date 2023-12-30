@@ -1,8 +1,5 @@
 FooBar():
 	a := 1
-	b := 2
-	x := 2 ^ 1
-	c := a + b
 
 // CopyMemory(dest: *byte, src: *byte, size: uint):
 // 	for i := 0, i < size:

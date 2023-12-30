@@ -1437,9 +1437,9 @@ static Ast_Function ParseFunction(Token*& token, uint32 indent, Ast_Module* modu
 {
 	Ast_Function function;
 	ZeroMemory(&function);
-	function.ir = null;
 	function.name = token->identifier_string;
 	function.name_token = token;
+	function.procedure = MakeProcedure(function.name);
 	token += 1;
 	ParseParameters(&function, token, indent, module);
 	token = token->closure+1;

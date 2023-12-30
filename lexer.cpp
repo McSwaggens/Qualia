@@ -311,6 +311,7 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 			default:           token->kind = TOKEN_LITERAL_FLOAT;   break;
 			case QUALIFIER_32: token->kind = TOKEN_LITERAL_FLOAT32; break;
 			case QUALIFIER_64: token->kind = TOKEN_LITERAL_FLOAT64; break;
+
 			case QUALIFIER_16:
 				LexerError(module, token->location, "Invalid float literal qualifier: float16 is not a valid type.\n");
 
@@ -631,35 +632,14 @@ static void LexerParse(Ast_Module* module)
 				if (IsKeyword(cursor, TOKEN_WHILE))       { cursor += ToString(TOKEN_WHILE).length;       token->kind = TOKEN_WHILE;       break; }
 				goto PARSE_IDENTIFIER;
 
-			case 'G':
-			case 'H':
-			case 'I':
-			case 'J':
-			case 'K':
-			case 'L':
-			case 'P':
-			case 'Q':
-			case 'R':
-			case 'S':
-			case 'T':
-			case 'U':
-			case 'V':
-			case 'W':
-			case 'Y':
-			case 'Z':
+			case 'G': case 'H': case 'I': case 'J':
+			case 'K': case 'L': case 'P': case 'Q':
+			case 'R': case 'S': case 'T': case 'U':
+			case 'V': case 'W': case 'Y': case 'Z':
+			case 'g': case 'h': case 'j': case 'k':
+			case 'l': case 'm': case 'p': case 'q':
+			case 'v': case 'x': case 'y': case 'z':
 			case '_':
-			case 'g':
-			case 'h':
-			case 'j':
-			case 'k':
-			case 'l':
-			case 'm':
-			case 'p':
-			case 'q':
-			case 'v':
-			case 'x':
-			case 'y':
-			case 'z':
 			PARSE_IDENTIFIER:
 			{
 				char* begin = cursor;

@@ -234,6 +234,8 @@ struct Procedure
 	Ast_Function* function;
 	List<Block*> blocks;
 	Block* entry;
+	uint32 instruction_ticker;
+	uint32 block_ticker;
 
 	Block* NewBlock();
 };
@@ -306,6 +308,8 @@ struct Instruction
 		return ((uint64)opcode >> IR_OPCODE_BITCNT) & ((1<<IR_AUX_OPCNT_BITCNT)-1);
 	}
 };
+
+static Procedure* MakeProcedure(String name);
 
 static void Write(OutputBuffer* buffer, Procedure* function);
 static void GenerateIR(Ast_Module* module);

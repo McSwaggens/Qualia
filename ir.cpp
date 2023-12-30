@@ -5,10 +5,19 @@
 
 static List<Procedure*> procedures = null;
 
+static Procedure* MakeProcedure(String name)
+{
+	Procedure* proc = Allocate<Procedure>();
+	procedures.Add(proc);
+	return proc;
+}
+
 Block* Procedure::NewBlock()
 {
 	Block* block = Allocate<Block>();
 	ZeroMemory(block);
+	block->procedure = this;
+	block->id = this->block_ticker++;
 
 	this->blocks.Add(block);
 
@@ -23,6 +32,7 @@ Instruction* Block::NewInstruction(Instruction instruction)
 {
 	Instruction* result = Allocate<Instruction>();
 	*result = instruction;
+	result->id = this->procedure->instruction_ticker++;
 
 	result->block = this;
 
@@ -275,12 +285,15 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 				case TYPE_UINT16:
 				case TYPE_UINT8:
 					result = literal->value_int;
+					break;
 
 				case TYPE_FLOAT32:
 					result = literal->value_f32;
+					break;
 
 				case TYPE_FLOAT64:
 					result = literal->value_f64;
+					break;
 			}
 		} break;
 
@@ -440,6 +453,7 @@ static Procedure* FunctionToIR(Ast_Function* function)
 	Procedure* proc = Allocate<Procedure>();
 	ZeroMemory(proc);
 	proc->function = function;
+	function->procedure = proc;
 
 	Block* binit = proc->NewBlock();
 
@@ -477,7 +491,7 @@ static void GenerateIR(Ast_Module* module)
 	for (uint64 i = 0; i < module->scope.functions; i++)
 	{
 		Ast_Function* function = &module->scope.functions[i];
-		Print("%\n", function->ir);
+		Print("%\n", function->procedure);
 	}
 }
 

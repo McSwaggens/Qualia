@@ -600,28 +600,25 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression)
 	}
 }
 
-static void GenericWriteName(OutputBuffer* buffer, Instruction* instruction)
-{
-	BufferWriteString(buffer, "i");
-	Write(buffer, instruction->id);
-
-	Write(buffer, " ");
-
-	if (instruction->DoesReturn())
-	{
-		Write(buffer, instruction->opcode);
-	}
-}
-
-static void Write(OutputBuffer* buffer, Block* block)
-{
-	BufferWriteString(buffer, "b");
-	Write(buffer, block->id);
-}
-
 static void Write(OutputBuffer* buffer, OpCode kind)
 {
 	Write(buffer, ToString(kind));
+}
+
+static void WriteGenericName(OutputBuffer* buffer, Instruction* instruction)
+{
+	switch (instruction->opcode)
+	{
+		case IR_STACK:
+			BufferWriteString(buffer, "s");
+			break;
+
+		default:
+			BufferWriteString(buffer, "i");
+			break;
+	}
+
+	Write(buffer, instruction->id);
 }
 
 static void Write(OutputBuffer* buffer, Value value)
@@ -634,7 +631,7 @@ static void Write(OutputBuffer* buffer, Value value)
 
 	if (value.kind == IR_INSTRUCTION)
 	{
-		GenericWriteName(buffer, value.instruction);
+		WriteGenericName(buffer, value.instruction);
 	}
 	else if (value.kind == IR_CONST_INT)
 	{
@@ -658,8 +655,16 @@ static void Write(OutputBuffer* buffer, Instruction* instruction)
 		return;
 	}
 
-	BufferWriteString(buffer, "\t");
-	Write(buffer, ToString(instruction->opcode));
+	BufferWriteString(buffer, "  ");
+
+	if (instruction->DoesReturn())
+	{
+		WriteGenericName(buffer, instruction);
+		BufferWriteString(buffer, " = ");
+	}
+
+	Write(buffer, instruction->opcode);
+	Write(buffer, ' ');
 
 	uint32 num_ops = instruction->GetOperandCount();
 
@@ -669,8 +674,8 @@ static void Write(OutputBuffer* buffer, Instruction* instruction)
 		{
 			for (uint32 i = 0; i < num_ops; i++)
 			{
-				Write(buffer, ' ');
-				Write(buffer, &instruction->ops[i]);
+				if (i) BufferWriteString(buffer, ", ");
+				Write(buffer, instruction->ops[i]);
 			}
 		} break;
 
@@ -710,8 +715,30 @@ static void Write(OutputBuffer* buffer, Instruction* instruction)
 	BufferWriteString(buffer, "\n");
 }
 
-static void Write(OutputBuffer* buffer, Procedure* function)
+static void Write(OutputBuffer* buffer, Block* block)
 {
-	// @Todo: Rewrite
+	Print(buffer, "b%:\n", block->id);
+	for (uint32 i = 0; i < block->instructions.count; i++)
+	{
+		Instruction* instruction = block->instructions[i];
+
+		if (instruction == block->controlFlowInstruction)
+			continue;
+
+		Write(buffer, instruction);
+	}
+}
+
+static void Write(OutputBuffer* buffer, Procedure* proc)
+{
+	// IrPrintHelper helper;
+	// ZeroMemory(&helper);
+	// IrPrintHelperParse(proc->entry, &helper);
+
+	for (uint32 i = 0; i < proc->blocks.count; i++)
+	{
+		Block* block = proc->blocks[i];
+		Write(buffer, block);
+	}
 }
 

@@ -234,7 +234,6 @@ static void Write(OutputBuffer* buffer, TypeID type)
 				case TYPE_INT16:   BufferWriteString(buffer, "int16");   break;
 				case TYPE_INT32:   BufferWriteString(buffer, "int32");   break;
 				case TYPE_INT64:   BufferWriteString(buffer, "int64");   break;
-				case TYPE_FLOAT16: BufferWriteString(buffer, "float16"); break;
 				case TYPE_FLOAT32: BufferWriteString(buffer, "float32"); break;
 				case TYPE_FLOAT64: BufferWriteString(buffer, "float64"); break;
 				default: break;

@@ -10,7 +10,7 @@ bin/qualia: *.cpp *.h *.asm
 		-nostdinc -nostdinc++\
 		-fno-rtti -fno-exceptions\
 		qualia.cpp bin/general.o -lm\
-		-Og -ggdb -DDEBUG
+		-O0 -ggdb -DDEBUG
 		# -O3
 		# -ggdb -g3 -fno-omit-frame-pointer -DDEBUG
 		# -fno-stack-protector\

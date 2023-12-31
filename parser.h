@@ -371,7 +371,7 @@ struct Ast_Branch
 {
 	Ast_Branch_Kind kind;
 	Ast_Branch_Clause_Kind clause;
-	Block* ir;
+	Block* entry_block;
 
 	union
 	{

@@ -39,6 +39,8 @@ static void Assert(bool b = false, String desc = null, InternalLocation loc = Ge
 			Print("%:%: error: %\n", loc.file, loc.line, desc);
 		}
 
+		// DebugBreak();
+
 		ExitProcess(false);
 	}
 }

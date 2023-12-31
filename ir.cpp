@@ -176,7 +176,7 @@ Instruction* Block::Branch(Value cond, Block* btrue, Block* bfalse)
 	Assert(!this->controlFlowInstruction);
 
 	Instruction* result = this->NewInstruction((Instruction){
-		.opcode = IR_JUMP,
+		.opcode = IR_BRANCH,
 		.op0 = cond,
 		.op1 = btrue,
 		.op2 = bfalse,
@@ -257,7 +257,9 @@ struct IrGenHelper
 	Value  return_stack;
 };
 
-static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_reference = false)
+static void CodeToIR(Ast_Code* code, Block* block, Block* bexit, Block* bbreak, IrGenHelper* helper);
+
+static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_reference, IrGenHelper* helper)
 {
 	Value result = Value();
 
@@ -325,12 +327,13 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 		case AST_EXPRESSION_BINARY_COMPARE_GREATER:
 		case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
 		case AST_EXPRESSION_BINARY_DOT:
+			Assert();
 
 		case AST_EXPRESSION_BINARY_ADD:
 		{
 			Ast_Expression_Binary* bin = (Ast_Expression_Binary*)expr;
-			Value vleft  = ExpressionToIR(bin->left,  block, true);
-			Value vright = ExpressionToIR(bin->right, block, true);
+			Value vleft  = ExpressionToIR(bin->left,  block, true, helper);
+			Value vright = ExpressionToIR(bin->right, block, true, helper);
 
 			if (IsInteger(bin->left->type))
 			{
@@ -349,8 +352,8 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 		case AST_EXPRESSION_BINARY_SUBTRACT:
 		{
 			Ast_Expression_Binary* bin = (Ast_Expression_Binary*)expr;
-			Value vleft  = ExpressionToIR(bin->left,  block, true);
-			Value vright = ExpressionToIR(bin->right, block, true);
+			Value vleft  = ExpressionToIR(bin->left,  block, true, helper);
+			Value vright = ExpressionToIR(bin->right, block, true, helper);
 			result = block->Sub(vleft, vright);
 		} break;
 
@@ -365,7 +368,14 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 		case AST_EXPRESSION_BINARY_AND:
 		case AST_EXPRESSION_BINARY_OR:
 		case AST_EXPRESSION_IF_ELSE:
+			Assert();
+
 		case AST_EXPRESSION_IMPLICIT_CAST:
+		{
+			Ast_Expression_Implicit_Cast* cast = (Ast_Expression_Implicit_Cast*)expr;
+			result = ExpressionToIR(cast->subexpression, block, true, helper);
+		} break;
+
 		case AST_EXPRESSION_CALL:
 		case AST_EXPRESSION_DOT_CALL:
 		case AST_EXPRESSION_SUBSCRIPT:
@@ -385,13 +395,67 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 	return result;
 }
 
-static void StatementToIR(Ast_Statement* statement, Block* block, Block* bbreak, IrGenHelper* helper)
+static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHelper* helper)
+{
+	Procedure* proc = helper->procedure;
+
+	if (branch->else_branch && !branch->else_branch->entry_block)
+		BranchToIR(branch->else_branch, bbreak, bexit, helper);
+
+	if (branch->then_branch && !branch->then_branch->entry_block)
+		BranchToIR(branch->then_branch, bbreak, bexit, helper);
+
+	Assert(!branch->entry_block);
+
+	branch->entry_block = proc->NewBlock();
+
+	Block* else_block = bexit;
+	Block* then_block = bexit;
+
+	if (branch->else_branch)
+		else_block = branch->else_branch->entry_block;
+
+	if (branch->then_branch)
+		then_block = branch->then_branch->entry_block;
+
+	switch (branch->kind)
+	{
+		case AST_BRANCH_NAKED:
+		{
+			CodeToIR(&branch->code, branch->entry_block, bexit, bbreak, helper);
+		} break;
+
+		case AST_BRANCH_IF:
+		{
+			Block* body_block = proc->NewBlock();
+			Value cond = ExpressionToIR(branch->if_condition, branch->entry_block, true, helper);
+			branch->entry_block->Branch(cond, body_block, else_block);
+			CodeToIR(&branch->code, body_block, then_block, bbreak, helper);
+		} break;
+
+		default:
+			AssertUnreachable();
+	}
+}
+
+static Block* BranchBlockToIR(Ast_BranchBlock* bb, Block* block, Block* bbreak, IrGenHelper* helper)
+{
+	Block* exit_block = helper->procedure->NewBlock();
+
+	BranchToIR(&bb->branches[0], bbreak, exit_block, helper);
+
+	block->Jump(bb->branches[0].entry_block);
+
+	return exit_block;
+}
+
+static Block* StatementToIR(Ast_Statement* statement, Block* block, Block* bbreak, IrGenHelper* helper)
 {
 	switch (statement->kind)
 	{
 		case AST_STATEMENT_EXPRESSION:
 		{
-			Value value = ExpressionToIR(statement->expression, block);
+			Value value = ExpressionToIR(statement->expression, block, false, helper);
 		} break;
 
 		case AST_STATEMENT_VARIABLE_DECLARATION:
@@ -399,7 +463,7 @@ static void StatementToIR(Ast_Statement* statement, Block* block, Block* bbreak,
 			Ast_Variable* var = &statement->variable_declaration;
 			Instruction* stack = block->Stack(GetTypeSize(var->type));
 			var->ir_stack = stack;
-			Value value = ExpressionToIR(var->assignment, block);
+			Value value = ExpressionToIR(var->assignment, block, true, helper);
 			block->Store(stack, value);
 		} break;
 
@@ -417,7 +481,7 @@ static void StatementToIR(Ast_Statement* statement, Block* block, Block* bbreak,
 		{
 			Ast_Increment* inc = &statement->increment;
 			bool is_inc = statement->kind == AST_STATEMENT_INCREMENT;
-			Value refval = ExpressionToIR(inc->expression, block);
+			Value refval = ExpressionToIR(inc->expression, block, false, helper);
 			Value val = block->Load(refval);
 
 			if (IsInteger(inc->expression->type))
@@ -443,18 +507,22 @@ static void StatementToIR(Ast_Statement* statement, Block* block, Block* bbreak,
 
 		case AST_STATEMENT_BREAK:
 		{
+			block->Jump(bbreak);
 		} break;
 
 		case AST_STATEMENT_CLAIM:
 
 		case AST_STATEMENT_BRANCH_BLOCK:
 		{
+			block = BranchBlockToIR(&statement->branch_block, block, bbreak, helper);
 		} break;
 
 		case AST_STATEMENT_DEFER:
 		{
 		} break;
 	}
+
+	return block;
 }
 
 static void CodeToIR(Ast_Code* code, Block* block, Block* bexit, Block* bbreak, IrGenHelper* helper)
@@ -463,8 +531,13 @@ static void CodeToIR(Ast_Code* code, Block* block, Block* bexit, Block* bbreak, 
 	for (uint64 i = 0; i < code->statements.count; i++)
 	{
 		Ast_Statement* statement = &code->statements[i];
-		StatementToIR(statement, block, bbreak, helper);
+		block = StatementToIR(statement, block, bbreak, helper);
+
+		if (block->controlFlowInstruction)
+			break;
 	}
+
+	block->Jump(bexit);
 }
 
 static Procedure* FunctionToIR(Ast_Function* function)
@@ -486,9 +559,11 @@ static Procedure* FunctionToIR(Ast_Function* function)
 	}
 
 	Block* exit = proc->NewBlock();
+	exit->Return();
 
-	IrGenHelper helper;
-	ZeroMemory(&helper);
+	IrGenHelper helper = (IrGenHelper) {
+		.procedure = proc,
+	};
 
 	CodeToIR(&function->code, binit, exit, null, &helper);
 

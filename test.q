@@ -1,6 +1,12 @@
 FooBar():
-	a : float32 = 1
-	dec a
+	a := 1
+
+	if 123:
+		b := 2
+	else:
+		c := 3
+	then if 456:
+		c := 4
 
 // CopyMemory(dest: *byte, src: *byte, size: uint):
 // 	for i := 0, i < size:

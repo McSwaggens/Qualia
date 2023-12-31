@@ -632,6 +632,14 @@ static void Write(OutputBuffer* buffer, Value value)
 	{
 		WriteGenericName(buffer, value.instruction);
 	}
+	else if (value.kind == IR_BLOCK)
+	{
+		Print(buffer, "b%", value.block->id);
+	}
+	else if (value.kind == IR_PROCEDURE)
+	{
+		Print(buffer, "%", value.procedure->function->name);
+	}
 	else if (value.kind == IR_CONST_INT)
 	{
 		Write(buffer, value.const_int);
@@ -726,6 +734,8 @@ static void Write(OutputBuffer* buffer, Block* block)
 
 		Write(buffer, instruction);
 	}
+
+	Write(buffer, block->controlFlowInstruction);
 }
 
 static void Write(OutputBuffer* buffer, Procedure* proc)

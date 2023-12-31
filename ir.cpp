@@ -428,9 +428,30 @@ static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHel
 		case AST_BRANCH_IF:
 		{
 			Block* body_block = proc->NewBlock();
+
 			Value cond = ExpressionToIR(branch->if_condition, branch->entry_block, true, helper);
 			branch->entry_block->Branch(cond, body_block, else_block);
+
 			CodeToIR(&branch->code, body_block, then_block, bbreak, helper);
+		} break;
+
+		case AST_BRANCH_WHILE:
+		{
+			Block* body_block = proc->NewBlock();
+			Block* loop_block = branch->entry_block;
+
+			Value cond = ExpressionToIR(branch->if_condition, branch->entry_block, true, helper);
+			branch->entry_block->Branch(cond, body_block, else_block);
+
+			if (branch->then_branch)
+			{
+				loop_block = proc->NewBlock();
+
+				Value cond = ExpressionToIR(branch->if_condition, loop_block, true, helper);
+				loop_block->Branch(cond, body_block, then_block);
+			}
+
+			CodeToIR(&branch->code, body_block, loop_block, bbreak, helper);
 		} break;
 
 		default:

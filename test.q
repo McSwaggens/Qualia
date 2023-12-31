@@ -1,11 +1,11 @@
 FooBar():
 	a := 1
 
-	if 123:
+	while 123:
 		b := 2
-	else:
+	then:
 		c := 3
-	then if 456:
+	else:
 		c := 4
 
 // CopyMemory(dest: *byte, src: *byte, size: uint):

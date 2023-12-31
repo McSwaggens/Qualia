@@ -1,5 +1,6 @@
 FooBar():
-	a := 1
+	a : float32 = 1
+	dec a
 
 // CopyMemory(dest: *byte, src: *byte, size: uint):
 // 	for i := 0, i < size:

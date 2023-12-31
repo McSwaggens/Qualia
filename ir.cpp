@@ -136,7 +136,7 @@ Instruction* Block::Sub(Value a, Value b)
 Instruction* Block::SubF32(Value a, Value b)
 {
 	Instruction* result = this->NewInstruction((Instruction){
-		.opcode = IR_ADD_F32,
+		.opcode = IR_SUB_F32,
 		.op0 = a,
 		.op1 = b,
 		.type = TYPE_FLOAT32,
@@ -148,7 +148,7 @@ Instruction* Block::SubF32(Value a, Value b)
 Instruction* Block::SubF64(Value a, Value b)
 {
 	Instruction* result = this->NewInstruction((Instruction){
-		.opcode = IR_ADD_F64,
+		.opcode = IR_SUB_F64,
 		.op0 = a,
 		.op1 = b,
 		.type = TYPE_FLOAT64,
@@ -398,6 +398,7 @@ static void StatementToIR(Ast_Statement* statement, Block* block, Block* bbreak,
 		{
 			Ast_Variable* var = &statement->variable_declaration;
 			Instruction* stack = block->Stack(GetTypeSize(var->type));
+			var->ir_stack = stack;
 			Value value = ExpressionToIR(var->assignment, block);
 			block->Store(stack, value);
 		} break;
@@ -414,8 +415,26 @@ static void StatementToIR(Ast_Statement* statement, Block* block, Block* bbreak,
 		case AST_STATEMENT_INCREMENT:
 		case AST_STATEMENT_DECREMENT:
 		{
+			Ast_Increment* inc = &statement->increment;
 			bool is_inc = statement->kind == AST_STATEMENT_INCREMENT;
-			Value refval = ExpressionToIR(statement->increment.expression, block);
+			Value refval = ExpressionToIR(inc->expression, block);
+			Value val = block->Load(refval);
+
+			if (IsInteger(inc->expression->type))
+			{
+				val = is_inc ? block->Add(val, 1) : block->Sub(val, 1);
+			}
+			else if (inc->expression->type == TYPE_FLOAT32)
+			{
+				val = is_inc ? block->AddF32(val, 1) : block->SubF32(val, 1);
+			}
+			else if (inc->expression->type == TYPE_FLOAT32)
+			{
+				val = is_inc ? block->AddF64(val, 1) : block->SubF64(val, 1);
+			}
+			else AssertUnreachable();
+
+			block->Store(refval, val);
 		} break;
 
 		case AST_STATEMENT_RETURN:

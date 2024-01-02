@@ -3,10 +3,8 @@ FooBar():
 
 	while 123:
 		b := 2
-	then:
-		c := 3
 	else:
-		c := 4
+		c := 3
 
 // CopyMemory(dest: *byte, src: *byte, size: uint):
 // 	for i := 0, i < size:

@@ -120,7 +120,6 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_BINARY_RIGHT_SHIFT,
 	AST_EXPRESSION_BINARY_AND,
 	AST_EXPRESSION_BINARY_OR,
-	// AST_EXPRESSION_BINARY_RANGE,
 	AST_EXPRESSION_IF_ELSE,
 	AST_EXPRESSION_IMPLICIT_CAST,
 	AST_EXPRESSION_CALL,
@@ -357,14 +356,13 @@ struct Ast_Branch_For_Range
 	Ast_Variable*   iterator;
 	Ast_Expression* range;
 	Ast_Expression* filter;
-	Ast_Expression* stride;
 };
 
 struct Ast_Branch_For_Verbose
 {
 	Ast_Variable* variable;
 	Ast_Expression* condition;
-	Ast_Expression* stride;
+	Ast_Expression* next;
 };
 
 struct Ast_Branch

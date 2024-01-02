@@ -427,31 +427,66 @@ static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHel
 
 		case AST_BRANCH_IF:
 		{
-			Block* body_block = proc->NewBlock();
+			Block* body = proc->NewBlock();
 
 			Value cond = ExpressionToIR(branch->if_condition, branch->entry_block, true, helper);
-			branch->entry_block->Branch(cond, body_block, else_block);
+			branch->entry_block->Branch(cond, body, else_block);
 
-			CodeToIR(&branch->code, body_block, then_block, bbreak, helper);
+			CodeToIR(&branch->code, body, then_block, bbreak, helper);
 		} break;
 
 		case AST_BRANCH_WHILE:
 		{
-			Block* body_block = proc->NewBlock();
-			Block* loop_block = branch->entry_block;
+			Block* b = branch->entry_block;
+			Block* body = proc->NewBlock();
+			Block* loop = branch->entry_block;
+
+			Value cond = ExpressionToIR(branch->if_condition, b, true, helper);
+			b->Branch(cond, body, else_block);
+
+			if (branch->then_branch || branch->else_branch)
+			{
+				loop = proc->NewBlock();
+
+				Value cond = ExpressionToIR(branch->if_condition, loop, true, helper);
+				loop->Branch(cond, body, then_block);
+			}
+
+			CodeToIR(&branch->code, body, loop, bbreak, helper);
+		} break;
+
+		case AST_BRANCH_FOR_VERBOSE:
+		{
+			Block* b = branch->entry_block;
+
+			Ast_Variable* var = branch->for_verbose.variable;
+			Value stack = b->Stack(GetTypeSize(var->type));
+
+			if (var->assignment)
+			{
+				Value v = ExpressionToIR(var->assignment, b, true, helper);
+				b->Store(stack, v);
+			}
+			else
+			{
+				b->Store(stack, 0);
+			}
+
+			Block* body = proc->NewBlock();
+			Block* loop = branch->entry_block;
 
 			Value cond = ExpressionToIR(branch->if_condition, branch->entry_block, true, helper);
-			branch->entry_block->Branch(cond, body_block, else_block);
+			branch->entry_block->Branch(cond, body, else_block);
 
 			if (branch->then_branch)
 			{
-				loop_block = proc->NewBlock();
+				loop = proc->NewBlock();
 
-				Value cond = ExpressionToIR(branch->if_condition, loop_block, true, helper);
-				loop_block->Branch(cond, body_block, then_block);
+				cond = ExpressionToIR(branch->if_condition, loop, true, helper);
+				loop->Branch(cond, body, then_block);
 			}
 
-			CodeToIR(&branch->code, body_block, loop_block, bbreak, helper);
+			CodeToIR(&branch->code, body, loop, bbreak, helper);
 		} break;
 
 		default:

@@ -1086,6 +1086,8 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_IN)
 					Error(module, token->location, "Iterator names must start with a lowercase letter.\n");
 
+				// Todo: Allow user to declare the type
+				// for n : uint in signed_nums:
 
 				if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_IN)
 				{
@@ -1106,15 +1108,6 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 
 					CheckScope(token, indent+1, module);
 					branch.for_range.range = ParseExpression(token, indent+1, module, false);
-
-					if (token->kind == TOKEN_COMMA)
-					{
-						CheckScope(token, indent, module);
-						token += 1;
-
-						CheckScope(token, indent+1, module);
-						branch.for_range.stride = ParseExpression(token, indent+1, module, false);
-					}
 
 					if (token->kind == TOKEN_WHERE)
 					{
@@ -1180,7 +1173,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 							Error(module, token->location, "For loop stride missing\n");
 
 						CheckScope(token, indent+1, module);
-						branch.for_verbose.stride = ParseExpression(token, indent+1, module, false);
+						branch.for_verbose.next = ParseExpression(token, indent+1, module, false);
 					}
 				}
 			} break;

@@ -32,7 +32,8 @@ static inline void Assume(bool b) { __builtin_assume(b); }
 #define GetInternalLineNumber()   __builtin_LINE()
 #define GetInternalColumnNumber() __builtin_COLUMN()
 
-static inline auto Abs(auto n) { return n >= 0 ? n : -n; }
+template<typename T>
+static inline T Abs(T n) { return n >= 0 ? n : -n; }
 
 template<typename T>
 static inline void Swap(T* a, T* b)

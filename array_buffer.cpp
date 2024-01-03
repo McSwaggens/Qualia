@@ -34,15 +34,13 @@ static Array_Buffer_Entry GetArrayBufferEntry(uint64 min_size)
 
 static void ReleaseArrayBuffer(void* data, uint64 size)
 {
-	if (size >= 512)
-	{
-		Array_Buffer_Entry entry;
-		entry.data = data;
-		entry.size = size;
+	if (size < 512) // Buffer not worth keeping
+		return; // @Todo: Release to global allocator
 
-		array_buffers.Add(entry);
-	}
+	Array_Buffer_Entry entry;
+	entry.data = data;
+	entry.size = size;
 
-	// Buffer not worth keeping
+	array_buffers.Add(entry);
 }
 

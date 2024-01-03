@@ -1,10 +1,12 @@
 FooBar():
 	a := 1
 
-	while 123:
+	for i := 0, 100, 1:
 		b := 2
 	else:
 		c := 3
+	then:
+		c := 4
 
 // CopyMemory(dest: *byte, src: *byte, size: uint):
 // 	for i := 0, i < size:

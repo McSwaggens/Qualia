@@ -438,21 +438,22 @@ static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHel
 		case AST_BRANCH_WHILE:
 		{
 			Block* b = branch->entry_block;
-			Block* body = proc->NewBlock();
-			Block* loop = branch->entry_block;
+			Block* loop_head = branch->entry_block;
+			Block* loop_body = proc->NewBlock();
 
 			Value cond = ExpressionToIR(branch->if_condition, b, true, helper);
-			b->Branch(cond, body, else_block);
+			b->Branch(cond, loop_body, else_block);
 
 			if (branch->then_branch || branch->else_branch)
 			{
-				loop = proc->NewBlock();
+				loop_head = proc->NewBlock();
 
-				Value cond = ExpressionToIR(branch->if_condition, loop, true, helper);
-				loop->Branch(cond, body, then_block);
+				b = loop_head;
+				Value cond = ExpressionToIR(branch->if_condition, b, true, helper);
+				b->Branch(cond, loop_body, then_block);
 			}
 
-			CodeToIR(&branch->code, body, loop, bbreak, helper);
+			CodeToIR(&branch->code, loop_body, loop_head, bbreak, helper);
 		} break;
 
 		case AST_BRANCH_FOR_VERBOSE:
@@ -472,21 +473,30 @@ static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHel
 				b->Store(stack, 0);
 			}
 
-			Block* body = proc->NewBlock();
-			Block* loop = branch->entry_block;
+			Block* loop_head = proc->NewBlock();
+			Block* loop_body = proc->NewBlock();
+			Block* loop_post = proc->NewBlock();
 
-			Value cond = ExpressionToIR(branch->if_condition, branch->entry_block, true, helper);
-			branch->entry_block->Branch(cond, body, else_block);
+			b->Jump(loop_head);
 
-			if (branch->then_branch)
+			b = loop_head;
+			Value cond = ExpressionToIR(branch->for_verbose.condition, b, true, helper);
+			b->Branch(cond, loop_body, else_block);
+
+			if (branch->then_branch || branch->else_branch)
 			{
-				loop = proc->NewBlock();
-
-				cond = ExpressionToIR(branch->if_condition, loop, true, helper);
-				loop->Branch(cond, body, then_block);
+				loop_head = proc->NewBlock();
+				b = loop_head;
+				Value cond = ExpressionToIR(branch->for_verbose.condition, b, true, helper);
+				b->Branch(cond, loop_body, then_block);
 			}
 
-			CodeToIR(&branch->code, body, loop, bbreak, helper);
+			b = loop_post;
+			Value vnext = ExpressionToIR(branch->for_verbose.next, b, true, helper);
+			b->Store(stack, vnext);
+			b->Jump(loop_head);
+
+			CodeToIR(&branch->code, loop_body, loop_post, bbreak, helper);
 		} break;
 
 		default:

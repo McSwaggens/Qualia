@@ -11,18 +11,18 @@ struct Instruction;
 struct Block;
 struct Procedure;
 
-static const uint64 IR_AUX_BITCNT = 3;
-static const uint16 IR_AUX_OPCNT_BITCNT = 2;
-static const uint16 IR_AUX_RETBIT = 1<<15;
-static const uint64 IR_OPCODE_BITCNT = 16 - IR_AUX_BITCNT;
+static const u64 IR_AUX_BITCNT = 3;
+static const u16 IR_AUX_OPCNT_BITCNT = 2;
+static const u16 IR_AUX_RETBIT = 1<<15;
+static const u64 IR_OPCODE_BITCNT = 16 - IR_AUX_BITCNT;
 
-static const uint16 IR_RETBIT = (4 << (16-IR_AUX_BITCNT));
-static const uint16 IR_OPCNT0 = (0 << (16-IR_AUX_BITCNT));
-static const uint16 IR_OPCNT1 = (1 << (16-IR_AUX_BITCNT));
-static const uint16 IR_OPCNT2 = (2 << (16-IR_AUX_BITCNT));
-static const uint16 IR_OPCNT3 = (3 << (16-IR_AUX_BITCNT));
+static const u16 IR_RETBIT = (4 << (16-IR_AUX_BITCNT));
+static const u16 IR_OPCNT0 = (0 << (16-IR_AUX_BITCNT));
+static const u16 IR_OPCNT1 = (1 << (16-IR_AUX_BITCNT));
+static const u16 IR_OPCNT2 = (2 << (16-IR_AUX_BITCNT));
+static const u16 IR_OPCNT3 = (3 << (16-IR_AUX_BITCNT));
 
-enum OpCode : uint16
+enum OpCode : u16
 {
 	// ---------------- 0 Operands ---------------- //
 	IR_NOP    = 0  | IR_OPCNT0,
@@ -185,7 +185,7 @@ static String ToString(OpCode opcode)
 	}
 }
 
-enum ValueKind : uint8
+enum ValueKind : u8
 {
 	IR_NONE = 0,
 	IR_INSTRUCTION,
@@ -205,7 +205,7 @@ struct Value
 		Instruction* instruction;
 		Block* block;
 		Procedure* procedure;
-		int64   const_int;
+		s64   const_int;
 		float32 const_f32;
 		float64 const_f64;
 	};
@@ -215,15 +215,15 @@ struct Value
 	Value(Block*       b) : kind(IR_BLOCK),         block(b)       { }
 	Value(Procedure*   p) : kind(IR_PROCEDURE),     procedure(p)   { }
 
-	Value(int64        n) : kind(IR_CONST_INT),     const_int(n)   { }
-	Value(int32        n) : kind(IR_CONST_INT),     const_int(n)   { }
-	Value(int16        n) : kind(IR_CONST_INT),     const_int(n)   { }
-	Value(int8         n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(s64        n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(s32        n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(s16        n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(s8         n) : kind(IR_CONST_INT),     const_int(n)   { }
 
-	Value(uint64       n) : kind(IR_CONST_INT),     const_int(n)   { }
-	Value(uint32       n) : kind(IR_CONST_INT),     const_int(n)   { }
-	Value(uint16       n) : kind(IR_CONST_INT),     const_int(n)   { }
-	Value(uint8        n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(u64       n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(u32       n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(u16       n) : kind(IR_CONST_INT),     const_int(n)   { }
+	Value(u8        n) : kind(IR_CONST_INT),     const_int(n)   { }
 
 	Value(float32      f) : kind(IR_CONST_FLOAT32), const_f32(f)   { }
 	Value(float64      f) : kind(IR_CONST_FLOAT64), const_f64(f)   { }
@@ -234,8 +234,8 @@ struct Procedure
 	Ast_Function* function;
 	List<Block*> blocks;
 	Block* entry;
-	uint32 instruction_ticker;
-	uint32 block_ticker;
+	u32 instruction_ticker;
+	u32 block_ticker;
 
 	Block* NewBlock();
 };
@@ -243,7 +243,7 @@ struct Procedure
 struct Block
 {
 	Procedure* procedure;
-	uint64 id;
+	u64 id;
 
 	List<Instruction*> instructions;
 	List<Instruction*> phis;
@@ -253,7 +253,7 @@ struct Block
 	List<Block*> users;
 
 	Instruction* NewInstruction(Instruction instruction);
-	Instruction* Param(uint64 n);
+	Instruction* Param(u64 n);
 	Instruction* Stack(Value size);
 	Instruction* Load(Value addr);
 	Instruction* Store(Value dest, Value value);
@@ -288,7 +288,7 @@ struct Instruction
 	OpCode opcode;
 	Block* block;
 	TypeID type;
-	uint64 id;
+	u64 id;
 
 	union
 	{
@@ -303,9 +303,9 @@ struct Instruction
 		return opcode & IR_RETBIT;
 	}
 
-	uint64 GetOperandCount()
+	u64 GetOperandCount()
 	{
-		return ((uint64)opcode >> IR_OPCODE_BITCNT) & ((1<<IR_AUX_OPCNT_BITCNT)-1);
+		return ((u64)opcode >> IR_OPCODE_BITCNT) & ((1<<IR_AUX_OPCNT_BITCNT)-1);
 	}
 };
 

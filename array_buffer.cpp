@@ -9,7 +9,7 @@ static void InitArrayBufferPool()
 	ZeroMemory(&array_buffers);
 }
 
-static Array_Buffer_Entry GetArrayBufferEntry(uint64 min_size)
+static Array_Buffer_Entry GetArrayBufferEntry(u64 min_size)
 {
 	if (array_buffers.count && array_buffers.Last().size > min_size) HOT
 	{
@@ -18,7 +18,7 @@ static Array_Buffer_Entry GetArrayBufferEntry(uint64 min_size)
 		return entry;
 	}
 
-	uint64 new_size = 1 << 14;
+	u64 new_size = 1 << 14;
 
 	if (min_size >= new_size) COLD
 	{
@@ -27,12 +27,12 @@ static Array_Buffer_Entry GetArrayBufferEntry(uint64 min_size)
 
 	Array_Buffer_Entry entry;
 	entry.size = new_size;
-	entry.data = GetPage(new_size);
+	entry.data = AllocateVirtualPage(new_size, PAGE_FLAG_WRITE);
 
 	return entry;
 }
 
-static void ReleaseArrayBuffer(void* data, uint64 size)
+static void ReleaseArrayBuffer(void* data, u64 size)
 {
 	if (size < 512) // Buffer not worth keeping
 		return; // @Todo: Release to global allocator

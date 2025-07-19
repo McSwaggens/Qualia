@@ -2,7 +2,7 @@
 
 #include "int.h"
 
-enum TypeKind : uint32
+enum TypeKind : u32
 {
 	TYPE_PRIMITIVE   = 0,
 
@@ -19,20 +19,20 @@ enum TypeKind : uint32
 	TYPE_FIXED_ARRAY = 8,
 };
 
-static const uint32 TYPE_BITCOUNT       = sizeof(uint32)*8;
-static const uint32 TYPE_KIND_BITCOUNT  = 4;
-static const uint32 TYPE_INDEX_BITCOUNT = TYPE_BITCOUNT - TYPE_KIND_BITCOUNT;
+static const u32 TYPE_BITCOUNT       = sizeof(u32)*8;
+static const u32 TYPE_KIND_BITCOUNT  = 4;
+static const u32 TYPE_INDEX_BITCOUNT = TYPE_BITCOUNT - TYPE_KIND_BITCOUNT;
 
-static const uint32 PRIMITIVE_COUNT = 12;
-static const uint32 PRIMITIVE_BEGIN = 1;
-static const uint32 PRIMITIVE_END   = PRIMITIVE_BEGIN + PRIMITIVE_COUNT;
-static const uint32 TYPE_POINTER_TO_PRIMITIVE_OFFSET  = PRIMITIVE_COUNT*1;
-static const uint32 TYPE_OPTIONAL_TO_PRIMITIVE_OFFSET = PRIMITIVE_COUNT*2;
-static const uint32 TYPE_ARRAY_TO_PRIMITIVE_OFFSET    = PRIMITIVE_COUNT*3;
-static const uint32 TYPE_EXTRA_OFFSET                 = PRIMITIVE_COUNT*4 + 1;
-static const uint32 CORE_TYPES_COUNT                  = TYPE_EXTRA_OFFSET + 2 + 1;
+static const u32 PRIMITIVE_COUNT = 12;
+static const u32 PRIMITIVE_BEGIN = 1;
+static const u32 PRIMITIVE_END   = PRIMITIVE_BEGIN + PRIMITIVE_COUNT;
+static const u32 TYPE_POINTER_TO_PRIMITIVE_OFFSET  = PRIMITIVE_COUNT*1;
+static const u32 TYPE_OPTIONAL_TO_PRIMITIVE_OFFSET = PRIMITIVE_COUNT*2;
+static const u32 TYPE_ARRAY_TO_PRIMITIVE_OFFSET    = PRIMITIVE_COUNT*3;
+static const u32 TYPE_EXTRA_OFFSET                 = PRIMITIVE_COUNT*4 + 1;
+static const u32 CORE_TYPES_COUNT                  = TYPE_EXTRA_OFFSET + 2 + 1;
 
-enum TypeID : uint32
+enum TypeID : u32
 {
 
 	TYPE_NULL    = 0,
@@ -116,7 +116,7 @@ struct ArrayTypeInfo
 struct FixedArrayTypeInfo
 {
 	TypeID subtype;
-	uint64 length;
+	u64 length;
 };
 
 struct FunctionTypeInfo
@@ -128,7 +128,7 @@ struct FunctionTypeInfo
 struct TupleTypeInfo
 {
 	TypeID* elements;
-	uint64  count;
+	u64  count;
 };
 
 struct EnumTypeInfo
@@ -145,12 +145,12 @@ struct StructTypeInfo
 struct ExtensionEntry
 {
 	TypeID type;
-	union { TypeID output; uint64 length; };
+	union { TypeID output; u64 length; };
 };
 
 struct ExtensionTable
 {
-	uint32 count;
+	u32 count;
 	ExtensionEntry* entries;
 };
 
@@ -160,7 +160,7 @@ struct TypeInfo
 	TypeID optional;
 	TypeID array;
 	ExtensionTable extensions;
-	uint64 size;
+	u64 size;
 
 	union
 	{
@@ -179,13 +179,13 @@ struct TypeInfo
 struct TypeSystem
 {
 	TypeInfo* infos;
-	uint64 info_count;
-	uint64 info_capacity;
+	u64 info_count;
+	u64 info_capacity;
 };
 
 static TypeSystem type_system;
 
-static inline TypeID CreateTypeID(TypeKind kind, uint32 index)
+static inline TypeID CreateTypeID(TypeKind kind, u32 index)
 {
 	Assume(index < (1<<TYPE_INDEX_BITCOUNT));
 	return (TypeID)((kind << TYPE_INDEX_BITCOUNT) | index);
@@ -193,12 +193,12 @@ static inline TypeID CreateTypeID(TypeKind kind, uint32 index)
 
 static inline TypeKind GetTypeKind(TypeID id)
 {
-	return (TypeKind)((int32)id >> TYPE_INDEX_BITCOUNT);
+	return (TypeKind)((s32)id >> TYPE_INDEX_BITCOUNT);
 }
 
-static inline int32 GetTypeIndex(TypeID id)
+static inline s32 GetTypeIndex(TypeID id)
 {
-	return (uint32)id & (-1u >> TYPE_KIND_BITCOUNT);
+	return (u32)id & (-1u >> TYPE_KIND_BITCOUNT);
 }
 
 static inline TypeInfo* GetTypeInfo(TypeID type)
@@ -220,7 +220,7 @@ static TypeID GetSubType(TypeID type)
 	}
 }
 
-static const uint8 PRIMITIVE_SIZE_LUT[PRIMITIVE_COUNT+1] = {
+static const u8 PRIMITIVE_SIZE_LUT[PRIMITIVE_COUNT+1] = {
 	[TYPE_BYTE]    = 1,
 	[TYPE_BOOL]    = 1,
 	[TYPE_UINT8]   = 1,
@@ -235,7 +235,7 @@ static const uint8 PRIMITIVE_SIZE_LUT[PRIMITIVE_COUNT+1] = {
 	[TYPE_FLOAT64] = 8,
 };
 
-static inline uint64 GetTypeSize(TypeID type)
+static inline u64 GetTypeSize(TypeID type)
 {
 	switch (GetTypeKind(type))
 	{
@@ -251,7 +251,7 @@ static inline uint64 GetTypeSize(TypeID type)
 	}
 }
 
-enum CastKind : int32
+enum CastKind : s32
 {
 	CAST_IMPLICIT,
 	CAST_COERCIVE,
@@ -377,15 +377,15 @@ static TypeID GetFunctionOutputType(TypeID type)
 static bool CanCast(CastKind cast, TypeID from, TypeID to);
 static void InitTypeSystem(void);
 static TypeID MergeTypeRight(TypeID a, TypeID b);
-static TypeID CreateStructType(Ast_Struct* ast, uint64 size);
+static TypeID CreateStructType(Ast_Struct* ast, u64 size);
 static TypeID CreateEnumType(Ast_Enum* ast, TypeID backing_type);
 static TypeID GetArithmeticBackingType(TypeID id);
 static TypeID GetSubType(TypeID type);
 static TypeID GetPointer(TypeID subtype);
 static TypeID GetOptional(TypeID subtype);
 static TypeID GetArray(TypeID subtype);
-static TypeID GetTuple(TypeID* types, uint64 count);
-static TypeID GetFixedArray(TypeID subtype, uint64 length);
+static TypeID GetTuple(TypeID* types, u64 count);
+static TypeID GetFixedArray(TypeID subtype, u64 length);
 static TypeID GetFunctionType(TypeID input, TypeID output);
 static TypeID GetDominantType(TypeID a, TypeID b);
 

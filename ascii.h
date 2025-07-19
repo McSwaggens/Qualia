@@ -133,7 +133,7 @@
 // 7e: ~                    0111_1110
 // 7f: Delete               0111_1111
 
-typedef uint8 AsciiFlags;
+typedef u8 AsciiFlags;
 static const AsciiFlags ASCII_NONE       = 0x00;
 static const AsciiFlags ASCII_BINARY     = 0x02; // 0, 1
 static const AsciiFlags ASCII_DECIMAL    = 0x0A; // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
@@ -274,7 +274,7 @@ static const AsciiFlags ASCII_FLAGS_TABLE[256] = {
 	[127]  = ASCII_NONE, // Delete
 };
 
-static const uint8 ASCII_DECODE_TABLE[256] = {
+static const u8 ASCII_DECODE_TABLE[256] = {
 	[0]    = '0',
 	[1]    = 0xFF,
 	[2]    = 0xFF,
@@ -419,14 +419,14 @@ static inline bool IsHexAlpha(char c)   { return c >= 'A' && c <= 'F' || c >= 'a
 static inline bool IsDecimal(char c)    { return c >= '0' && c <= '9'; }
 static inline bool IsBinary(char c)     { return c >= '0' && c <= '1'; }
 
-static inline AsciiFlags GetAsciiFlags(char c) { return ASCII_FLAGS_TABLE[(uint8)c]; }
+static inline AsciiFlags GetAsciiFlags(char c) { return ASCII_FLAGS_TABLE[(u8)c]; }
 static inline bool IsAlphaLut(char c)    { return GetAsciiFlags(c) &  ASCII_ALPHA;     }
 static inline bool IsHexLut(char c)      { return GetAsciiFlags(c) & (ASCII_HEX_ALPHA|ASCII_DECIMAL); }
 static inline bool IsHexAlphaLut(char c) { return GetAsciiFlags(c) &  ASCII_HEX_ALPHA; }
 static inline bool IsDecimalLut(char c)  { return GetAsciiFlags(c) &  ASCII_DECIMAL;   }
 static inline bool IsBinaryLut(char c)   { return GetAsciiFlags(c) &  ASCII_BINARY;    }
 
-enum Base : uint8
+enum Base : u8
 {
 	BASE2  = 2,
 	// octal is for losers.
@@ -460,9 +460,9 @@ static inline bool IsDigit(char c, Base base)
 	}
 }
 
-static inline uint64 DecodeDigitLut(char c) { return ASCII_DECODE_TABLE[(uint8)c]; }
+static inline u64 DecodeDigitLut(char c) { return ASCII_DECODE_TABLE[(u8)c]; }
 
-static inline uint64 DecodeDigit(char c, Base base)
+static inline u64 DecodeDigit(char c, Base base)
 {
 	switch (base)
 	{
@@ -476,7 +476,7 @@ static inline uint64 DecodeDigit(char c, Base base)
 	}
 }
 
-static inline uint64 DecodeDigit_Known(char c)
+static inline u64 DecodeDigit_Known(char c)
 {
 	switch (c)
 	{

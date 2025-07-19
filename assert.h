@@ -10,15 +10,15 @@ struct InternalLocation
 {
 	String file;
 	String function;
-	int32 line;
-	int32 offset;
+	s32 line;
+	s32 offset;
 };
 
 static constexpr InternalLocation GetInternalLocation(
 	String file     = GetInternalFileName(),
 	String function = GetInternalFunctionName(),
-	int32  line     = GetInternalLineNumber(),
-	int32  offset   = GetInternalColumnNumber())
+	s32  line     = GetInternalLineNumber(),
+	s32  offset   = GetInternalColumnNumber())
 {
 	InternalLocation location;
 	location.file = file;

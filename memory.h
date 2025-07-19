@@ -13,37 +13,33 @@ enum PageFlags
 	PAGE_FLAG_STACK   = 0x04,
 };
 
-static void InitPageCache();
 static void InitGlobalArena();
 
-static byte* AllocateVirtualPage(uint64 size, PageFlags flags);
-static void  DeAllocateVirtualPage(byte* page, uint64 size);
-
-static byte* GetPage(uint64 size);
-static void  RetirePage(byte* page, uint64 size);
+static byte* AllocateVirtualPage(u64 size, PageFlags flags);
+static void  DeAllocateVirtualPage(byte* page, u64 size);
 
 // ------------------------------------------- //
 
-static byte* AllocateMemory(uint64 size);
-static byte* ReAllocateMemory(void* p, uint64 old_size, uint64 new_size);
-static void  DeAllocateMemory(void* p, uint64 size);
+static byte* AllocateMemory(u64 size);
+static byte* ReAllocateMemory(void* p, u64 old_size, u64 new_size);
+static void  DeAllocateMemory(void* p, u64 size);
 
 // ------------------------------------------- //
 
 template<typename T>
-static inline T* Allocate(uint64 count = 1)
+static inline T* Allocate(u64 count = 1)
 {
 	return (T*)AllocateMemory(count * sizeof(T));
 }
 
 template<typename T>
-static inline T* ReAllocate(T* p, uint64 old_count, uint64 new_count)
+static inline T* ReAllocate(T* p, u64 old_count, u64 new_count)
 {
 	return (T*)ReAllocateMemory((byte*)p, old_count * sizeof(T), new_count * sizeof(T));
 }
 
 template<typename T>
-static inline void DeAllocate(T* p, uint64 count = 1)
+static inline void DeAllocate(T* p, u64 count = 1)
 {
 	DeAllocateMemory((byte*)p, count * sizeof(T));
 }
@@ -57,7 +53,7 @@ static inline void DeAllocateArray(Array<T> array)
 }
 
 template<typename T>
-static inline Array<T> AllocateArray(uint64 count)
+static inline Array<T> AllocateArray(u64 count)
 {
 	return Array<T>((T*)AllocateMemory(count * sizeof(T)), count);
 }
@@ -67,7 +63,7 @@ static inline Array<T> AllocateArray(uint64 count)
 struct Stack_Block
 {
 	Stack_Block* previous;
-	uint64 size;
+	u64 size;
 	char data[];
 };
 
@@ -78,9 +74,9 @@ struct Stack
 	byte* end;
 };
 
-static Stack CreateStack(uint64 size);
+static Stack CreateStack(u64 size);
 static void  FreeStack(Stack* stack);
-static void* StackAllocate(Stack* stack, uint64 size);
+static void* StackAllocate(Stack* stack, u64 size);
 
 template<typename T>
 static inline T* StackAllocate(Stack* stack)
@@ -89,13 +85,13 @@ static inline T* StackAllocate(Stack* stack)
 }
 
 template<typename T>
-static inline T* StackAllocate(Stack* stack, uint64 count)
+static inline T* StackAllocate(Stack* stack, u64 count)
 {
 	return (T*)StackAllocate(stack, count * sizeof(T));
 }
 
 template<typename T>
-static Array<T> StackAllocateArray(Stack* stack, uint64 count)
+static Array<T> StackAllocateArray(Stack* stack, u64 count)
 {
 	Array<T> array;
 	array.data = count ? StackAllocate<T>(stack, count) : null;
@@ -106,15 +102,15 @@ static Array<T> StackAllocateArray(Stack* stack, uint64 count)
 // ------------------------------------------- //
 
 template<typename T>
-static void CopyMemory(T* dest, const T* src, uint64 count = 1)
+static void CopyMemory(T* dest, const T* src, u64 count = 1)
 {
 	__builtin_memcpy(dest, src, sizeof(T) * count);
 }
 
 template<typename T>
-static void FillMemory(T* dest, uint64 count, T value)
+static void FillMemory(T* dest, u64 count, T value)
 {
-	for (uint64 i = 0; i < count; i++) dest[i] = value;
+	for (u64 i = 0; i < count; i++) dest[i] = value;
 }
 
 template<typename T>
@@ -124,15 +120,15 @@ static void FillMemory(T* begin, T* end, T value)
 }
 
 template<typename T>
-static inline bool CompareMemory(const T* a, const T* b, uint64 count = 1)
+static inline bool CompareMemory(const T* a, const T* b, u64 count = 1)
 {
 	return __builtin_memcmp(a, b, sizeof(T) * count) == 0;
 }
 
 template<typename T>
-static inline bool Compare(const T* a, const T* b, uint64 count = 1)
+static inline bool Compare(const T* a, const T* b, u64 count = 1)
 {
-	for (uint64 i = 0; i < count; i++)
+	for (u64 i = 0; i < count; i++)
 	{
 		if (!Compare(a[i], b[i])) return false;
 	}
@@ -147,7 +143,7 @@ static inline void ZeroMemory(T* begin, T* end)
 }
 
 template<typename T>
-static inline void ZeroMemory(T* p, uint64 count = 1)
+static inline void ZeroMemory(T* p, u64 count = 1)
 {
 	ZeroMemory(p, p + count);
 }

@@ -10,20 +10,20 @@
 struct Array_Buffer_Entry
 {
 	void* data;
-	uint64 size;
+	u64 size;
 };
 
-static Array_Buffer_Entry GetArrayBufferEntry(uint64 min_size);
-static void ReleaseArrayBuffer(void* data, uint64 size);
+static Array_Buffer_Entry GetArrayBufferEntry(u64 min_size);
+static void ReleaseArrayBuffer(void* data, u64 size);
 static void InitArrayBufferPool();
 
 template<typename T>
 struct Array_Buffer
 {
 	T* data;
-	uint64 count;
-	uint64 capacity;
-	uint64 size;
+	u64 count;
+	u64 capacity;
+	u64 size;
 
 	void Add(T value)
 	{

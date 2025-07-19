@@ -5,21 +5,21 @@
 struct String
 {
 	char* data;
-	uint32 length;
-	uint32 capacity;
+	u32 length;
+	u32 capacity;
 
-	constexpr String() = default;
+	String() = default;
 	constexpr String(Null) : data(null), length(0), capacity(0) { }
-	constexpr String(char* data, uint32 length, uint32 cap = 0) : data(data), length(length), capacity(cap) { }
+	constexpr String(char* data, u32 length, u32 cap = 0) : data(data), length(length), capacity(cap) { }
 	constexpr String(char* begin, char* end) : data(begin), length(end-begin), capacity(0) { }
-	constexpr String(const char* data, uint32 length, uint32 cap = 0) : data(const_cast<char*>(data)), length(length), capacity(cap) { }
+	constexpr String(const char* data, u32 length, u32 cap = 0) : data(const_cast<char*>(data)), length(length), capacity(cap) { }
 
-	template<uint64 N>
+	template<u64 N>
 	constexpr String(const char (&s)[N]) : data(const_cast<char*>(s)), length(N-1), capacity(0) { }
 	constexpr operator bool() const { return data != null; }
 
-	constexpr char& operator[](uint32 n) { return data[n]; }
-	constexpr char  operator[](uint32 n) const { return data[n]; }
+	constexpr char& operator[](u32 n) { return data[n]; }
+	constexpr char  operator[](u32 n) const { return data[n]; }
 
 	constexpr char* Begin() { return data; }
 	constexpr char* End()   { return data + length; }
@@ -36,7 +36,7 @@ struct String
 	{
 		if (length + other.length >= capacity)
 		{
-			uint32 old_capacity = capacity;
+			u32 old_capacity = capacity;
 			capacity = capacity * 2 + other.length;
 			data = ReAllocate(data, old_capacity, capacity);
 		}
@@ -49,7 +49,7 @@ struct String
 	{
 		if (length + 1 >= capacity)
 		{
-			uint32 old_capacity = capacity;
+			u32 old_capacity = capacity;
 			capacity += length + 1;
 			data = ReAllocate(data, old_capacity, capacity);
 		}
@@ -58,12 +58,12 @@ struct String
 	}
 };
 
-static inline String AllocateString(uint64 length, uint64 extra_capacity)
+static inline String AllocateString(u64 length, u64 extra_capacity)
 {
 	return String(Allocate<char>(length+extra_capacity), length, length+extra_capacity);
 }
 
-static inline String StackAllocateString(Stack* stack, uint64 length)
+static inline String StackAllocateString(Stack* stack, u64 length)
 {
 	return String(StackAllocate<char>(stack, length), length, 0);
 }
@@ -80,7 +80,7 @@ static String DuplicateString(String string)
 	return copy;
 }
 
-static String DuplicateString(char* s, uint64 length)
+static String DuplicateString(char* s, u64 length)
 {
 	String copy = AllocateString(length, 0);
 	CopyMemory(copy.data, s, length);
@@ -92,13 +92,13 @@ static constexpr bool CompareString(String a, String b)
 	return a.length == b.length && CompareMemory(a.data, b.data, a.length);
 }
 
-template<uint64 N>
+template<u64 N>
 static inline bool CompareStringRaw(const char* a, const char (&b)[N])
 {
 	return CompareMemory(a, b, N-1);
 }
 
-static constexpr uint64 CStringLength(const char* s)
+static constexpr u64 CStringLength(const char* s)
 {
 	// What kind of demented "person" would "design" a string like this?
 	// It's an extremely simple concept, but still they managed to fuck it up somehow.

@@ -6,17 +6,17 @@
 
 static void Write(OutputBuffer* buffer, char c) { BufferWriteByte(buffer, c); }
 
-static void Write(OutputBuffer* buffer, int8  n)  { Write(buffer, (int64)n); }
-static void Write(OutputBuffer* buffer, int16 n)  { Write(buffer, (int64)n); }
-static void Write(OutputBuffer* buffer, int32 n)  { Write(buffer, (int64)n); }
-static void Write(OutputBuffer* buffer, uint8  n) { Write(buffer, (uint64)n); }
-static void Write(OutputBuffer* buffer, uint16 n) { Write(buffer, (uint64)n); }
-static void Write(OutputBuffer* buffer, uint32 n) { Write(buffer, (uint64)n); }
-static void Write(OutputBuffer* buffer, unsigned long int n) { Write(buffer, (uint64)n); }
+static void Write(OutputBuffer* buffer, s8  n)  { Write(buffer, (s64)n); }
+static void Write(OutputBuffer* buffer, s16 n)  { Write(buffer, (s64)n); }
+static void Write(OutputBuffer* buffer, s32 n)  { Write(buffer, (s64)n); }
+static void Write(OutputBuffer* buffer, u8  n) { Write(buffer, (u64)n); }
+static void Write(OutputBuffer* buffer, u16 n) { Write(buffer, (u64)n); }
+static void Write(OutputBuffer* buffer, u32 n) { Write(buffer, (u64)n); }
+static void Write(OutputBuffer* buffer, unsigned long int n) { Write(buffer, (u64)n); }
 
 // 3 5 10 20
 // Lut for n < 256?
-static void Write(OutputBuffer* buffer, uint64 n)
+static void Write(OutputBuffer* buffer, u64 n)
 {
 	const int max = 20; // ceil(log10(pow(2, sizeof(n)*8-1)))
 	char digits[max];
@@ -30,17 +30,17 @@ static void Write(OutputBuffer* buffer, uint64 n)
 	BufferWriteData(buffer, digits + (max - count), count);
 }
 
-static void Write(OutputBuffer* buffer, int64 n)
+static void Write(OutputBuffer* buffer, s64 n)
 {
 	if (n < 0) { BufferWriteByte(buffer, '-'); n = -n; }
-	Write(buffer, (uint64)n);
+	Write(buffer, (u64)n);
 }
 
-static void Write(OutputBuffer* buffer, void* p) { Write(buffer, Hex((uint64)p)); }
+static void Write(OutputBuffer* buffer, void* p) { Write(buffer, Hex((u64)p)); }
 
-static void GenericWriteHex(OutputBuffer* buffer, uint64 n)
+static void GenericWriteHex(OutputBuffer* buffer, u64 n)
 {
-	const uint8 length_table[65] = {
+	const u8 length_table[65] = {
 		16, 16, 16, 16,
 		15, 15, 15, 15,
 		14, 14, 14, 14,
@@ -61,10 +61,10 @@ static void GenericWriteHex(OutputBuffer* buffer, uint64 n)
 
 	char character_buffer[17];
 
-	uint64 digits = length_table[CountLeadingZeroes64(n)];
-	uint64 k = digits << 2;
+	u64 digits = length_table[CountLeadingZeroes64(n)];
+	u64 k = digits << 2;
 
-	for (uint64 i = 0; i < digits; i++)
+	for (u64 i = 0; i < digits; i++)
 	{
 		k -= 4;
 		character_buffer[i] = "0123456789ABCDEF"[(n >> k) & 0xF];
@@ -74,7 +74,7 @@ static void GenericWriteHex(OutputBuffer* buffer, uint64 n)
 	BufferWriteData(buffer, character_buffer, digits+1);
 }
 
-static void GenericWriteBin(OutputBuffer* buffer, uint64 n)
+static void GenericWriteBin(OutputBuffer* buffer, u64 n)
 {
 	if (!n)
 	{
@@ -82,7 +82,7 @@ static void GenericWriteBin(OutputBuffer* buffer, uint64 n)
 		return;
 	}
 
-	const uint32 table[16] = {
+	const u32 table[16] = {
 		0x30303030,
 		0x31303030,
 		0x30313030,
@@ -102,11 +102,11 @@ static void GenericWriteBin(OutputBuffer* buffer, uint64 n)
 	};
 
 	char character_buffer[65];
-	int64 lz = CountLeadingZeroes64(n);
+	s64 lz = CountLeadingZeroes64(n);
 
-	for (int64 i = 0; i < 16; i++)
+	for (s64 i = 0; i < 16; i++)
 	{
-		((uint32*)character_buffer)[i] = table[(n >> (60-(i*4))) & 0x0f];
+		((u32*)character_buffer)[i] = table[(n >> (60-(i*4))) & 0x0f];
 	}
 
 	character_buffer[64] = 'b';
@@ -141,9 +141,9 @@ static void Write(OutputBuffer* buffer, float32 f)
 static void Write(OutputBuffer* buffer, float64 f)
 {
 	// @FixMe: This really isn't that great, but it's good enough for now.
-	Write(buffer, (int64)f);
+	Write(buffer, (s64)f);
 	BufferWriteByte(buffer, '.');
-	Write(buffer, (int64)Abs((f-(int64)f) * Pow(10, 9)));
+	Write(buffer, (s64)Abs((f-(s64)f) * Pow(10, 9)));
 }
 
 static void Write(OutputBuffer* buffer, Token_Kind kind)
@@ -245,7 +245,7 @@ static void Write(OutputBuffer* buffer, TypeID type)
 			TupleTypeInfo tuple_info = info->tuple_info;
 			BufferWriteByte(buffer, '(');
 
-			for (int32 i = 0; i < tuple_info.count; i++)
+			for (s32 i = 0; i < tuple_info.count; i++)
 			{
 				if (i) BufferWriteString(buffer, ", ");
 				Write(buffer, tuple_info.elements[i]);
@@ -455,7 +455,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression)
 
 			BufferWriteString(buffer, "{ ");
 
-			for (uint32 i = 0; i < fixed_array->elements.count; i++)
+			for (u32 i = 0; i < fixed_array->elements.count; i++)
 			{
 				if (!i) BufferWriteString(buffer, ", ");
 
@@ -551,7 +551,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression)
 		{
 			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
 			BufferWriteString(buffer, "(");
-			for (uint32 i = 0; i < tuple->elements.count; i++)
+			for (u32 i = 0; i < tuple->elements.count; i++)
 			{
 				if (i) BufferWriteString(buffer, ", ");
 				Write(buffer, tuple->elements[i]);
@@ -673,13 +673,13 @@ static void Write(OutputBuffer* buffer, Instruction* instruction)
 	Write(buffer, instruction->opcode);
 	Write(buffer, ' ');
 
-	uint32 num_ops = instruction->GetOperandCount();
+	u32 num_ops = instruction->GetOperandCount();
 
 	switch (instruction->opcode)
 	{
 		default:
 		{
-			for (uint32 i = 0; i < num_ops; i++)
+			for (u32 i = 0; i < num_ops; i++)
 			{
 				if (i) BufferWriteString(buffer, ", ");
 				Write(buffer, instruction->ops[i]);
@@ -688,7 +688,7 @@ static void Write(OutputBuffer* buffer, Instruction* instruction)
 
 		case IR_PHI:
 		{
-			for (uint32 i = 0; i < num_ops; i++)
+			for (u32 i = 0; i < num_ops; i++)
 			{
 				PhiEntry* entry = &instruction->entries[i];
 				if (i) BufferWriteString(buffer, ", ");
@@ -711,7 +711,7 @@ static void Write(OutputBuffer* buffer, Instruction* instruction)
 		{
 			BufferWriteString(buffer, " |  ");
 
-			for (uint32 j = 0; j < instruction->users.count; j++)
+			for (u32 j = 0; j < instruction->users.count; j++)
 			{
 				if (j) BufferWriteString(buffer, ", ");
 				Write(buffer, instruction->users[j]);
@@ -725,7 +725,7 @@ static void Write(OutputBuffer* buffer, Instruction* instruction)
 static void Write(OutputBuffer* buffer, Block* block)
 {
 	Print(buffer, "b%:\n", block->id);
-	for (uint32 i = 0; i < block->instructions.count; i++)
+	for (u32 i = 0; i < block->instructions.count; i++)
 	{
 		Instruction* instruction = block->instructions[i];
 
@@ -744,7 +744,7 @@ static void Write(OutputBuffer* buffer, Procedure* proc)
 	// ZeroMemory(&helper);
 	// IrPrintHelperParse(proc->entry, &helper);
 
-	for (uint32 i = 0; i < proc->blocks.count; i++)
+	for (u32 i = 0; i < proc->blocks.count; i++)
 	{
 		Block* block = proc->blocks[i];
 		Write(buffer, block);

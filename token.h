@@ -2,7 +2,7 @@
 
 #include "string.h"
 
-enum Token_Kind : uint8
+enum Token_Kind : u8
 {
 	TOKEN_EOF = 0,
 	TOKEN_IDENTIFIER_FORMAL,
@@ -209,14 +209,14 @@ static constexpr String ToString(Token_Kind kind)
 	}
 }
 
-typedef uint16 Indent16;
+typedef u16 Indent16;
 
 struct SourceLocation
 {
 	// Signed because of error printing. 64-bit is overkill anyways.
-	int64 line;
-	int64 offset;
-	int64 extent;
+	s64 line;
+	s64 offset;
+	s64 extent;
 };
 
 // @Todo: SOA! (Make sure to measure!)
@@ -232,19 +232,19 @@ struct Token
 		struct
 		{
 			Token* closure; // Used as linked list during lexing
-			uint64 comma_count;
+			u64 comma_count;
 		};
 
 		String  identifier_string;
 		String  literal_string;
-		int64   literal_int;
+		s64   literal_int;
 		float64 literal_float;
 	};
 
 	SourceLocation location;
 };
 
-static void Write(OutputBuffer* buffer, Token_Kind kind);
-static void Write(OutputBuffer* buffer, Token* token);
-static void Write(OutputBuffer* buffer, Token token);
+static void Write(struct OutputBuffer* buffer, Token_Kind kind);
+static void Write(struct OutputBuffer* buffer, Token* token);
+static void Write(struct OutputBuffer* buffer, Token token);
 

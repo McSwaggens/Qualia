@@ -8,7 +8,7 @@
 #include "string.h"
 #include "ascii.h"
 
-using LiteralQualifier = uint64;
+using LiteralQualifier = u64;
 
 static const LiteralQualifier QUALIFIER_B = (1llu<<0);
 static const LiteralQualifier QUALIFIER_H = (1llu<<1);
@@ -96,11 +96,11 @@ static LiteralQualifier ParseLiteralQualifier(char** begin)
 	return qualifier;
 }
 
-static float64 AsciiToFloat(char* p, uint64 count, Base base)
+static float64 AsciiToFloat(char* p, u64 count, Base base)
 {
 	float64 value = 0.0;
 
-	for (uint32 i = 0; i < count; i++)
+	for (u32 i = 0; i < count; i++)
 	{
 		Assert(IsDigit(*p, base));
 		value *= (float64)base;
@@ -111,12 +111,12 @@ static float64 AsciiToFloat(char* p, uint64 count, Base base)
 	return value;
 }
 
-static float64 AsciiToFloat_Fractional(char* p, uint64 count, Base base)
+static float64 AsciiToFloat_Fractional(char* p, u64 count, Base base)
 {
 	float64 value = 0.0;
 	float64 scale = 1.0;
 
-	for (uint32 i = 0; i < count; i++)
+	for (u32 i = 0; i < count; i++)
 	{
 		// @OptimizeMe: Nasty dependency chain. Precompute base^-count?
 		Assert(IsDigit(*p, base));
@@ -128,9 +128,9 @@ static float64 AsciiToFloat_Fractional(char* p, uint64 count, Base base)
 	return value;
 }
 
-static uint64 AsciiToInt(char* begin, uint64 count, Base base, bool* overflow)
+static u64 AsciiToInt(char* begin, u64 count, Base base, bool* overflow)
 {
-	uint64 value = 0;
+	u64 value = 0;
 
 	if (base == BASE_BINARY)
 	{
@@ -142,10 +142,10 @@ static uint64 AsciiToInt(char* begin, uint64 count, Base base, bool* overflow)
 			return value;
 		}
 
-		for (uint32 i = 0; i < count; i++)
+		for (u32 i = 0; i < count; i++)
 		{
 			Assert(IsDigit(*p, BASE_BINARY));
-			value |= (uint64)DecodeDigit(*p, BASE_BINARY) << (uint64)(count-1-i);
+			value |= (u64)DecodeDigit(*p, BASE_BINARY) << (u64)(count-1-i);
 			if (*++p == '_') ++p;
 		}
 	}
@@ -159,7 +159,7 @@ static uint64 AsciiToInt(char* begin, uint64 count, Base base, bool* overflow)
 		else if (count == 20) COLD
 		{
 			char* p = begin;
-			for (uint32 i = 0; i < count; i++)
+			for (u32 i = 0; i < count; i++)
 			{
 				if (*p > "18446744073709551615"[i])
 				{
@@ -171,7 +171,7 @@ static uint64 AsciiToInt(char* begin, uint64 count, Base base, bool* overflow)
 			}
 		}
 
-		const uint64 factors[20] = {
+		const u64 factors[20] = {
 			10000000000000000000llu,
 			1000000000000000000,
 			100000000000000000,
@@ -194,13 +194,13 @@ static uint64 AsciiToInt(char* begin, uint64 count, Base base, bool* overflow)
 			1,
 		};
 
-		uint64 base_factor_index = 20-count;
+		u64 base_factor_index = 20-count;
 		char* p = begin;
 
-		for (uint32 i = 0; i < count; i++)
+		for (u32 i = 0; i < count; i++)
 		{
 			Assert(IsDigit(*p, BASE_DECIMAL));
-			value += factors[base_factor_index+i] * (uint64)DecodeDigit(*p, BASE_DECIMAL);
+			value += factors[base_factor_index+i] * (u64)DecodeDigit(*p, BASE_DECIMAL);
 			if (*++p == '_') ++p;
 		}
 	}
@@ -213,9 +213,9 @@ static uint64 AsciiToInt(char* begin, uint64 count, Base base, bool* overflow)
 			return value;
 		}
 
-		for (uint32 i = 0; i < count; i++)
+		for (u32 i = 0; i < count; i++)
 		{
-			value |= (uint64)DecodeDigitLut(*p) << (uint64)(count-1-i)*4;
+			value |= (u64)DecodeDigitLut(*p) << (u64)(count-1-i)*4;
 			if (*++p == '_') ++p;
 		}
 	}
@@ -226,7 +226,7 @@ static uint64 AsciiToInt(char* begin, uint64 count, Base base, bool* overflow)
 struct LiteralComponent
 {
 	char* begin;
-	uint32 count;
+	u32 count;
 	Base base;
 	LiteralQualifier qualifier;
 	char* end;
@@ -347,11 +347,11 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 		}
 
 		bool overflow = false;
-		uint64 scaler = (qualifier & QUALIFIER_SCALER_MASK);
-		uint64 size = qualifier & QUALIFIER_SIZE_MASK;
-		uint64 effective_size = size ? size : 64;
-		uint64 value = AsciiToInt(whole.begin, whole.count, base, &overflow);
-		uint64 fractional_scaled = 0;
+		u64 scaler = (qualifier & QUALIFIER_SCALER_MASK);
+		u64 size = qualifier & QUALIFIER_SIZE_MASK;
+		u64 effective_size = size ? size : 64;
+		u64 value = AsciiToInt(whole.begin, whole.count, base, &overflow);
+		u64 fractional_scaled = 0;
 
 		if (overflow)
 		{
@@ -366,12 +366,12 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 			}
 
 			float64 fractional_value = AsciiToFloat_Fractional(fractional.begin, fractional.count, base);
-			fractional_scaled = (uint64)(fractional_value * (float64)scaler);
+			fractional_scaled = (u64)(fractional_value * (float64)scaler);
 		}
 
 		if (scaler)
 		{
-			uint64 scaled_value = 0;
+			u64 scaled_value = 0;
 
 			if (CheckedMultiply(value, scaler, &scaled_value) || CheckedAdd(scaled_value, fractional_scaled, &scaled_value))
 			{
@@ -458,9 +458,9 @@ static void LexerParse(Ast_Module* module)
 	Token* tokens = (Token*)AllocateMemory(sizeof(Token) * (data.count+1));
 	List<Line> lines = AllocateList<Line>(Min(code.length, 4096u));
 
-	int64 line_number = 0;
-	int64 indent = 0;
-	int64 prev_region_index = -1;
+	s64 line_number = 0;
+	s64 indent = 0;
+	s64 prev_region_index = -1;
 
 	char* cursor = code.data;
 	char* end = code.data + code.length;
@@ -474,7 +474,7 @@ static void LexerParse(Ast_Module* module)
 
 	while (cursor < end)
 	{
-		uint64 old_line = line_number;
+		u64 old_line = line_number;
 
 		while (IsWhiteSpace(*cursor) || *cursor == '\n' || *cursor == '\r' || CompareStringRaw(cursor, "//"))
 		{
@@ -644,8 +644,8 @@ static void LexerParse(Ast_Module* module)
 			{
 				char* begin = cursor;
 
-				uint32 upper = 0;
-				uint32 lower = 0;
+				u32 upper = 0;
+				u32 lower = 0;
 
 				for (; IsLowerCase(*cursor) || IsUpperCase(*cursor) || IsDecimal(*cursor) || *cursor == '_'; cursor++)
 				{
@@ -657,7 +657,7 @@ static void LexerParse(Ast_Module* module)
 					}
 				}
 
-				uint64 size = cursor - begin;
+				u64 size = cursor - begin;
 				String str  = String(begin, size);
 
 				if (*begin == '_') COLD
@@ -698,7 +698,7 @@ static void LexerParse(Ast_Module* module)
 				token->kind = TOKEN_LITERAL_STRING;
 
 				char* start = ++cursor;
-				uint64 escapes = 0;
+				u64 escapes = 0;
 
 				for (; cursor < end && *cursor != '"'; cursor++)
 				{
@@ -719,7 +719,7 @@ static void LexerParse(Ast_Module* module)
 
 				if (escapes)
 				{
-					uint64 length = end - start - escapes;
+					u64 length = end - start - escapes;
 					token->literal_string = AllocateString(length, 0);
 
 					char* c = start;
@@ -915,7 +915,7 @@ static void LexerParse(Ast_Module* module)
 	token++;
 
 	Token* token_end = token;
-	uint64 token_count = token_end - tokens_begin;
+	u64 token_count = token_end - tokens_begin;
 
 	module->tokens = Array(tokens, token_count);
 	module->code   = code;

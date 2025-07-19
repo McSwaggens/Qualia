@@ -5,6 +5,7 @@
 #include "token.h"
 #include "type_system.h"
 #include "ir.h"
+#include "file_system.h"
 
 struct Ast_Expression;
 struct Ast_Expression_Tuple;
@@ -132,7 +133,7 @@ enum Ast_Expression_Kind
 	AST_EXPRESSION_AS,
 };
 
-typedef uint8 Ast_Expression_Flags;
+typedef u8 Ast_Expression_Flags;
 static const Ast_Expression_Flags AST_EXPRESSION_FLAG_REFERENTIAL            = (1<<0);
 static const Ast_Expression_Flags AST_EXPRESSION_FLAG_PURE                   = (1<<1);
 static const Ast_Expression_Flags AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE = (1<<2);
@@ -194,7 +195,7 @@ struct Ast_Expression_Array : Ast_Expression
 struct Ast_Expression_Tuple : Ast_Expression
 {
 	Array<Ast_Expression*> elements;
-	uint32 recursive_count;
+	u32 recursive_count;
 };
 
 struct Ast_Expression_Fixed_Array : Ast_Expression
@@ -216,7 +217,7 @@ struct Ast_Expression_Literal : Ast_Expression
 	union
 	{
 		bool    value_bool;
-		int64   value_int;
+		s64   value_int;
 		float32 value_f32;
 		float64 value_f64;
 	};
@@ -290,7 +291,7 @@ struct Ast_Code
 	Array<Ast_Statement> statements;
 	List<Ast_Defer*> defers;
 	Ast_Scope scope;
-	uint64 frame_size;
+	u64 frame_size;
 	bool contains_return;
 	bool contains_break;
 	bool all_paths_return;
@@ -323,14 +324,14 @@ enum Ast_Statement_Kind
 	AST_STATEMENT_DEFER,
 };
 
-enum Ast_Branch_Clause_Kind : uint8
+enum Ast_Branch_Clause_Kind : u8
 {
 	AST_BRANCH_CLAUSE_INIT = 0,
 	AST_BRANCH_CLAUSE_ELSE,
 	AST_BRANCH_CLAUSE_THEN
 };
 
-enum Ast_Branch_Kind : uint8
+enum Ast_Branch_Kind : u8
 {
 	AST_BRANCH_NAKED = 0,
 
@@ -426,7 +427,7 @@ struct Ast_Increment // Nudge?
 	Ast_Expression* expression;
 };
 
-using Ast_Variable_Flags = uint8;
+using Ast_Variable_Flags = u8;
 static const Ast_Variable_Flags AST_VARIABLE_FLAG_PARAMETER = (1<<0);
 static const Ast_Variable_Flags AST_VARIABLE_FLAG_GLOBAL    = (1<<1);
 static const Ast_Variable_Flags AST_VARIABLE_FLAG_CONSTANT  = (1<<2);
@@ -441,7 +442,7 @@ struct Ast_Variable
 	Ast_Type* ast_type;
 	Ast_Expression* assignment;
 	Value ir_stack;
-	uint64 offset; // @RemoveMe?
+	u64 offset; // @RemoveMe?
 	// @Todo: Add span
 	Ast_Variable() = default;
 };
@@ -513,8 +514,8 @@ struct Ast_Struct_Member
 	Token* name_token;
 	TypeID type;
 	Ast_Type ast_type;
-	uint64 offset;
-	uint32 index;
+	u64 offset;
+	u32 index;
 };
 
 struct Ast_Enum_Member
@@ -522,8 +523,8 @@ struct Ast_Enum_Member
 	String name;
 	Token* name_token;
 	Ast_Expression* expression;
-	int64 value;
-	uint32 index;
+	s64 value;
+	u32 index;
 };
 
 struct Ast_Struct
@@ -571,8 +572,8 @@ static void LexerParse(Ast_Module* module);
 static void InitIntrinsicFunctions(Ast_Module* module);
 static Ast_Module* ParseFile(String file_path);
 static void SemanticParse(Ast_Module* module);
-static uint64 CalculateStackFrameSize(Ast_Function* function);
-static uint64 CalculateStackFrameSize(Ast_Code* code, uint64 offset);
+static u64 CalculateStackFrameSize(Ast_Function* function);
+static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset);
 static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Module* module);
 static void ScanScope(Ast_Scope* scope, Ast_Module* module);
 static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, Ast_Module* module);

@@ -12,9 +12,9 @@ template<typename ...Args>
 [[noreturn]]
 static void LexerError(Ast_Module* module, SourceLocation where, String format, Args&&... message_args)
 {
-	int64 margin = 2;
-	int64 begin = where.line;
-	int64 number_of_lines = 1 + margin;
+	s64 margin = 2;
+	s64 begin = where.line;
+	s64 number_of_lines = 1 + margin;
 
 	Print(&unix_error_buffer, "%:%:%: error: ", module->file_path, (where.line+1), (where.offset+1));
 	Print(&unix_error_buffer, format, message_args...);
@@ -34,14 +34,14 @@ template<typename ...Args>
 [[noreturn]]
 static void Error(Ast_Module* module, SourceLocation where, String format, Args&&... message_args)
 {
-	int64 margin = 2;
-	int64 begin = where.line;
-	int64 number_of_lines = 1 + margin;
+	s64 margin = 2;
+	s64 begin = where.line;
+	s64 number_of_lines = 1 + margin;
 
 	Print(&unix_error_buffer, "%:%:%: error: ", module->file_path, (where.line+1), (where.offset+1));
 	Print(&unix_error_buffer, format, message_args...);
 
-	for (int64 line = begin; line < begin + number_of_lines && line < module->lines.count; line++)
+	for (s64 line = begin; line < begin + number_of_lines && line < module->lines.count; line++)
 	{
 		Print(&unix_error_buffer, "%\n", module->lines[line].string);
 	}
@@ -56,18 +56,18 @@ static void Error(Ast_Module* module, Ast_Expression* expr, String format, Args&
 	Token* begin = expr->begin;
 	Token* end = expr->end;
 
-	int64 margin = 2;
-	int64 line_begin = begin->location.line;
+	s64 margin = 2;
+	s64 line_begin = begin->location.line;
 	SourceLocation pos_begin = begin->location;
 	SourceLocation pos_end = end[-1].location; // @Bug: What if begin = end. Is this invalid input? IDK
-	int64 number_of_lines = pos_end.line - pos_begin.line + margin + 1;
+	s64 number_of_lines = pos_end.line - pos_begin.line + margin + 1;
 
 	Print(&unix_error_buffer, "%:%:%: error: ", module->file_path, (pos_begin.line+1), (pos_begin.offset+1));
 	Print(&unix_error_buffer, format, message_args...);
 
 	// @Todo: Coloring/Highlighting
 
-	for (int64 line = line_begin; line < line_begin + number_of_lines && line < module->lines.count; line++)
+	for (s64 line = line_begin; line < line_begin + number_of_lines && line < module->lines.count; line++)
 	{
 		Print(&unix_error_buffer, "%\n", module->lines[line].string);
 	}

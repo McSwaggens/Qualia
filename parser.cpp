@@ -204,7 +204,7 @@ static bool IsExpressionStarter(Token_Kind kind)
 		|| kind == TOKEN_OPEN_BRACE;
 }
 
-static uint32 GetTernaryPrecedence(Token_Kind kind)
+static u32 GetTernaryPrecedence(Token_Kind kind)
 {
 	switch (kind)
 	{
@@ -217,7 +217,7 @@ static uint32 GetTernaryPrecedence(Token_Kind kind)
 	}
 }
 
-static uint32 GetBinaryPrecedence(Token_Kind kind)
+static u32 GetBinaryPrecedence(Token_Kind kind)
 {
 	switch (kind)
 	{
@@ -268,7 +268,7 @@ static uint32 GetBinaryPrecedence(Token_Kind kind)
 	}
 }
 
-static uint32 GetUnaryPrecedence(Token_Kind kind)
+static u32 GetUnaryPrecedence(Token_Kind kind)
 {
 	switch (kind)
 	{
@@ -290,7 +290,7 @@ static uint32 GetUnaryPrecedence(Token_Kind kind)
 	}
 }
 
-static uint32 GetPostfixPrecedence(Token_Kind kind)
+static u32 GetPostfixPrecedence(Token_Kind kind)
 {
 	switch (kind)
 	{
@@ -323,7 +323,7 @@ static bool IsOperator(Token_Kind kind)
 		|| IsTernaryOperator(kind);
 }
 
-static uint32 GetOperatorPrecedence(Token_Kind kind)
+static u32 GetOperatorPrecedence(Token_Kind kind)
 {
 	if (IsBinaryOperator(kind))  return GetBinaryPrecedence(kind);
 	if (IsTernaryOperator(kind)) return GetTernaryPrecedence(kind);
@@ -331,23 +331,23 @@ static uint32 GetOperatorPrecedence(Token_Kind kind)
 	AssertUnreachable();
 }
 
-static bool IsCorrectScope(Token* token, uint32 indent)
+static bool IsCorrectScope(Token* token, u32 indent)
 {
 	return !token->newline || token->indent == indent;
 }
 
-static void CheckScope(Token* token, uint32 indent, Ast_Module* module)
+static void CheckScope(Token* token, u32 indent, Ast_Module* module)
 {
 	if (!IsCorrectScope(token, indent))
 		Error(module, token->location, "Invalid indentation.\n");
 }
 
-static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module);
-static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module* module, bool assignment_break = false, uint32 parent_precedence = -2);
-static Ast_Function ParseFunction(Token*& token, uint32 indent, Ast_Module* module);
-static Ast_Code ParseCode(Token*& token, uint32 indent, Ast_Module* module);
+static Ast_Type ParseType(Token*& token, u32 indent, Ast_Module* module);
+static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* module, bool assignment_break = false, u32 parent_precedence = -2);
+static Ast_Function ParseFunction(Token*& token, u32 indent, Ast_Module* module);
+static Ast_Code ParseCode(Token*& token, u32 indent, Ast_Module* module);
 
-static Ast_Struct ParseStruct(Token*& token, uint32 indent, Ast_Module* module)
+static Ast_Struct ParseStruct(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Struct structure;
 	ZeroMemory(&structure);
@@ -418,7 +418,7 @@ static Ast_Struct ParseStruct(Token*& token, uint32 indent, Ast_Module* module)
 	return structure;
 }
 
-static Ast_Enum ParseEnum(Token*& token, uint32 indent, Ast_Module* module)
+static Ast_Enum ParseEnum(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Enum enumeration;
 	token += 1;
@@ -488,12 +488,12 @@ static Ast_Enum ParseEnum(Token*& token, uint32 indent, Ast_Module* module)
 	return enumeration;
 }
 
-static bool CanTakeNextOp(Token* token, bool assignment_break, uint32 parent_precedence)
+static bool CanTakeNextOp(Token* token, bool assignment_break, u32 parent_precedence)
 {
 	return !(!IsOperator(token->kind) || (token->kind == TOKEN_EQUAL && assignment_break)) && GetOperatorPrecedence(token->kind) < parent_precedence + IsOperatorRightToLeft(token->kind);
 }
 
-static Ast_Expression* ParseExpression(Token*& token, uint32 indent, Ast_Module* module, bool assignment_break, uint32 parent_precedence)
+static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* module, bool assignment_break, u32 parent_precedence)
 {
 	Ast_Expression* left;
 
@@ -818,7 +818,7 @@ static Token* GetEndOfTypeIfValid(Token* token)
 	return null;
 }
 
-static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
+static Ast_Type ParseType(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Type type;
 	ZeroMemory(&type);
@@ -970,7 +970,7 @@ static Ast_Type ParseType(Token*& token, uint32 indent, Ast_Module* module)
 	return type;
 }
 
-static void ParseParameters(Ast_Function* function, Token* open_paren, uint32 indent, Ast_Module* module)
+static void ParseParameters(Ast_Function* function, Token* open_paren, u32 indent, Ast_Module* module)
 {
 	Token* closure = open_paren->closure;
 	Token* token = open_paren+1;
@@ -1027,7 +1027,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, uint32 in
 	function->parameters = params.Lock();
 }
 
-static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module* module)
+static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_BranchBlock branch_block;
 	ZeroMemory(&branch_block);
@@ -1217,7 +1217,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, uint32 indent, Ast_Module
 	return branch_block;
 }
 
-static Ast_Statement ParseStatement(Token*& token, uint32 indent, Ast_Module* module)
+static Ast_Statement ParseStatement(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Statement statement = Ast_Statement();
 	ZeroMemory(&statement);
@@ -1364,7 +1364,7 @@ static bool IsScopeTerminator(Token_Kind kind)
 	return kind == TOKEN_SEMICOLON || kind == TOKEN_ELSE || kind == TOKEN_THEN;
 }
 
-static Ast_Code ParseCode(Token*& token, uint32 indent, Ast_Module* module)
+static Ast_Code ParseCode(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Code code;
 	ZeroMemory(&code);
@@ -1426,7 +1426,7 @@ static Ast_Code ParseCode(Token*& token, uint32 indent, Ast_Module* module)
 	return code;
 }
 
-static Ast_Function ParseFunction(Token*& token, uint32 indent, Ast_Module* module)
+static Ast_Function ParseFunction(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Function function;
 	ZeroMemory(&function);
@@ -1459,7 +1459,7 @@ static Ast_Function ParseFunction(Token*& token, uint32 indent, Ast_Module* modu
 	return function;
 }
 
-static Ast_Import ParseImport(Token*& token, uint32 indent, Ast_Module* module)
+static Ast_Import ParseImport(Token*& token, u32 indent, Ast_Module* module)
 {
 	Ast_Import import;
 	import.token = token;

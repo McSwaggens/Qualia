@@ -93,7 +93,7 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to)
 		{
 			if (to_kind == TYPE_TUPLE && cast >= CAST_COERCIVE && from_info->tuple_info.count == to_info->tuple_info.count)
 			{
-				for (uint64 i = 0; i < from_info->tuple_info.count; i++)
+				for (u64 i = 0; i < from_info->tuple_info.count; i++)
 				{
 					if (!CanCast(cast, from_info->tuple_info.elements[i], to_info->tuple_info.elements[i]))
 						return false;
@@ -216,7 +216,7 @@ static void InitTypeSystem(void)
 	type_system.info_capacity = 1<<20;
 	type_system.infos = (TypeInfo*)AllocateMemory(type_system.info_capacity*sizeof(TypeInfo));
 
-	for (int32 prim = PRIMITIVE_BEGIN; prim < PRIMITIVE_END; prim++)
+	for (s32 prim = PRIMITIVE_BEGIN; prim < PRIMITIVE_END; prim++)
 	{
 		TypeInfo* info = &type_system.infos[prim];
 		ZeroMemory(info);
@@ -345,13 +345,13 @@ static TypeID GetArray(TypeID subtype)
 	return result;
 }
 
-static TypeID GetFixedArray(TypeID subtype, uint64 length)
+static TypeID GetFixedArray(TypeID subtype, u64 length)
 {
 	Assert(subtype);
 
 	TypeInfo* info = GetTypeInfo(subtype);
 
-	for (uint32 i = 0; i < info->extensions.count; i++)
+	for (u32 i = 0; i < info->extensions.count; i++)
 	{
 		ExtensionEntry* entry = &info->extensions.entries[i];
 
@@ -384,7 +384,7 @@ static TypeID GetFunctionType(TypeID input, TypeID output)
 
 	TypeInfo* input_info = GetTypeInfo(input);
 
-	for (uint32 i = 0; i < input_info->extensions.count; i++)
+	for (u32 i = 0; i < input_info->extensions.count; i++)
 	{
 		ExtensionEntry* entry = &input_info->extensions.entries[i];
 
@@ -411,7 +411,7 @@ static TypeID GetFunctionType(TypeID input, TypeID output)
 	return result;
 }
 
-static TypeID GetTuple(TypeID* elements, uint64 count)
+static TypeID GetTuple(TypeID* elements, u64 count)
 {
 	if (!count)
 		return TYPE_EMPTY_TUPLE;
@@ -422,7 +422,7 @@ static TypeID GetTuple(TypeID* elements, uint64 count)
 	TypeInfo* header_info = GetTypeInfo(elements[0]);
 	ExtensionTable* table = &header_info->extensions;
 
-	for (int32 i = 0; i < table->count; i++)
+	for (s32 i = 0; i < table->count; i++)
 	{
 		ExtensionEntry* entry = &table->entries[i];
 
@@ -438,8 +438,8 @@ static TypeID GetTuple(TypeID* elements, uint64 count)
 			return entry->type;
 	}
 
-	uint64 size = 0;
-	for (int32 i = 0; i < count; i++)
+	u64 size = 0;
+	for (s32 i = 0; i < count; i++)
 		size += GetTypeSize(elements[i]);
 
 	TypeID* new_elements = (TypeID*)AllocateMemory(sizeof(TypeID) * count);
@@ -459,7 +459,7 @@ static TypeID GetTuple(TypeID* elements, uint64 count)
 	return result;
 }
 
-static TypeID CreateStructType(Ast_Struct* ast, uint64 size)
+static TypeID CreateStructType(Ast_Struct* ast, u64 size)
 {
 	TypeID result = CreateType(TYPE_STRUCT, {
 		.size = size,
@@ -498,7 +498,7 @@ static TypeID MergeTypeRight(TypeID a, TypeID b)
 		return GetTuple((TypeID[]){ a, b }, 2);
 
 	TypeInfo* b_info = GetTypeInfo(b);
-	uint64 count = b_info->tuple_info.count+1;
+	u64 count = b_info->tuple_info.count+1;
 
 	TypeID elements[count];
 	elements[0] = a;

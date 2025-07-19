@@ -7,18 +7,18 @@
 
 static TypeID GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module);
 
-static uint64 CalculateStackFrameSize(Ast_Function* function)
+static u64 CalculateStackFrameSize(Ast_Function* function)
 {
 	return CalculateStackFrameSize(&function->code, 0);
 }
 
 // @Note: This doesn't calculate the minimum memory needed to represent the stackframe which would be ideal for producing optimized binaries.
 //        Another function needs to created for that.
-static uint64 CalculateStackFrameSize(Ast_Code* code, uint64 offset)
+static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset)
 {
-	uint64 initial_offset = offset;
+	u64 initial_offset = offset;
 
-	for (uint32 i = 0; i < code->scope.variables.count; i++)
+	for (u32 i = 0; i < code->scope.variables.count; i++)
 	{
 		Ast_Variable* variable = code->scope.variables[i];
 		variable->offset = offset;
@@ -26,7 +26,7 @@ static uint64 CalculateStackFrameSize(Ast_Code* code, uint64 offset)
 		// Print("Variable %:\n\tsize = %\n\toffset = %\n", variable->name, variable->type->size, variable->offset);
 	}
 
-	for (uint32 i = 0; i < code->statements.count; i++)
+	for (u32 i = 0; i < code->statements.count; i++)
 	{
 		Ast_Statement* statement = &code->statements[i];
 
@@ -109,14 +109,14 @@ static TypeID GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Ast_Module* m
 
 		case AST_BASETYPE_TUPLE:
 		{
-			uint32 tuple_count = basetype.tuple.count;
+			u32 tuple_count = basetype.tuple.count;
 
 			if (!tuple_count)
 				Error(module, basetype.token->location, "Empty tuple is an invalid type.\n");
 
 			TypeID types[tuple_count];
 
-			for (uint32 i = 0; i < tuple_count; i++)
+			for (u32 i = 0; i < tuple_count; i++)
 			{
 				types[i] = GetType(&basetype.tuple[i], scope, module);
 			}
@@ -153,7 +153,7 @@ static TypeID GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module)
 	if (!result)
 		return result;
 
-	for (int32 i = ast_type->specifiers.count-1; i >= 0; i--)
+	for (s32 i = ast_type->specifiers.count-1; i >= 0; i--)
 	{
 		Ast_Specifier* specifier = &ast_type->specifiers[i];
 
@@ -177,7 +177,7 @@ static TypeID GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module)
 				Assert(specifier->size_expression->kind == AST_EXPRESSION_TERMINAL_LITERAL);
 
 				Ast_Expression_Literal* literal = (Ast_Expression_Literal*)specifier->size_expression;
-				uint64 length = literal->token->literal_int;
+				u64 length = literal->token->literal_int;
 
 				if (length <= 0) // Shouldn't we just enforce uint?
 					Error(module, specifier->size_expression, "Fixed array size must be larger than 0.\n");
@@ -190,7 +190,7 @@ static TypeID GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module)
 	return result;
 }
 
-static void Intrinsic_SystemCall(int64* input, int64* output)
+static void Intrinsic_SystemCall(s64* input, s64* output)
 {
 	*output = SystemCall(input[0], input[1], input[2], input[3], input[4], input[5], input[6]);
 }
@@ -225,7 +225,7 @@ static void InitIntrinsics()
 
 static IntrinsicID FindIntrinsic(String name, TypeID input_type)
 {
-	for (uint64 id = 0; id < INTRINSIC_COUNT; id++)
+	for (u64 id = 0; id < INTRINSIC_COUNT; id++)
 	{
 		TypeInfo* info = GetTypeInfo(intrinsic_type_lut[id]);
 
@@ -258,7 +258,7 @@ static Ast_Variable* FindVariable(Ast_Scope* scope, String name)
 {
 	while (scope)
 	{
-		for (uint32 i = 0; i < scope->variables.count; i++)
+		for (u32 i = 0; i < scope->variables.count; i++)
 		{
 			Ast_Variable* variable = scope->variables[i];
 
@@ -377,7 +377,7 @@ static void ScanExpressionFixedArray(Ast_Expression_Fixed_Array* fixed_array, As
 
 	Ast_Expression_Flags flags = AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
-	for (uint32 i = 0; i < fixed_array->elements.count; i++)
+	for (u32 i = 0; i < fixed_array->elements.count; i++)
 	{
 		Ast_Expression* element = fixed_array->elements[i];
 		ScanExpression(element, scope, module);
@@ -495,7 +495,7 @@ static void ScanExpressionTuple(Ast_Expression_Tuple* tuple, Ast_Scope* scope, A
 		AST_EXPRESSION_FLAG_PURE |
 		AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
-	for (uint32 i = 0; i < tuple->elements.count; i++)
+	for (u32 i = 0; i < tuple->elements.count; i++)
 	{
 		Ast_Expression* element = tuple->elements[i];
 		ScanExpression(element, scope, module);
@@ -562,7 +562,7 @@ static void ScanExpressionCall(Ast_Expression_Call* call, Ast_Scope* scope, Ast_
 
 		dot->left = ImplicitCast(dot->left, function->parameters[0].type, module);
 
-		for (uint32 i = 0; i < dcall->parameters->elements.count; i++)
+		for (u32 i = 0; i < dcall->parameters->elements.count; i++)
 			call->parameters->elements[i] = ImplicitCast(call->parameters->elements[i], function->parameters[i+1].type, module);
 
 		return;
@@ -1098,7 +1098,7 @@ static void GenerateClosure(Ast_Struct* target, Array<TypeID> tuple);
 
 static void GenerateClosure(Ast_Struct* target, Array<TypeID> tuple)
 {
-	for (uint32 i = 0; i < tuple.count; i++)
+	for (u32 i = 0; i < tuple.count; i++)
 	{
 		TypeID type = tuple[i];
 		TypeInfo* type_info = GetTypeInfo(type);
@@ -1155,10 +1155,10 @@ static void CalculateTupleSize(TypeID tuple)
 
 	if (info->size) return;
 
-	uint64 size = 0;
+	u64 size = 0;
 
 	Assert(info->tuple_info.count);
-	for (uint32 i = 0; i < info->tuple_info.count; i++)
+	for (u32 i = 0; i < info->tuple_info.count; i++)
 	{
 		TypeID element_type = info->tuple_info.elements[i];
 
@@ -1182,7 +1182,7 @@ static void CalculateStructSize(Ast_Struct* ast_struct)
 	if (GetTypeSize(ast_struct->type)) return;
 	TypeInfo* info = GetTypeInfo(ast_struct->type);
 
-	uint64 size = 0;
+	u64 size = 0;
 
 	for (Ast_Struct_Member* member = ast_struct->members; member < ast_struct->members.End(); member++)
 	{
@@ -1438,7 +1438,7 @@ static void ScanVerboseFor(Ast_Module* module, Ast_Function* function, Ast_Code*
 
 static void ScanBranchBlock(Ast_Module* module, Ast_Function* function, Ast_Code* code, Ast_BranchBlock* branch_block)
 {
-	for (uint32 i = 0; i < branch_block->branches.count; i++)
+	for (u32 i = 0; i < branch_block->branches.count; i++)
 	{
 		Ast_Branch* branch = &branch_block->branches[i];
 
@@ -1681,7 +1681,7 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, A
 static TypeID GetTypeFromParams(Array<Ast_Variable> params, Ast_Module* module)
 {
 	TypeID types[params.count];
-	for (uint32 i = 0; i < params.count; i++)
+	for (u32 i = 0; i < params.count; i++)
 	{
 		types[i] = params[i].type;
 	}

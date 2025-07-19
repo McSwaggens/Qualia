@@ -2,6 +2,7 @@
 
 #include "array.h"
 #include "list.h"
+#include "memory.h"
 
 struct Ast_Module;
 
@@ -45,19 +46,10 @@ static void CompileFile(String file_path)
 	GenerateIR(module);
 }
 
-struct Linux_Booty
-{
-	char* path;
-	Array<char*> arguments;
-};
-
-// extern "C" void Start_Linux(Linux_Booty* booty)
-
 int main(int argc, char** args)
 {
 	modules = null;
 
-	InitPageCache();
 	InitGlobalArena();
 	InitArrayBufferPool();
 	InitThread();
@@ -72,7 +64,7 @@ int main(int argc, char** args)
 		// "test_literals.q"
 	};
 
-	for (uint32 i = 0; i < COUNT(files); i++)
+	for (u32 i = 0; i < COUNT(files); i++)
 	{
 		Print("Compiling: %\n", files[i]);
 		CompileFile(files[i]);

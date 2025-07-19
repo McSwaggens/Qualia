@@ -45,7 +45,7 @@ Instruction* Block::NewInstruction(Instruction instruction)
 	return result;
 }
 
-Instruction* Block::Param(uint64 n)
+Instruction* Block::Param(u64 n)
 {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_PARAM,
@@ -594,7 +594,7 @@ static Block* StatementToIR(Ast_Statement* statement, Block* block, Block* bbrea
 static void CodeToIR(Ast_Code* code, Block* block, Block* bexit, Block* bbreak, IrGenHelper* helper)
 {
 	Procedure* proc = helper->procedure;
-	for (uint64 i = 0; i < code->statements.count; i++)
+	for (u64 i = 0; i < code->statements.count; i++)
 	{
 		Ast_Statement* statement = &code->statements[i];
 		block = StatementToIR(statement, block, bbreak, helper);
@@ -615,7 +615,7 @@ static Procedure* FunctionToIR(Ast_Function* function)
 
 	Block* binit = proc->NewBlock();
 
-	for (uint64 i = 0; i < function->parameters.count; i++)
+	for (u64 i = 0; i < function->parameters.count; i++)
 	{
 		Ast_Variable* var = &function->parameters[i];
 		Instruction* stack = binit->Stack(GetTypeSize(var->type));
@@ -642,13 +642,13 @@ static Procedure* FunctionToIR(Ast_Function* function)
 
 static void GenerateIR(Ast_Module* module)
 {
-	for (uint64 i = 0; i < module->scope.functions; i++)
+	for (u64 i = 0; i < module->scope.functions; i++)
 	{
 		Ast_Function* function = &module->scope.functions[i];
 		Procedure* procedure = FunctionToIR(function);
 	}
 
-	for (uint64 i = 0; i < module->scope.functions; i++)
+	for (u64 i = 0; i < module->scope.functions; i++)
 	{
 		Ast_Function* function = &module->scope.functions[i];
 		Print("%\n", function->procedure);

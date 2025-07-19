@@ -9,24 +9,24 @@
 struct IntFormat
 {
 	Base base;
-	uint64 value;
+	u64 value;
 };
 
-static inline IntFormat Hex(uint64 n) { return (IntFormat){ .base = BASE_HEX,    .value = n }; }
-static inline IntFormat Bin(uint64 n) { return (IntFormat){ .base = BASE_BINARY, .value = n }; }
+static inline IntFormat Hex(u64 n) { return (IntFormat){ .base = BASE_HEX,    .value = n }; }
+static inline IntFormat Bin(u64 n) { return (IntFormat){ .base = BASE_BINARY, .value = n }; }
 
 static void Write(OutputBuffer* buffer, IntFormat format);
 
 static void Write(OutputBuffer* buffer, char   c);
-static void Write(OutputBuffer* buffer, uint8  n);
-static void Write(OutputBuffer* buffer, uint16 n);
-static void Write(OutputBuffer* buffer, uint32 n);
-static void Write(OutputBuffer* buffer, uint64 n);
+static void Write(OutputBuffer* buffer, u8  n);
+static void Write(OutputBuffer* buffer, u16 n);
+static void Write(OutputBuffer* buffer, u32 n);
+static void Write(OutputBuffer* buffer, u64 n);
 
-static void Write(OutputBuffer* buffer, int8  n);
-static void Write(OutputBuffer* buffer, int16 n);
-static void Write(OutputBuffer* buffer, int32 n);
-static void Write(OutputBuffer* buffer, int64 n);
+static void Write(OutputBuffer* buffer, s8  n);
+static void Write(OutputBuffer* buffer, s16 n);
+static void Write(OutputBuffer* buffer, s32 n);
+static void Write(OutputBuffer* buffer, s64 n);
 
 static void Write(OutputBuffer* buffer, float32 n);
 static void Write(OutputBuffer* buffer, float64 n);
@@ -47,7 +47,7 @@ static void Write(OutputBuffer* buffer, Array<T> array)
 {
 	BufferWriteString(buffer, "{ ");
 
-	for (uint64 i = 0; i < array.count; i++)
+	for (u64 i = 0; i < array.count; i++)
 	{
 		if (i != 0) BufferWriteString(buffer, ", ");
 		Write(buffer, array[i]);

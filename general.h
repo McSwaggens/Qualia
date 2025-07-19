@@ -43,28 +43,28 @@ static inline void Swap(T* a, T* b)
 	*b = tmp;
 }
 
-static inline int8  Min(int8 a,  int8 b)        { return a <= b ? a : b; }
-static inline int16 Min(int16 a, int16 b)       { return a <= b ? a : b; }
-static inline int32 Min(int32 a, int32 b)       { return a <= b ? a : b; }
-static inline int64 Min(int64 a, int64 b)       { return a <= b ? a : b; }
+static inline s8  Min(s8 a,  s8 b)        { return a <= b ? a : b; }
+static inline s16 Min(s16 a, s16 b)       { return a <= b ? a : b; }
+static inline s32 Min(s32 a, s32 b)       { return a <= b ? a : b; }
+static inline s64 Min(s64 a, s64 b)       { return a <= b ? a : b; }
 
-static inline uint8  Min(uint8 a,  uint8 b)     { return a <= b ? a : b; }
-static inline uint16 Min(uint16 a, uint16 b)    { return a <= b ? a : b; }
-static inline uint32 Min(uint32 a, uint32 b)    { return a <= b ? a : b; }
-static inline uint64 Min(uint64 a, uint64 b)    { return a <= b ? a : b; }
+static inline u8  Min(u8 a,  u8 b)     { return a <= b ? a : b; }
+static inline u16 Min(u16 a, u16 b)    { return a <= b ? a : b; }
+static inline u32 Min(u32 a, u32 b)    { return a <= b ? a : b; }
+static inline u64 Min(u64 a, u64 b)    { return a <= b ? a : b; }
 
 static inline float32 Min(float32 a, float32 b) { return a <= b ? a : b; }
 static inline float64 Min(float64 a, float64 b) { return a <= b ? a : b; }
 
-static inline int8  Max(int8 a,  int8 b)        { return a <= b ? a : b; }
-static inline int16 Max(int16 a, int16 b)       { return a <= b ? a : b; }
-static inline int32 Max(int32 a, int32 b)       { return a <= b ? a : b; }
-static inline int64 Max(int64 a, int64 b)       { return a <= b ? a : b; }
+static inline s8  Max(s8 a,  s8 b)        { return a <= b ? a : b; }
+static inline s16 Max(s16 a, s16 b)       { return a <= b ? a : b; }
+static inline s32 Max(s32 a, s32 b)       { return a <= b ? a : b; }
+static inline s64 Max(s64 a, s64 b)       { return a <= b ? a : b; }
 
-static inline uint8  Max(uint8 a,  uint8 b)     { return a <= b ? a : b; }
-static inline uint16 Max(uint16 a, uint16 b)    { return a <= b ? a : b; }
-static inline uint32 Max(uint32 a, uint32 b)    { return a <= b ? a : b; }
-static inline uint64 Max(uint64 a, uint64 b)    { return a <= b ? a : b; }
+static inline u8  Max(u8 a,  u8 b)     { return a <= b ? a : b; }
+static inline u16 Max(u16 a, u16 b)    { return a <= b ? a : b; }
+static inline u32 Max(u32 a, u32 b)    { return a <= b ? a : b; }
+static inline u64 Max(u64 a, u64 b)    { return a <= b ? a : b; }
 
 static inline float32 Max(float32 a, float32 b) { return a <= b ? a : b; }
 static inline float64 Max(float64 a, float64 b) { return a <= b ? a : b; }
@@ -72,74 +72,77 @@ static inline float64 Max(float64 a, float64 b) { return a <= b ? a : b; }
 template<typename T>
 static inline T Clamp(T v, T min, T max) { return v < min ? min : v > max ? max : v; }
 
-static auto Pow(auto base, auto exponent)
-{
-	return __builtin_powl(base, exponent); // @Bug @FixMe: This isn't correct.
-}
+static double Pow(double base, double exponent) { return __builtin_powl(base, exponent); } // @Bug @FixMe: This isn't correct.
+static float  Pow(float  base, float  exponent) { return __builtin_powl(base, exponent); } // @Bug @FixMe: This isn't correct.
 
-static uint64 MaskLowerBits64(uint64 n, uint64 bits)   { return n & (-1 >> (sizeof(n) * 8 - bits)); }
-static uint64 MaskUpperBits64(uint64 n, uint64 bits)   { return n >> (sizeof(n) * 8 - bits); }
+static u64 Pow(u64 base, u64 exponent) { return __builtin_powl(base, exponent); }
+static s64 Pow(s64 base, s64 exponent) { return __builtin_powl(base, exponent); }
+static u32 Pow(u32 base, u32 exponent) { return __builtin_powl(base, exponent); }
+static s32 Pow(s32 base, s32 exponent) { return __builtin_powl(base, exponent); }
 
-static inline bool CheckedAdd(uint64 a, uint64 b, uint64* result)      { return __builtin_uaddll_overflow(a, b, result); }
-static inline bool CheckedSubtract(uint64 a, uint64 b, uint64* result) { return __builtin_usubll_overflow(a, b, result); }
-static inline bool CheckedMultiply(uint64 a, uint64 b, uint64* result) { return __builtin_umulll_overflow(a, b, result); }
+static u64 MaskLowerBits64(u64 n, u64 bits)   { return n & (-1 >> (sizeof(n) * 8 - bits)); }
+static u64 MaskUpperBits64(u64 n, u64 bits)   { return n >> (sizeof(n) * 8 - bits); }
 
-static inline bool CheckedAdd_Signed(int64 a, int64 b, int64* result)      { return __builtin_saddll_overflow(a, b, result); }
-static inline bool CheckedSubtract_Signed(int64 a, int64 b, int64* result) { return __builtin_ssubll_overflow(a, b, result); }
-static inline bool CheckedMultiply_Signed(int64 a, int64 b, int64* result) { return __builtin_smulll_overflow(a, b, result); }
+static inline bool CheckedAdd(u64 a, u64 b, u64* result)      { return __builtin_uaddll_overflow(a, b, result); }
+static inline bool CheckedSubtract(u64 a, u64 b, u64* result) { return __builtin_usubll_overflow(a, b, result); }
+static inline bool CheckedMultiply(u64 a, u64 b, u64* result) { return __builtin_umulll_overflow(a, b, result); }
 
-static inline uint64 ToBigEndian64(uint64 n) { return __builtin_bswap64(n); }
-static inline uint32 ToBigEndian32(uint32 n) { return __builtin_bswap32(n); }
-static inline uint16 ToBigEndian16(uint16 n) { return __builtin_bswap16(n); }
+static inline bool CheckedAdd_Signed(s64 a, s64 b, s64* result)      { return __builtin_saddll_overflow(a, b, result); }
+static inline bool CheckedSubtract_Signed(s64 a, s64 b, s64* result) { return __builtin_ssubll_overflow(a, b, result); }
+static inline bool CheckedMultiply_Signed(s64 a, s64 b, s64* result) { return __builtin_smulll_overflow(a, b, result); }
 
-static inline uint64 ToLittleEndian64(uint64 n) { return __builtin_bswap64(n); }
-static inline uint32 ToLittleEndian32(uint32 n) { return __builtin_bswap32(n); }
-static inline uint16 ToLittleEndian16(uint16 n) { return __builtin_bswap16(n); }
+static inline u64 ToBigEndian64(u64 n) { return __builtin_bswap64(n); }
+static inline u32 ToBigEndian32(u32 n) { return __builtin_bswap32(n); }
+static inline u16 ToBigEndian16(u16 n) { return __builtin_bswap16(n); }
 
-static inline uint64 ReverseBytes64(uint64 n) { return __builtin_bswap64(n); }
-static inline uint32 ReverseBytes32(uint32 n) { return __builtin_bswap32(n); }
-static inline uint16 ReverseBytes16(uint16 n) { return __builtin_bswap16(n); }
+static inline u64 ToLittleEndian64(u64 n) { return __builtin_bswap64(n); }
+static inline u32 ToLittleEndian32(u32 n) { return __builtin_bswap32(n); }
+static inline u16 ToLittleEndian16(u16 n) { return __builtin_bswap16(n); }
+
+static inline u64 ReverseBytes64(u64 n) { return __builtin_bswap64(n); }
+static inline u32 ReverseBytes32(u32 n) { return __builtin_bswap32(n); }
+static inline u16 ReverseBytes16(u16 n) { return __builtin_bswap16(n); }
 
 // @Warning: Clang implements this is with ~20 instructions
-static inline uint64 ReverseBits64(uint64 n) { return __builtin_bitreverse64(n); }
-static inline uint32 ReverseBits32(uint32 n) { return __builtin_bitreverse32(n); }
-static inline uint16 ReverseBits16(uint16 n) { return __builtin_bitreverse16(n); }
-static inline uint8  ReverseBits8(uint8 n)   { return __builtin_bitreverse16(n) >> 8u; }
+static inline u64 ReverseBits64(u64 n) { return __builtin_bitreverse64(n); }
+static inline u32 ReverseBits32(u32 n) { return __builtin_bitreverse32(n); }
+static inline u16 ReverseBits16(u16 n) { return __builtin_bitreverse16(n); }
+static inline u8  ReverseBits8(u8 n)   { return __builtin_bitreverse16(n) >> 8u; }
 
 // popcnt
-static inline uint64 CountBits64(uint64 n) { return __builtin_popcountll(n); }
-static inline uint32 CountBits32(uint32 n) { return __builtin_popcount(n); }
-static inline uint16 CountBits16(uint16 n) { return __builtin_popcount((uint32)n); }
-static inline uint8  CountBits8(uint8 n)   { return __builtin_popcount((uint32)n); }
+static inline u64 CountBits64(u64 n) { return __builtin_popcountll(n); }
+static inline u32 CountBits32(u32 n) { return __builtin_popcount(n); }
+static inline u16 CountBits16(u16 n) { return __builtin_popcount((u32)n); }
+static inline u8  CountBits8(u8 n)   { return __builtin_popcount((u32)n); }
 
-CFUNC uint64 LzCnt(uint64 rax); // lzcnt 0 = 64
-CFUNC uint64 TzCnt(uint64 rax); // tzcnt 0 = 64
+CFUNC u64 LzCnt(u64 rax); // lzcnt 0 = 64
+CFUNC u64 TzCnt(u64 rax); // tzcnt 0 = 64
 
 // lzcnt
 // `n == 0` check is here to prevent clang from braking the program. Branch is removed.
-static inline uint64 CountLeadingZeroes64(uint64 n) { return n == (uint64)0 ? (uint64)64 : __builtin_clzll(n); }
-static inline uint32 CountLeadingZeroes32(uint32 n) { return n == 0 ? 32 : __builtin_clz(n); }
-static inline uint32 CountLeadingZeroes16(uint16 n) { return n == 0 ? 16 : CountLeadingZeroes32(n) - (32-16); }
-static inline uint32 CountLeadingZeroes8(uint8 n)   { return n == 0 ? 8  : CountLeadingZeroes32(n) - (32-8); }
+static inline u64 CountLeadingZeroes64(u64 n) { return n == (u64)0 ? (u64)64 : __builtin_clzll(n); }
+static inline u32 CountLeadingZeroes32(u32 n) { return n == 0 ? 32 : __builtin_clz(n); }
+static inline u32 CountLeadingZeroes16(u16 n) { return n == 0 ? 16 : CountLeadingZeroes32(n) - (32-16); }
+static inline u32 CountLeadingZeroes8(u8 n)   { return n == 0 ? 8  : CountLeadingZeroes32(n) - (32-8); }
 
 // tzcnt
-static inline uint64 CountTrailingZeroes64(uint64 n) { return n == (uint64)0 ? (uint64)64 : __builtin_ctzll(n); }
-static inline uint32 CountTrailingZeroes32(uint32 n) { return n == 0 ? 32 : __builtin_ctz(n); }
-static inline uint32 CountTrailingZeroes16(uint16 n) { return n == 0 ? 16 : CountTrailingZeroes32(n); }
-static inline uint32 CountTrailingZeroes8(uint8 n)   { return n == 0 ? 8  : CountTrailingZeroes32(n); }
+static inline u64 CountTrailingZeroes64(u64 n) { return n == (u64)0 ? (u64)64 : __builtin_ctzll(n); }
+static inline u32 CountTrailingZeroes32(u32 n) { return n == 0 ? 32 : __builtin_ctz(n); }
+static inline u32 CountTrailingZeroes16(u16 n) { return n == 0 ? 16 : CountTrailingZeroes32(n); }
+static inline u32 CountTrailingZeroes8(u8 n)   { return n == 0 ? 8  : CountTrailingZeroes32(n); }
 
-static inline uint64 BitsOfInformation64(uint64 n) { return 64llu-CountLeadingZeroes64(n); }
-static inline uint32 BitsOfInformation32(uint32 n) { return 32-CountLeadingZeroes32(n); }
-static inline uint32 BitsOfInformation16(uint16 n) { return 16-CountLeadingZeroes16(n); }
-static inline uint32 BitsOfInformation8(uint8 n)   { return 8-CountLeadingZeroes8(n); }
+static inline u64 BitsOfInformation64(u64 n) { return 64llu-CountLeadingZeroes64(n); }
+static inline u32 BitsOfInformation32(u32 n) { return 32-CountLeadingZeroes32(n); }
+static inline u32 BitsOfInformation16(u16 n) { return 16-CountLeadingZeroes16(n); }
+static inline u32 BitsOfInformation8(u8 n)   { return 8-CountLeadingZeroes8(n); }
 
-static inline bool IsPow2(uint64 n) { return CountBits64(n) == 1; }
+static inline bool IsPow2(u64 n) { return CountBits64(n) == 1; }
 
 // @Note: 2^n -> 2^(n+1)
-static inline uint64 NextPow2(uint64 n) { return 1 << BitsOfInformation64(n); }
+static inline u64 NextPow2(u64 n) { return 1 << BitsOfInformation64(n); }
 
 // @Note: NextPow2(2^n) = 2^n
-static uint64 RaisePow2(uint64 n)
+static u64 RaisePow2(u64 n)
 {
 	return IsPow2(n) ? n : NextPow2(n);
 }
@@ -147,8 +150,8 @@ static uint64 RaisePow2(uint64 n)
 [[noreturn]]
 static void ExitProcess(bool success);
 
-CFUNC int64 SystemCall(int64 rax, int64 rdi = 0, int64 rsi = 0, int64 rdx = 0, int64 r10 = 0, int64 r8 = 0, int64 r9 = 0);
+CFUNC s64 SystemCall(s64 rax, s64 rdi = 0, s64 rsi = 0, s64 rdx = 0, s64 r10 = 0, s64 r8 = 0, s64 r9 = 0);
 
-static inline uint64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc
+static inline u64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc
 
 #endif // GENERAL_H

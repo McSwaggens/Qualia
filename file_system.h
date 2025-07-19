@@ -2,8 +2,8 @@
 
 #include "string.h"
 
-typedef int32 FileHandle;
-typedef int32 DirectoryHandle;
+typedef s32 FileHandle;
+typedef s32 DirectoryHandle;
 
 static const FileHandle      NULL_FILE_HANDLE      = -1;
 static const DirectoryHandle NULL_DIRECTORY_HANDLE = -1;
@@ -11,12 +11,12 @@ static const DirectoryHandle NULL_DIRECTORY_HANDLE = -1;
 static inline bool IsFileHandleValid(FileHandle handle)           { return handle >= 0; }
 static inline bool IsDirectoryHandleValid(DirectoryHandle handle) { return handle >= 0; }
 
-static const uint64 OUTPUT_BUFFER_SIZE = 4096 * 2;
+static const u64 OUTPUT_BUFFER_SIZE = 4096 * 2;
 
 struct OutputBuffer
 {
 	FileHandle handle;
-	uint64 current_index;
+	u64 current_index;
 	byte data[OUTPUT_BUFFER_SIZE];
 };
 
@@ -41,20 +41,20 @@ enum FileMode
 };
 
 
-typedef uint32 FileAccessFlags;
+typedef u32 FileAccessFlags;
 static const FileAccessFlags FILE_ACCESS_READ  = 0x1;
 static const FileAccessFlags FILE_ACCESS_WRITE = 0x2;
 
-static Array<byte> FileLoad(String path, uint64 padding_left, uint64 padding_right);
+static Array<byte> FileLoad(String path, u64 padding_left, u64 padding_right);
 static FileHandle  FileOpen(String path, FileMode mode, FileAccessFlags access_flags);
 static void        FileClose(FileHandle file);
 static bool        FileDoesExist(String path);
-static void        FileRead(FileHandle file, byte* dest, uint64 size);
-static void        FileWrite(FileHandle file, const byte* data, uint64 size);
-static uint64      FileQuerySize(FileHandle file);
+static void        FileRead(FileHandle file, byte* dest, u64 size);
+static void        FileWrite(FileHandle file, const byte* data, u64 size);
+static u64      FileQuerySize(FileHandle file);
 
 static void BufferWriteString(OutputBuffer* buffer, String string);
-static void BufferWriteData(OutputBuffer* buffer, const char* src, uint64 size);
+static void BufferWriteData(OutputBuffer* buffer, const char* src, u64 size);
 static void BufferWriteByte(OutputBuffer* buffer, byte b);
 static void BufferFlush(OutputBuffer* buffer);
 

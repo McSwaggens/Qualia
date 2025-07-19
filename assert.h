@@ -6,8 +6,7 @@
 
 #define StaticAssert(x) static_assert(x)
 
-struct InternalLocation
-{
+struct InternalLocation {
 	String file;
 	String function;
 	s32 line;
@@ -18,8 +17,7 @@ static constexpr InternalLocation GetInternalLocation(
 	String file     = GetInternalFileName(),
 	String function = GetInternalFunctionName(),
 	s32  line     = GetInternalLineNumber(),
-	s32  offset   = GetInternalColumnNumber())
-{
+	s32  offset   = GetInternalColumnNumber()) {
 	InternalLocation location;
 	location.file = file;
 	location.function = function;
@@ -28,14 +26,11 @@ static constexpr InternalLocation GetInternalLocation(
 	return location;
 }
 
-static void Assert(bool b = false, String desc = null, InternalLocation loc = GetInternalLocation())
-{
-	if (IsDebug() && !b)
-	{
+static void Assert(bool b = false, String desc = null, InternalLocation loc = GetInternalLocation()) {
+	if (IsDebug() && !b) {
 		Print("%:%: error: Assertion failed in %\n", loc.file, loc.line, loc.function);
 
-		if (desc)
-		{
+		if (desc) {
 			Print("%:%: error: %\n", loc.file, loc.line, desc);
 		}
 

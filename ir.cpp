@@ -5,15 +5,13 @@
 
 static List<Procedure*> procedures = null;
 
-static Procedure* MakeProcedure(String name)
-{
+static Procedure* MakeProcedure(String name) {
 	Procedure* proc = Allocate<Procedure>();
 	procedures.Add(proc);
 	return proc;
 }
 
-Block* Procedure::NewBlock()
-{
+Block* Procedure::NewBlock() {
 	Block* block = Allocate<Block>();
 	ZeroMemory(block);
 	block->procedure = this;
@@ -28,8 +26,7 @@ Block* Procedure::NewBlock()
 // -------------------------------------------------- //
 
 
-Instruction* Block::NewInstruction(Instruction instruction)
-{
+Instruction* Block::NewInstruction(Instruction instruction) {
 	Instruction* result = Allocate<Instruction>();
 	*result = instruction;
 	result->id = this->procedure->instruction_ticker++;
@@ -45,8 +42,7 @@ Instruction* Block::NewInstruction(Instruction instruction)
 	return result;
 }
 
-Instruction* Block::Param(u64 n)
-{
+Instruction* Block::Param(u64 n) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_PARAM,
 		.op0 = n,
@@ -55,8 +51,7 @@ Instruction* Block::Param(u64 n)
 	return result;
 }
 
-Instruction* Block::Stack(Value size)
-{
+Instruction* Block::Stack(Value size) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_STACK,
 	});
@@ -64,8 +59,7 @@ Instruction* Block::Stack(Value size)
 	return result;
 }
 
-Instruction* Block::Load(Value addr)
-{
+Instruction* Block::Load(Value addr) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_LOAD,
 		.op0 = addr,
@@ -74,8 +68,7 @@ Instruction* Block::Load(Value addr)
 	return result;
 }
 
-Instruction* Block::Store(Value dest, Value value)
-{
+Instruction* Block::Store(Value dest, Value value) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_STORE,
 		.op0 = dest,
@@ -85,8 +78,7 @@ Instruction* Block::Store(Value dest, Value value)
 	return result;
 }
 
-Instruction* Block::Add(Value a, Value b)
-{
+Instruction* Block::Add(Value a, Value b) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_ADD,
 		.op0 = a,
@@ -97,8 +89,7 @@ Instruction* Block::Add(Value a, Value b)
 	return result;
 }
 
-Instruction* Block::AddF32(Value a, Value b)
-{
+Instruction* Block::AddF32(Value a, Value b) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_ADD_F32,
 		.op0 = a,
@@ -109,8 +100,7 @@ Instruction* Block::AddF32(Value a, Value b)
 	return result;
 }
 
-Instruction* Block::AddF64(Value a, Value b)
-{
+Instruction* Block::AddF64(Value a, Value b) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_ADD_F64,
 		.op0 = a,
@@ -121,8 +111,7 @@ Instruction* Block::AddF64(Value a, Value b)
 	return result;
 }
 
-Instruction* Block::Sub(Value a, Value b)
-{
+Instruction* Block::Sub(Value a, Value b) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_SUB,
 		.op0 = a,
@@ -133,8 +122,7 @@ Instruction* Block::Sub(Value a, Value b)
 	return result;
 }
 
-Instruction* Block::SubF32(Value a, Value b)
-{
+Instruction* Block::SubF32(Value a, Value b) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_SUB_F32,
 		.op0 = a,
@@ -145,8 +133,7 @@ Instruction* Block::SubF32(Value a, Value b)
 	return result;
 }
 
-Instruction* Block::SubF64(Value a, Value b)
-{
+Instruction* Block::SubF64(Value a, Value b) {
 	Instruction* result = this->NewInstruction((Instruction){
 		.opcode = IR_SUB_F64,
 		.op0 = a,
@@ -157,8 +144,7 @@ Instruction* Block::SubF64(Value a, Value b)
 	return result;
 }
 
-Instruction* Block::Jump(Block* to)
-{
+Instruction* Block::Jump(Block* to) {
 	Assert(!this->controlFlowInstruction);
 
 	Instruction* result = this->NewInstruction((Instruction){
@@ -171,8 +157,7 @@ Instruction* Block::Jump(Block* to)
 	return result;
 }
 
-Instruction* Block::Branch(Value cond, Block* btrue, Block* bfalse)
-{
+Instruction* Block::Branch(Value cond, Block* btrue, Block* bfalse) {
 	Assert(!this->controlFlowInstruction);
 
 	Instruction* result = this->NewInstruction((Instruction){
@@ -187,8 +172,7 @@ Instruction* Block::Branch(Value cond, Block* btrue, Block* bfalse)
 	return result;
 }
 
-Instruction* Block::Return(Value value)
-{
+Instruction* Block::Return(Value value) {
 	Assert(!this->controlFlowInstruction);
 
 	Instruction* result = this->NewInstruction((Instruction){
@@ -201,8 +185,7 @@ Instruction* Block::Return(Value value)
 	return result;
 }
 
-Instruction* Block::Return()
-{
+Instruction* Block::Return() {
 	Assert(!this->controlFlowInstruction);
 
 	Instruction* result = this->NewInstruction((Instruction){
@@ -218,8 +201,7 @@ Instruction* Block::Return()
 // -------------------------------------------------- //
 
 
-Value Block::Cast(Value value, TypeID from, TypeID to)
-{
+Value Block::Cast(Value value, TypeID from, TypeID to) {
 	return value;
 }
 
@@ -227,8 +209,7 @@ Value Block::Cast(Value value, TypeID from, TypeID to)
 // -------------------------------------------------- //
 
 
-void Block::Remove()
-{
+void Block::Remove() {
 	Procedure* proc = this->procedure;
 
 	FreeList(this->users);
@@ -239,8 +220,7 @@ void Block::Remove()
 	this->instructions = null;
 	this->phis = null;
 
-	if (proc->entry == this)
-	{
+	if (proc->entry == this) {
 		Assert();
 	}
 
@@ -259,12 +239,10 @@ struct IrGenHelper
 
 static void CodeToIR(Ast_Code* code, Block* block, Block* bexit, Block* bbreak, IrGenHelper* helper);
 
-static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_reference, IrGenHelper* helper)
-{
+static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_reference, IrGenHelper* helper) {
 	Value result = Value();
 
-	switch (expr->kind)
-	{
+	switch (expr->kind) {
 		case AST_EXPRESSION_TERMINAL_NAME:
 		case AST_EXPRESSION_TERMINAL_FUNCTION:
 		case AST_EXPRESSION_TERMINAL_INTRINSIC:
@@ -274,8 +252,7 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 		{
 			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expr;
 
-			switch (expr->type)
-			{
+			switch (expr->type) {
 				default: AssertUnreachable();
 
 				case TYPE_INT64:
@@ -335,14 +312,12 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 			Value vleft  = ExpressionToIR(bin->left,  block, true, helper);
 			Value vright = ExpressionToIR(bin->right, block, true, helper);
 
-			if (IsInteger(bin->left->type))
-			{
+			if (IsInteger(bin->left->type)) {
 				result = block->Add(vleft, vright);
 				break;
 			}
 
-			if (bin->left->type == TYPE_FLOAT32)
-			{
+			if (bin->left->type == TYPE_FLOAT32) {
 				result = block->AddF32(vleft, vright);
 				break;
 			}
@@ -387,16 +362,14 @@ static Value ExpressionToIR(Ast_Expression* expr, Block*& block, bool remove_ref
 			Assert();
 	}
 
-	if (remove_reference && (expr->flags & AST_EXPRESSION_FLAG_REFERENTIAL))
-	{
+	if (remove_reference && (expr->flags & AST_EXPRESSION_FLAG_REFERENTIAL)) {
 		result = block->Load(result);
 	}
 
 	return result;
 }
 
-static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHelper* helper)
-{
+static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHelper* helper) {
 	Procedure* proc = helper->procedure;
 
 	if (branch->else_branch && !branch->else_branch->entry_block)
@@ -418,8 +391,7 @@ static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHel
 	if (branch->then_branch)
 		then_block = branch->then_branch->entry_block;
 
-	switch (branch->kind)
-	{
+	switch (branch->kind) {
 		case AST_BRANCH_NAKED:
 		{
 			CodeToIR(&branch->code, branch->entry_block, bexit, bbreak, helper);
@@ -444,8 +416,7 @@ static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHel
 			Value cond = ExpressionToIR(branch->if_condition, b, true, helper);
 			b->Branch(cond, loop_body, else_block);
 
-			if (branch->then_branch || branch->else_branch)
-			{
+			if (branch->then_branch || branch->else_branch) {
 				loop_head = proc->NewBlock();
 
 				b = loop_head;
@@ -463,8 +434,7 @@ static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHel
 			Ast_Variable* var = branch->for_verbose.variable;
 			Value stack = b->Stack(GetTypeSize(var->type));
 
-			if (var->assignment)
-			{
+			if (var->assignment) {
 				Value v = ExpressionToIR(var->assignment, b, true, helper);
 				b->Store(stack, v);
 			}
@@ -483,8 +453,7 @@ static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHel
 			Value cond = ExpressionToIR(branch->for_verbose.condition, b, true, helper);
 			b->Branch(cond, loop_body, else_block);
 
-			if (branch->then_branch || branch->else_branch)
-			{
+			if (branch->then_branch || branch->else_branch) {
 				loop_head = proc->NewBlock();
 				b = loop_head;
 				Value cond = ExpressionToIR(branch->for_verbose.condition, b, true, helper);
@@ -504,8 +473,7 @@ static void BranchToIR(Ast_Branch* branch, Block* bbreak, Block* bexit, IrGenHel
 	}
 }
 
-static Block* BranchBlockToIR(Ast_BranchBlock* bb, Block* block, Block* bbreak, IrGenHelper* helper)
-{
+static Block* BranchBlockToIR(Ast_BranchBlock* bb, Block* block, Block* bbreak, IrGenHelper* helper) {
 	Block* exit_block = helper->procedure->NewBlock();
 
 	BranchToIR(&bb->branches[0], bbreak, exit_block, helper);
@@ -515,10 +483,8 @@ static Block* BranchBlockToIR(Ast_BranchBlock* bb, Block* block, Block* bbreak, 
 	return exit_block;
 }
 
-static Block* StatementToIR(Ast_Statement* statement, Block* block, Block* bbreak, IrGenHelper* helper)
-{
-	switch (statement->kind)
-	{
+static Block* StatementToIR(Ast_Statement* statement, Block* block, Block* bbreak, IrGenHelper* helper) {
+	switch (statement->kind) {
 		case AST_STATEMENT_EXPRESSION:
 		{
 			Value value = ExpressionToIR(statement->expression, block, false, helper);
@@ -550,16 +516,13 @@ static Block* StatementToIR(Ast_Statement* statement, Block* block, Block* bbrea
 			Value refval = ExpressionToIR(inc->expression, block, false, helper);
 			Value val = block->Load(refval);
 
-			if (IsInteger(inc->expression->type))
-			{
+			if (IsInteger(inc->expression->type)) {
 				val = is_inc ? block->Add(val, 1) : block->Sub(val, 1);
 			}
-			else if (inc->expression->type == TYPE_FLOAT32)
-			{
+			else if (inc->expression->type == TYPE_FLOAT32) {
 				val = is_inc ? block->AddF32(val, 1) : block->SubF32(val, 1);
 			}
-			else if (inc->expression->type == TYPE_FLOAT32)
-			{
+			else if (inc->expression->type == TYPE_FLOAT32) {
 				val = is_inc ? block->AddF64(val, 1) : block->SubF64(val, 1);
 			}
 			else AssertUnreachable();
@@ -591,11 +554,9 @@ static Block* StatementToIR(Ast_Statement* statement, Block* block, Block* bbrea
 	return block;
 }
 
-static void CodeToIR(Ast_Code* code, Block* block, Block* bexit, Block* bbreak, IrGenHelper* helper)
-{
+static void CodeToIR(Ast_Code* code, Block* block, Block* bexit, Block* bbreak, IrGenHelper* helper) {
 	Procedure* proc = helper->procedure;
-	for (u64 i = 0; i < code->statements.count; i++)
-	{
+	for (u64 i = 0; i < code->statements.count; i++) {
 		Ast_Statement* statement = &code->statements[i];
 		block = StatementToIR(statement, block, bbreak, helper);
 
@@ -606,8 +567,7 @@ static void CodeToIR(Ast_Code* code, Block* block, Block* bexit, Block* bbreak, 
 	block->Jump(bexit);
 }
 
-static Procedure* FunctionToIR(Ast_Function* function)
-{
+static Procedure* FunctionToIR(Ast_Function* function) {
 	Procedure* proc = Allocate<Procedure>();
 	ZeroMemory(proc);
 	proc->function = function;
@@ -615,8 +575,7 @@ static Procedure* FunctionToIR(Ast_Function* function)
 
 	Block* binit = proc->NewBlock();
 
-	for (u64 i = 0; i < function->parameters.count; i++)
-	{
+	for (u64 i = 0; i < function->parameters.count; i++) {
 		Ast_Variable* var = &function->parameters[i];
 		Instruction* stack = binit->Stack(GetTypeSize(var->type));
 		var->ir_stack = stack;
@@ -640,16 +599,13 @@ static Procedure* FunctionToIR(Ast_Function* function)
 // -------------------------------------------------- //
 
 
-static void GenerateIR(Ast_Module* module)
-{
-	for (u64 i = 0; i < module->scope.functions; i++)
-	{
+static void GenerateIR(Ast_Module* module) {
+	for (u64 i = 0; i < module->scope.functions; i++) {
 		Ast_Function* function = &module->scope.functions[i];
 		Procedure* procedure = FunctionToIR(function);
 	}
 
-	for (u64 i = 0; i < module->scope.functions; i++)
-	{
+	for (u64 i = 0; i < module->scope.functions; i++) {
 		Ast_Function* function = &module->scope.functions[i];
 		Print("%\n", function->procedure);
 	}

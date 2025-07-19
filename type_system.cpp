@@ -3,8 +3,7 @@
 #include "general.h"
 #include "assert.h"
 
-static TypeID GetArithmeticBackingType(TypeID id)
-{
+static TypeID GetArithmeticBackingType(TypeID id) {
 	if (id == TYPE_BOOL)
 		return TYPE_INT8;
 
@@ -17,18 +16,15 @@ static TypeID GetArithmeticBackingType(TypeID id)
 	return id;
 }
 
-static TypeID GetIntegerWithSign(TypeID type, bool sign)
-{
-	if (sign) switch (type)
-	{
+static TypeID GetIntegerWithSign(TypeID type, bool sign) {
+	if (sign) switch (type) {
 		case TYPE_UINT8:  return TYPE_INT8;
 		case TYPE_UINT16: return TYPE_INT16;
 		case TYPE_UINT32: return TYPE_INT32;
 		case TYPE_UINT64: return TYPE_INT64;
 		default: return type;
 	}
-	else switch (type)
-	{
+	else switch (type) {
 		case TYPE_INT8:  return TYPE_UINT8;
 		case TYPE_INT16: return TYPE_UINT16;
 		case TYPE_INT32: return TYPE_UINT32;
@@ -37,30 +33,26 @@ static TypeID GetIntegerWithSign(TypeID type, bool sign)
 	}
 }
 
-static TypeID GetDominantType(TypeID a, TypeID b)
-{
+static TypeID GetDominantType(TypeID a, TypeID b) {
 	if (a == b)
 		return a;
 
 	if (a < b)
 		Swap(&a, &b);
 
-	if (IsInteger(a) && IsInteger(b))
-	{
+	if (IsInteger(a) && IsInteger(b)) {
 		bool sign = IsSignedInteger(a) && IsSignedInteger(b);
 		return GetIntegerWithSign(a, sign);
 	}
 
-	if (GetTypeKind(a) == TYPE_PRIMITIVE && GetTypeKind(b) == TYPE_PRIMITIVE)
-	{
+	if (GetTypeKind(a) == TYPE_PRIMITIVE && GetTypeKind(b) == TYPE_PRIMITIVE) {
 	}
 
 	Assert("Invalid dominator combo");
 	return TYPE_NULL;
 }
 
-static bool CanCast(CastKind cast, TypeID from, TypeID to)
-{
+static bool CanCast(CastKind cast, TypeID from, TypeID to) {
 	TypeKind from_kind = GetTypeKind(from);
 	TypeKind to_kind   = GetTypeKind(to);
 
@@ -76,8 +68,7 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to)
 	if (to == TYPE_BYTE)
 		return GetTypeSize(from) == 1;
 
-	switch (from_kind)
-	{
+	switch (from_kind) {
 		case TYPE_PRIMITIVE:
 		{
 			if (to_kind == TYPE_PRIMITIVE)
@@ -91,10 +82,8 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to)
 
 		case TYPE_TUPLE:
 		{
-			if (to_kind == TYPE_TUPLE && cast >= CAST_COERCIVE && from_info->tuple_info.count == to_info->tuple_info.count)
-			{
-				for (u64 i = 0; i < from_info->tuple_info.count; i++)
-				{
+			if (to_kind == TYPE_TUPLE && cast >= CAST_COERCIVE && from_info->tuple_info.count == to_info->tuple_info.count) {
+				for (u64 i = 0; i < from_info->tuple_info.count; i++) {
 					if (!CanCast(cast, from_info->tuple_info.elements[i], to_info->tuple_info.elements[i]))
 						return false;
 				}
@@ -110,8 +99,7 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to)
 		{
 			TypeID backing_type = from_info->enum_info.backing_type;
 
-			switch (to)
-			{
+			switch (to) {
 				case TYPE_BOOL:
 					return cast >= CAST_COERCIVE;
 
@@ -134,16 +122,14 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to)
 
 		case TYPE_POINTER:
 		{
-			if (to_kind == TYPE_POINTER)
-			{
+			if (to_kind == TYPE_POINTER) {
 				if (from == TYPE_POINTER_BYTE || to == TYPE_POINTER_BYTE)
 					return cast >= CAST_IMPLICIT;
 
 				return cast >= CAST_EXPLICIT;
 			}
 
-			switch (to)
-			{
+			switch (to) {
 				case TYPE_BOOL:
 					return cast >= CAST_COERCIVE;
 
@@ -195,10 +181,8 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to)
 	return false;
 }
 
-static void AddExtensionEntry(ExtensionTable* table, ExtensionEntry entry)
-{
-	if (!table->count || IsPow2(table->count & -16))
-	{
+static void AddExtensionEntry(ExtensionTable* table, ExtensionEntry entry) {
+	if (!table->count || IsPow2(table->count & -16)) {
 		table->entries = (ExtensionEntry*)ReAllocateMemory(
 			table->entries,
 			sizeof(ExtensionEntry) * table->count,
@@ -209,15 +193,13 @@ static void AddExtensionEntry(ExtensionTable* table, ExtensionEntry entry)
 	table->entries[table->count++] = entry;
 }
 
-static void InitTypeSystem(void)
-{
+static void InitTypeSystem(void) {
 	ZeroMemory(&type_system);
 	type_system.info_count = CORE_TYPES_COUNT;
 	type_system.info_capacity = 1<<20;
 	type_system.infos = (TypeInfo*)AllocateMemory(type_system.info_capacity*sizeof(TypeInfo));
 
-	for (s32 prim = PRIMITIVE_BEGIN; prim < PRIMITIVE_END; prim++)
-	{
+	for (s32 prim = PRIMITIVE_BEGIN; prim < PRIMITIVE_END; prim++) {
 		TypeInfo* info = &type_system.infos[prim];
 		ZeroMemory(info);
 
@@ -270,8 +252,7 @@ static void InitTypeSystem(void)
 	);
 }
 
-static TypeID CreateType(TypeKind kind, TypeInfo info)
-{
+static TypeID CreateType(TypeKind kind, TypeInfo info) {
 	if (type_system.info_count == type_system.info_capacity) COLD
 	{
 		type_system.info_capacity <<= 4;
@@ -288,8 +269,7 @@ static TypeID CreateType(TypeKind kind, TypeInfo info)
 	return result;
 }
 
-static TypeID GetPointer(TypeID subtype)
-{
+static TypeID GetPointer(TypeID subtype) {
 	Assert(subtype);
 
 	TypeInfo* info = GetTypeInfo(subtype);
@@ -307,8 +287,7 @@ static TypeID GetPointer(TypeID subtype)
 	return ptr;
 }
 
-static TypeID GetOptional(TypeID subtype)
-{
+static TypeID GetOptional(TypeID subtype) {
 	Assert(subtype);
 
 	TypeInfo* info = GetTypeInfo(subtype);
@@ -326,8 +305,7 @@ static TypeID GetOptional(TypeID subtype)
 	return result;
 }
 
-static TypeID GetArray(TypeID subtype)
-{
+static TypeID GetArray(TypeID subtype) {
 	Assert(subtype);
 
 	TypeInfo* info = GetTypeInfo(subtype);
@@ -345,14 +323,12 @@ static TypeID GetArray(TypeID subtype)
 	return result;
 }
 
-static TypeID GetFixedArray(TypeID subtype, u64 length)
-{
+static TypeID GetFixedArray(TypeID subtype, u64 length) {
 	Assert(subtype);
 
 	TypeInfo* info = GetTypeInfo(subtype);
 
-	for (u32 i = 0; i < info->extensions.count; i++)
-	{
+	for (u32 i = 0; i < info->extensions.count; i++) {
 		ExtensionEntry* entry = &info->extensions.entries[i];
 
 		if (entry->length == length && GetTypeKind(entry->type) == TYPE_FIXED_ARRAY)
@@ -377,15 +353,13 @@ static TypeID GetFixedArray(TypeID subtype, u64 length)
 	return result;
 }
 
-static TypeID GetFunctionType(TypeID input, TypeID output)
-{
+static TypeID GetFunctionType(TypeID input, TypeID output) {
 	Assert(input);
 	Assert(output);
 
 	TypeInfo* input_info = GetTypeInfo(input);
 
-	for (u32 i = 0; i < input_info->extensions.count; i++)
-	{
+	for (u32 i = 0; i < input_info->extensions.count; i++) {
 		ExtensionEntry* entry = &input_info->extensions.entries[i];
 
 		if (entry->output == output && GetTypeKind(entry->type) == TYPE_FUNCTION)
@@ -411,8 +385,7 @@ static TypeID GetFunctionType(TypeID input, TypeID output)
 	return result;
 }
 
-static TypeID GetTuple(TypeID* elements, u64 count)
-{
+static TypeID GetTuple(TypeID* elements, u64 count) {
 	if (!count)
 		return TYPE_EMPTY_TUPLE;
 
@@ -422,8 +395,7 @@ static TypeID GetTuple(TypeID* elements, u64 count)
 	TypeInfo* header_info = GetTypeInfo(elements[0]);
 	ExtensionTable* table = &header_info->extensions;
 
-	for (s32 i = 0; i < table->count; i++)
-	{
+	for (s32 i = 0; i < table->count; i++) {
 		ExtensionEntry* entry = &table->entries[i];
 
 		if (entry->length != count)
@@ -459,8 +431,7 @@ static TypeID GetTuple(TypeID* elements, u64 count)
 	return result;
 }
 
-static TypeID CreateStructType(Ast_Struct* ast, u64 size)
-{
+static TypeID CreateStructType(Ast_Struct* ast, u64 size) {
 	TypeID result = CreateType(TYPE_STRUCT, {
 		.size = size,
 		.struct_info.ast = ast,
@@ -469,8 +440,7 @@ static TypeID CreateStructType(Ast_Struct* ast, u64 size)
 	return result;
 }
 
-static TypeID CreateEnumType(Ast_Enum* ast, TypeID backing_type)
-{
+static TypeID CreateEnumType(Ast_Enum* ast, TypeID backing_type) {
 	TypeID result = CreateType(TYPE_ENUM, {
 		.size = GetTypeSize(backing_type),
 		.enum_info.ast = ast,
@@ -486,8 +456,7 @@ static TypeID CreateEnumType(Ast_Enum* ast, TypeID backing_type)
 // A + B = (A, B)
 // (A, B) + C = ((A, B), C)
 // A + (B, C) = (A, B, C)
-static TypeID MergeTypeRight(TypeID a, TypeID b)
-{
+static TypeID MergeTypeRight(TypeID a, TypeID b) {
 	if (a == TYPE_EMPTY_TUPLE)
 		return b;
 

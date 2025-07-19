@@ -440,20 +440,16 @@ enum Base : u8
 	BASE_HEX = BASE_HEXADECIMAL,
 };
 
-static String ToString(Base base)
-{
-	switch (base)
-	{
+static String ToString(Base base) {
+	switch (base) {
 		case BASE_BINARY:      return "Binary";
 		case BASE_DECIMAL:     return "Decimal";
 		case BASE_HEXADECIMAL: return "Hexadecimal";
 	}
 }
 
-static inline bool IsDigit(char c, Base base)
-{
-	switch (base)
-	{
+static inline bool IsDigit(char c, Base base) {
+	switch (base) {
 		case BASE16: return c >= '0' && c <= '9' || c >= 'A' && c <= 'F' || c >= 'a' && c <= 'f';
 		case BASE10: return c >= '0' && c <= '9';
 		case BASE2:  return c >= '0' && c <= '1';
@@ -462,10 +458,8 @@ static inline bool IsDigit(char c, Base base)
 
 static inline u64 DecodeDigitLut(char c) { return ASCII_DECODE_TABLE[(u8)c]; }
 
-static inline u64 DecodeDigit(char c, Base base)
-{
-	switch (base)
-	{
+static inline u64 DecodeDigit(char c, Base base) {
+	switch (base) {
 		case BASE16:
 			if (c >= 'A' && c <= 'F') return c-'A'+0x0A;
 			if (c >= 'a' && c <= 'f') return c-'a'+0x0A;
@@ -476,10 +470,8 @@ static inline u64 DecodeDigit(char c, Base base)
 	}
 }
 
-static inline u64 DecodeDigit_Known(char c)
-{
-	switch (c)
-	{
+static inline u64 DecodeDigit_Known(char c) {
+	switch (c) {
 		case '0': return 0x00;
 		case '1': return 0x01;
 
@@ -510,10 +502,8 @@ static inline u64 DecodeDigit_Known(char c)
 	}
 }
 
-static inline char GetEscapeCharacter(char c)
-{
-	switch (c)
-	{
+static inline char GetEscapeCharacter(char c) {
+	switch (c) {
 		case '0': return '\0';
 		case 'a': return '\a';
 		case 'b': return '\b';
@@ -529,10 +519,8 @@ static inline char GetEscapeCharacter(char c)
 	}
 }
 
-static inline bool IsEscapeCharacter(char c)
-{
-	switch (c)
-	{
+static inline bool IsEscapeCharacter(char c) {
+	switch (c) {
 		case '0':  return true;
 		case 'a':  return true;
 		case 'b':  return true;

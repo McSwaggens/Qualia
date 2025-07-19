@@ -2,8 +2,7 @@
 
 #include "string.h"
 
-enum Token_Kind : u8
-{
+enum Token_Kind : u8 {
 	TOKEN_EOF = 0,
 	TOKEN_IDENTIFIER_FORMAL,
 	TOKEN_IDENTIFIER_CASUAL,
@@ -104,10 +103,8 @@ enum Token_Kind : u8
 	TOKEN_SEMICOLON,
 };
 
-static constexpr String ToString(Token_Kind kind)
-{
-	switch (kind)
-	{
+static constexpr String ToString(Token_Kind kind) {
+	switch (kind) {
 		case TOKEN_EOF:                 return "<eof>";
 		case TOKEN_IDENTIFIER_FORMAL:   return "<formal_identifier>";
 		case TOKEN_IDENTIFIER_CASUAL:   return "<casual_identifier>";
@@ -211,8 +208,7 @@ static constexpr String ToString(Token_Kind kind)
 
 typedef u16 Indent16;
 
-struct SourceLocation
-{
+struct SourceLocation {
 	// Signed because of error printing. 64-bit is overkill anyways.
 	s64 line;
 	s64 offset;
@@ -221,16 +217,13 @@ struct SourceLocation
 
 // @Todo: SOA! (Make sure to measure!)
 
-struct Token
-{
+struct Token {
 	Token_Kind kind;
 	bool newline;
 	Indent16 indent;
 
-	union
-	{
-		struct
-		{
+	union {
+		struct {
 			Token* closure; // Used as linked list during lexing
 			u64 comma_count;
 		};

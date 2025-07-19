@@ -23,8 +23,7 @@ struct Array
 };
 
 template<typename T>
-static inline bool Compare(Array<T> a, Array<T> b)
-{
+static inline bool Compare(Array<T> a, Array<T> b) {
 	return a.count == b.count && (a.elements == b.elements || Compare(a.elements, b.elements, a.count));
 }
 

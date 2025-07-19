@@ -37,18 +37,15 @@ static void Write(OutputBuffer* buffer, void* p);
 static void Write(OutputBuffer* buffer, String str);
 
 template<typename T>
-static void Write(OutputBuffer* buffer, List<T> list)
-{
+static void Write(OutputBuffer* buffer, List<T> list) {
 	Write(buffer, list.ToSpan());
 }
 
 template<typename T>
-static void Write(OutputBuffer* buffer, Array<T> array)
-{
+static void Write(OutputBuffer* buffer, Array<T> array) {
 	BufferWriteString(buffer, "{ ");
 
-	for (u64 i = 0; i < array.count; i++)
-	{
+	for (u64 i = 0; i < array.count; i++) {
 		if (i != 0) BufferWriteString(buffer, ", ");
 		Write(buffer, array[i]);
 	}
@@ -57,24 +54,20 @@ static void Write(OutputBuffer* buffer, Array<T> array)
 }
 
 template<typename ...Args>
-static void Print(OutputBuffer* buffer, String format, Args&&... args)
-{
+static void Print(OutputBuffer* buffer, String format, Args&&... args) {
 	char* end = format.data + format.length;
 	char* p = format.data;
 
-	auto internal_print = [=, &p]<typename T>(T&& t)
-	{
+	auto internal_print = [=, &p]<typename T>(T&& t) {
 		char* start = p;
 
 		while (p < end && *p != '%') p++;
 
-		if (start != p)
-		{
+		if (start != p) {
 			BufferWriteData(buffer, start, p-start);
 		}
 
-		if (p < end)
-		{
+		if (p < end) {
 			Write(buffer, t);
 			p++;
 		}
@@ -82,20 +75,17 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args)
 
 	(internal_print(args),...);
 
-	if (p < end)
-	{
+	if (p < end) {
 		BufferWriteData(buffer, p, end - p);
 	}
 }
 
 template<typename ...Args>
-static void Print(String format, Args&&... args)
-{
+static void Print(String format, Args&&... args) {
 	Print(&unix_output_buffer, format, args...);
 }
 
-static void Write(OutputBuffer* buffer, bool b)
-{
+static void Write(OutputBuffer* buffer, bool b) {
 	if (b) BufferWriteString(buffer, "true");
 	else   BufferWriteString(buffer, "false");
 }

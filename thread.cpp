@@ -3,23 +3,19 @@
 #include "memory.h"
 #include "linux.h"
 
-static void InitThread(void)
-{
+static void InitThread(void) {
 }
 
-static void KillCurrentThread(void)
-{
+static void KillCurrentThread(void) {
 }
 
-static s32 GetSystemThreadID(void)
-{
+static s32 GetSystemThreadID(void) {
 	return (s32)SystemCall(LINUX_SYSCALL_GET_TID);
 }
 
 static const u64 THREAD_STACK_SIZE_DEFAULT = 1<<24;
 
-static ThreadID CreateThread(u64 stack_size, void (*thread_start_function)(ThreadID id))
-{
+static ThreadID CreateThread(u64 stack_size, void (*thread_start_function)(ThreadID id)) {
 	byte* stack_top = AllocateVirtualPage(stack_size, PAGE_FLAG_STACK);
 	ThreadID thread_id = thread_id_counter;
 	thread_id_counter++;
@@ -67,12 +63,10 @@ static ThreadID CreateThread(u64 stack_size, void (*thread_start_function)(Threa
 
 	s32 linux_thread_id = (s32)SystemCall(LINUX_SYSCALL_CLONE3, (u64)&args, sizeof(args));
 
-	if (linux_thread_id < 0)
-	{
+	if (linux_thread_id < 0) {
 		Assert();
 	}
-	else if (linux_thread_id == 0)
-	{
+	else if (linux_thread_id == 0) {
 		thread_start_function(thread_id);
 		KillCurrentThread();
 		AssertUnreachable();

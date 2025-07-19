@@ -38,10 +38,8 @@ static const LiteralQualifier QUALIFIER_SIGN_MASK = QUALIFIER_U | QUALIFIER_S;
 static const LiteralQualifier QUALIFIER_CERTAIN_MASK = QUALIFIER_H | QUALIFIER_U | QUALIFIER_S | QUALIFIER_K | QUALIFIER_M | QUALIFIER_G | QUALIFIER_T | QUALIFIER_P;
 static const LiteralQualifier QUALIFIER_INTEGER_MASK = QUALIFIER_SIGN_MASK | QUALIFIER_SCALER_MASK;
 
-static inline Base GetBaseFromQualifier(LiteralQualifier qualifier)
-{
-	switch (qualifier & QUALIFIER_BASE_MASK)
-	{
+static inline Base GetBaseFromQualifier(LiteralQualifier qualifier) {
+	switch (qualifier & QUALIFIER_BASE_MASK) {
 		case 0: return BASE_DECIMAL;
 		case 1: return BASE_BINARY;
 		case 2: return BASE_HEX;
@@ -49,23 +47,20 @@ static inline Base GetBaseFromQualifier(LiteralQualifier qualifier)
 	}
 }
 
-static LiteralQualifier ParseLiteralQualifier(char** begin)
-{
+static LiteralQualifier ParseLiteralQualifier(char** begin) {
 	LiteralQualifier qualifier = 0;
 	char* p = *begin;
 
 	if      (*p == 'h') { qualifier |= QUALIFIER_H; p++; }
 	else if (*p == 'b') { qualifier |= QUALIFIER_B; p++; }
 
-	if (*p == 'f')
-	{
+	if (*p == 'f') {
 		qualifier |= QUALIFIER_F;
 		p++;
 	}
 	else
 	{
-		switch (*p)
-		{
+		switch (*p) {
 			default: break;
 			case 'k': qualifier |= QUALIFIER_K; p++; break;
 			case 'm': qualifier |= QUALIFIER_M; p++; break;
@@ -79,16 +74,14 @@ static LiteralQualifier ParseLiteralQualifier(char** begin)
 		else if (*p == 's') { qualifier |= QUALIFIER_S; p++; }
 	}
 
-	if (qualifier)
-	{
+	if (qualifier) {
 		if      (CompareStringRaw(p, "64")) { qualifier |= QUALIFIER_64 | QUALIFIER_JUNK_BIT; p += 2; }
 		else if (CompareStringRaw(p, "32")) { qualifier |= QUALIFIER_32 | QUALIFIER_JUNK_BIT; p += 2; }
 		else if (CompareStringRaw(p, "16")) { qualifier |= QUALIFIER_16 | QUALIFIER_JUNK_BIT; p += 2; }
 		else if (CompareStringRaw(p, "8"))  { qualifier |= QUALIFIER_8;  p += 1; }
 	}
 
-	if ((qualifier & QUALIFIER_CERTAIN_MASK) == 0 && (IsHexLut(*p) || *p == '_' || *p == 'h'))
-	{
+	if ((qualifier & QUALIFIER_CERTAIN_MASK) == 0 && (IsHexLut(*p) || *p == '_' || *p == 'h')) {
 		return 0;
 	}
 
@@ -96,12 +89,10 @@ static LiteralQualifier ParseLiteralQualifier(char** begin)
 	return qualifier;
 }
 
-static float64 AsciiToFloat(char* p, u64 count, Base base)
-{
+static float64 AsciiToFloat(char* p, u64 count, Base base) {
 	float64 value = 0.0;
 
-	for (u32 i = 0; i < count; i++)
-	{
+	for (u32 i = 0; i < count; i++) {
 		Assert(IsDigit(*p, base));
 		value *= (float64)base;
 		value += (float64)DecodeDigitLut(*p);
@@ -111,13 +102,11 @@ static float64 AsciiToFloat(char* p, u64 count, Base base)
 	return value;
 }
 
-static float64 AsciiToFloat_Fractional(char* p, u64 count, Base base)
-{
+static float64 AsciiToFloat_Fractional(char* p, u64 count, Base base) {
 	float64 value = 0.0;
 	float64 scale = 1.0;
 
-	for (u32 i = 0; i < count; i++)
-	{
+	for (u32 i = 0; i < count; i++) {
 		// @OptimizeMe: Nasty dependency chain. Precompute base^-count?
 		Assert(IsDigit(*p, base));
 		scale *= 1.0/(float64)base;
@@ -128,12 +117,10 @@ static float64 AsciiToFloat_Fractional(char* p, u64 count, Base base)
 	return value;
 }
 
-static u64 AsciiToInt(char* begin, u64 count, Base base, bool* overflow)
-{
+static u64 AsciiToInt(char* begin, u64 count, Base base, bool* overflow) {
 	u64 value = 0;
 
-	if (base == BASE_BINARY)
-	{
+	if (base == BASE_BINARY) {
 		char* p = begin;
 
 		if (count > 64) COLD
@@ -142,8 +129,7 @@ static u64 AsciiToInt(char* begin, u64 count, Base base, bool* overflow)
 			return value;
 		}
 
-		for (u32 i = 0; i < count; i++)
-		{
+		for (u32 i = 0; i < count; i++) {
 			Assert(IsDigit(*p, BASE_BINARY));
 			value |= (u64)DecodeDigit(*p, BASE_BINARY) << (u64)(count-1-i);
 			if (*++p == '_') ++p;
@@ -159,10 +145,8 @@ static u64 AsciiToInt(char* begin, u64 count, Base base, bool* overflow)
 		else if (count == 20) COLD
 		{
 			char* p = begin;
-			for (u32 i = 0; i < count; i++)
-			{
-				if (*p > "18446744073709551615"[i])
-				{
+			for (u32 i = 0; i < count; i++) {
+				if (*p > "18446744073709551615"[i]) {
 					*overflow = true;
 					return value;
 				}
@@ -197,15 +181,13 @@ static u64 AsciiToInt(char* begin, u64 count, Base base, bool* overflow)
 		u64 base_factor_index = 20-count;
 		char* p = begin;
 
-		for (u32 i = 0; i < count; i++)
-		{
+		for (u32 i = 0; i < count; i++) {
 			Assert(IsDigit(*p, BASE_DECIMAL));
 			value += factors[base_factor_index+i] * (u64)DecodeDigit(*p, BASE_DECIMAL);
 			if (*++p == '_') ++p;
 		}
 	}
-	else if (base == BASE_HEX)
-	{
+	else if (base == BASE_HEX) {
 		char* p = begin;
 		if (count > 16) COLD
 		{
@@ -213,8 +195,7 @@ static u64 AsciiToInt(char* begin, u64 count, Base base, bool* overflow)
 			return value;
 		}
 
-		for (u32 i = 0; i < count; i++)
-		{
+		for (u32 i = 0; i < count; i++) {
 			value |= (u64)DecodeDigitLut(*p) << (u64)(count-1-i)*4;
 			if (*++p == '_') ++p;
 		}
@@ -223,8 +204,7 @@ static u64 AsciiToInt(char* begin, u64 count, Base base, bool* overflow)
 	return value;
 }
 
-struct LiteralComponent
-{
+struct LiteralComponent {
 	char* begin;
 	u32 count;
 	Base base;
@@ -232,8 +212,7 @@ struct LiteralComponent
 	char* end;
 };
 
-static LiteralComponent ParseLiteralComponent(char* begin)
-{
+static LiteralComponent ParseLiteralComponent(char* begin) {
 	LiteralComponent component;
 	component.count = 0;
 	component.begin = begin;
@@ -246,8 +225,7 @@ static LiteralComponent ParseLiteralComponent(char* begin)
 
 	component.qualifier = ParseLiteralQualifier(&p);
 
-	if (!component.qualifier && IsHex(*p))
-	{
+	if (!component.qualifier && IsHex(*p)) {
 		while (IsHexLut(*p)) { component.count++; if (*++p == '_') p++; }
 		component.base = BASE_HEX;
 		component.qualifier = ParseLiteralQualifier(&p);
@@ -257,15 +235,13 @@ static LiteralComponent ParseLiteralComponent(char* begin)
 	return component;
 }
 
-static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
-{
+static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token) {
 	LiteralComponent whole;
 	LiteralComponent fractional;
 
 	char* p = *master_cursor;
 
-	if (*p == '0')
-	{
+	if (*p == '0') {
 		while (*p == '0') if (*++p == '_') p++;
 	}
 
@@ -274,14 +250,12 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 	LiteralQualifier qualifier = whole.qualifier;
 	Base base = whole.base;
 
-	if (whole.end[0] == '.' && (whole.qualifier & QUALIFIER_CERTAIN_MASK) == 0)
-	{
+	if (whole.end[0] == '.' && (whole.qualifier & QUALIFIER_CERTAIN_MASK) == 0) {
 		fractional = ParseLiteralComponent(whole.end+1);
 
 		if (IsDigit(whole.end[1], BASE_DECIMAL) ||
 			!qualifier && fractional.qualifier && !IsAlpha(fractional.end[0]) ||
-			qualifier && (fractional.qualifier & QUALIFIER_H) && !IsAlpha(fractional.end[0]))
-		{
+			qualifier && (fractional.qualifier & QUALIFIER_H) && !IsAlpha(fractional.end[0])) {
 			qualifier = fractional.qualifier;
 			base = (Base)Max(base, fractional.base);
 			whole.count += CountBits64(whole.qualifier);
@@ -293,21 +267,17 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 
 	Base qbase = GetBaseFromQualifier(qualifier);
 
-	if (base == BASE_HEX && (qualifier & QUALIFIER_BASE_MASK) == 0)
-	{
+	if (base == BASE_HEX && (qualifier & QUALIFIER_BASE_MASK) == 0) {
 		LexerError(module, token->location, "Hexadecimal missing 'h' qualifier.\n");
 	}
-	else if ((qualifier & QUALIFIER_BASE_MASK) && qbase < base)
-	{
+	else if ((qualifier & QUALIFIER_BASE_MASK) && qbase < base) {
 		LexerError(module, token->location, "% literal with % digits.\n", ToString(qbase), ToString(base));
 	}
 
 	base = qbase;
 
-	if ((qualifier & QUALIFIER_F) || has_fractional && (qualifier & QUALIFIER_INTEGER_MASK) == 0)
-	{
-		switch (qualifier & QUALIFIER_SIZE_MASK)
-		{
+	if ((qualifier & QUALIFIER_F) || has_fractional && (qualifier & QUALIFIER_INTEGER_MASK) == 0) {
+		switch (qualifier & QUALIFIER_SIZE_MASK) {
 			default:           token->kind = TOKEN_LITERAL_FLOAT;   break;
 			case QUALIFIER_32: token->kind = TOKEN_LITERAL_FLOAT32; break;
 			case QUALIFIER_64: token->kind = TOKEN_LITERAL_FLOAT64; break;
@@ -321,8 +291,7 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 
 		float64 value = AsciiToFloat(whole.begin, whole.count, base);
 
-		if (has_fractional)
-		{
+		if (has_fractional) {
 			float64 fractional_value = AsciiToFloat_Fractional(fractional.begin, fractional.count, base);
 			value += fractional_value;
 		}
@@ -331,8 +300,7 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 	}
 	else
 	{
-		switch (qualifier & (QUALIFIER_SIZE_MASK | QUALIFIER_U))
-		{
+		switch (qualifier & (QUALIFIER_SIZE_MASK | QUALIFIER_U)) {
 			default:           token->kind = TOKEN_LITERAL_INT;   break;
 			case QUALIFIER_8:  token->kind = TOKEN_LITERAL_INT8;  break;
 			case QUALIFIER_16: token->kind = TOKEN_LITERAL_INT16; break;
@@ -353,15 +321,12 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 		u64 value = AsciiToInt(whole.begin, whole.count, base, &overflow);
 		u64 fractional_scaled = 0;
 
-		if (overflow)
-		{
+		if (overflow) {
 			LexerError(module, token->location, "Integer literal exceeds %-bits.\n", effective_size);
 		}
 
-		if (has_fractional)
-		{
-			if (!scaler)
-			{
+		if (has_fractional) {
+			if (!scaler) {
 				LexerError(module, token->location, "Integer missing scaler qualifier.\n");
 			}
 
@@ -369,20 +334,17 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 			fractional_scaled = (u64)(fractional_value * (float64)scaler);
 		}
 
-		if (scaler)
-		{
+		if (scaler) {
 			u64 scaled_value = 0;
 
-			if (CheckedMultiply(value, scaler, &scaled_value) || CheckedAdd(scaled_value, fractional_scaled, &scaled_value))
-			{
+			if (CheckedMultiply(value, scaler, &scaled_value) || CheckedAdd(scaled_value, fractional_scaled, &scaled_value)) {
 				LexerError(module, token->location, "Integer literal with scaler exceeds %-bits.\n", effective_size);
 			}
 
 			value = scaled_value;
 		}
 
-		if (BitsOfInformation64(value) > effective_size)
-		{
+		if (BitsOfInformation64(value) > effective_size) {
 			LexerError(module, token->location, "Integer literal exceeds %-bits.\n", effective_size);
 		}
 
@@ -391,18 +353,15 @@ static void ParseLiteral(Ast_Module* module, char** master_cursor, Token* token)
 
 	*master_cursor = p;
 
-	if (IsAlpha(*p))
-	{
+	if (IsAlpha(*p)) {
 		LexerError(module, token->location, "Unexpected character after literal: '%'.\n", *p);
 	}
 }
 
-static bool CheckIfHexadecimal(char* p)
-{
+static bool CheckIfHexadecimal(char* p) {
 	while (IsHexLut(*p) || *p == '_') p++;
 
-	if (*p == '.')
-	{
+	if (*p == '.') {
 		p += 1;
 		while (IsHexLut(*p) || *p == '_') p++;
 	}
@@ -417,8 +376,7 @@ static bool CheckIfHexadecimal(char* p)
 // @Todo: Hash Literals
 // @Todo: Error continuation
 
-static inline bool IsKeyword(char* p, Token_Kind kind)
-{
+static inline bool IsKeyword(char* p, Token_Kind kind) {
 	char post = p[ToString(kind).length];
 
 	if (!CompareMemory(p, ToString(kind).data, ToString(kind).length))
@@ -436,10 +394,8 @@ static inline bool IsKeyword(char* p, Token_Kind kind)
 	return true;
 }
 
-static Token_Kind GetMatchingParen(Token_Kind kind)
-{
-	switch (kind)
-	{
+static Token_Kind GetMatchingParen(Token_Kind kind) {
+	switch (kind) {
 		case TOKEN_OPEN_PAREN:    return TOKEN_OPEN_PAREN;
 		case TOKEN_OPEN_BRACE:    return TOKEN_OPEN_BRACE;
 		case TOKEN_OPEN_BRACKET:  return TOKEN_OPEN_BRACKET;
@@ -450,8 +406,7 @@ static Token_Kind GetMatchingParen(Token_Kind kind)
 	}
 }
 
-static void LexerParse(Ast_Module* module)
-{
+static void LexerParse(Ast_Module* module) {
 	Array<char> data = FileLoad(module->file_path, 16, 64);
 	String code = String(data.elements, data.count);
 
@@ -472,23 +427,18 @@ static void LexerParse(Ast_Module* module)
 
 	Token* open_token = null;
 
-	while (cursor < end)
-	{
+	while (cursor < end) {
 		u64 old_line = line_number;
 
-		while (IsWhiteSpace(*cursor) || *cursor == '\n' || *cursor == '\r' || CompareStringRaw(cursor, "//"))
-		{
-			if (*cursor == '\t' && cursor == line_begin)
-			{
+		while (IsWhiteSpace(*cursor) || *cursor == '\n' || *cursor == '\r' || CompareStringRaw(cursor, "//")) {
+			if (*cursor == '\t' && cursor == line_begin) {
 				while (*++cursor == '\t');
 				indent = cursor - line_begin;
 			}
-			else if (CompareStringRaw(cursor, "//"))
-			{
+			else if (CompareStringRaw(cursor, "//")) {
 				for (cursor += 2; cursor < end && *cursor != '\n'; cursor++);
 			}
-			else if (*cursor == '\n')
-			{
+			else if (*cursor == '\n') {
 				Line line;
 				ZeroMemory(&line);
 
@@ -518,8 +468,7 @@ static void LexerParse(Ast_Module* module)
 
 		if (cursor >= end) break;
 
-		switch (*cursor)
-		{
+		switch (*cursor) {
 			case 'A':
 				if (IsKeyword(cursor, TOKEN_BITWISE_AND)) { cursor += ToString(TOKEN_BITWISE_AND).length; token->kind = TOKEN_BITWISE_AND; break; }
 
@@ -647,12 +596,10 @@ static void LexerParse(Ast_Module* module)
 				u32 upper = 0;
 				u32 lower = 0;
 
-				for (; IsLowerCase(*cursor) || IsUpperCase(*cursor) || IsDecimal(*cursor) || *cursor == '_'; cursor++)
-				{
+				for (; IsLowerCase(*cursor) || IsUpperCase(*cursor) || IsDecimal(*cursor) || *cursor == '_'; cursor++) {
 					if      (IsLowerCase(*cursor)) lower++;
 					else if (IsUpperCase(*cursor)) upper++;
-					else if (CompareStringRaw(cursor, "__"))
-					{
+					else if (CompareStringRaw(cursor, "__")) {
 						LexerError(module, token->location, "Consecutive underscores aren't allowed.\n");
 					}
 				}
@@ -677,12 +624,10 @@ static void LexerParse(Ast_Module* module)
 					cursor = begin;
 					ParseLiteral(module, &cursor, token);
 				}
-				else if (!lower)
-				{
+				else if (!lower) {
 					token->kind = TOKEN_IDENTIFIER_CONSTANT;
 				}
-				else if (IsUpperCase(*begin))
-				{
+				else if (IsUpperCase(*begin)) {
 					token->kind = TOKEN_IDENTIFIER_FORMAL;
 				}
 			} break;
@@ -700,13 +645,11 @@ static void LexerParse(Ast_Module* module)
 				char* start = ++cursor;
 				u64 escapes = 0;
 
-				for (; cursor < end && *cursor != '"'; cursor++)
-				{
+				for (; cursor < end && *cursor != '"'; cursor++) {
 					if (*cursor == '\n')
 						LexerError(module, token->location, "String literal not completed before end of the line.\n");
 
-					if (*cursor == '\\' && IsEscapeCharacter(cursor[1]))
-					{
+					if (*cursor == '\\' && IsEscapeCharacter(cursor[1])) {
 						escapes++;
 						cursor++;
 					}
@@ -717,24 +660,20 @@ static void LexerParse(Ast_Module* module)
 
 				char* end = cursor++;
 
-				if (escapes)
-				{
+				if (escapes) {
 					u64 length = end - start - escapes;
 					token->literal_string = AllocateString(length, 0);
 
 					char* c = start;
 					char* s = token->literal_string.data;
 
-					while (c < end)
-					{
-						if (*c != '\\')
-						{
+					while (c < end) {
+						if (*c != '\\') {
 							*(s++) = *(c);
 							continue;
 						}
 
-						switch (*(c++))
-						{
+						switch (*(c++)) {
 							case '0':  *s = '\0'; break;
 							case 'a':  *s = '\a'; break;
 							case 'b':  *s = '\b'; break;
@@ -776,8 +715,7 @@ static void LexerParse(Ast_Module* module)
 				if (!open_token)
 					break;
 
-				if (open_token->kind != doppelganger)
-				{
+				if (open_token->kind != doppelganger) {
 					LexerError(
 						module, token->location,
 						"Expected closure '%', not: '%'\n",
@@ -794,15 +732,13 @@ static void LexerParse(Ast_Module* module)
 			{
 				token->kind = TOKEN_DOT;
 
-				if (cursor[1] == '.')
-				{
+				if (cursor[1] == '.') {
 					token->kind = TOKEN_DOT_DOT;
 					cursor += 2;
 					break;
 				}
 
-				if (IsDecimal(cursor[1]) || IsHexAlpha(cursor[1]) && !IsAlpha(cursor[-1]) && CheckIfHexadecimal(cursor+1))
-				{
+				if (IsDecimal(cursor[1]) || IsHexAlpha(cursor[1]) && !IsAlpha(cursor[-1]) && CheckIfHexadecimal(cursor+1)) {
 					ParseLiteral(module, &cursor, token);
 					break;
 				}
@@ -921,8 +857,7 @@ static void LexerParse(Ast_Module* module)
 	module->code   = code;
 	module->lines  = lines.ToArray();
 
-	while (open_token)
-	{
+	while (open_token) {
 		Token* next = open_token->closure;
 		open_token->closure = null;
 		open_token = next;

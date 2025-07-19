@@ -36,8 +36,7 @@ template<typename T>
 static inline T Abs(T n) { return n >= 0 ? n : -n; }
 
 template<typename T>
-static inline void Swap(T* a, T* b)
-{
+static inline void Swap(T* a, T* b) {
 	T tmp = *a;
 	*a = *b;
 	*b = tmp;
@@ -142,8 +141,7 @@ static inline bool IsPow2(u64 n) { return CountBits64(n) == 1; }
 static inline u64 NextPow2(u64 n) { return 1 << BitsOfInformation64(n); }
 
 // @Note: NextPow2(2^n) = 2^n
-static u64 RaisePow2(u64 n)
-{
+static u64 RaisePow2(u64 n) {
 	return IsPow2(n) ? n : NextPow2(n);
 }
 

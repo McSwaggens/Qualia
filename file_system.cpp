@@ -8,13 +8,11 @@
 #include "print.h"
 #include "assert.h"
 
-static FileHandle FileOpen(String path, FileMode mode, FileAccessFlags access_flags)
-{
+static FileHandle FileOpen(String path, FileMode mode, FileAccessFlags access_flags) {
 	s32 flags;
 	u32 perm = 0x180;
 
-	switch (access_flags)
-	{
+	switch (access_flags) {
 		case FILE_ACCESS_READ:  flags = 0; break;
 		case FILE_ACCESS_WRITE: flags = 1; break;
 		case FILE_ACCESS_READ | FILE_ACCESS_WRITE: flags = 2; break;
@@ -33,8 +31,7 @@ static FileHandle FileOpen(String path, FileMode mode, FileAccessFlags access_fl
 	const u32 LINUX_DIRECTORY   = 0x10000;
 	const u32 LINUX_AUTO_CLOSE  = 0x80000; // @RemoveMe?
 
-	switch (mode)
-	{
+	switch (mode) {
 		// Just have a FILE_MODE_CREATE flag?
 		case FILE_MODE_OPEN:                                        break;
 		case FILE_MODE_APPEND:             flags |= LINUX_APPEND;   break;
@@ -45,8 +42,7 @@ static FileHandle FileOpen(String path, FileMode mode, FileAccessFlags access_fl
 		case FILE_MODE_CREATE_OR_TRUNCATE: flags |= LINUX_CREATE | LINUX_TRUNCATE;  break;
 	}
 
-	if (path.length >= 4096)
-	{
+	if (path.length >= 4096) {
 		return -1;
 	}
 
@@ -59,20 +55,16 @@ static FileHandle FileOpen(String path, FileMode mode, FileAccessFlags access_fl
 	return handle;
 }
 
-static void FileRead(FileHandle file_handle, byte* dest, u64 size)
-{
+static void FileRead(FileHandle file_handle, byte* dest, u64 size) {
 	SystemCall(0, file_handle, (s64)dest, size);
 }
 
-static void FileWrite(FileHandle file_handle, const byte* data, u64 size)
-{
+static void FileWrite(FileHandle file_handle, const byte* data, u64 size) {
 	SystemCall(1, file_handle, (s64)data, size);
 }
 
-static u64 FileQuerySize(FileHandle file_handle)
-{
-	struct Status
-	{
+static u64 FileQuerySize(FileHandle file_handle) {
+	struct Status {
 		u64 dev;
 		u64 ino;
 		u64 nlink;
@@ -101,19 +93,16 @@ static u64 FileQuerySize(FileHandle file_handle)
 	return status.size;
 }
 
-static void FileClose(FileHandle file_handle)
-{
+static void FileClose(FileHandle file_handle) {
 	SystemCall(3, file_handle);
 }
 
-static void BufferFlush(OutputBuffer* buffer)
-{
+static void BufferFlush(OutputBuffer* buffer) {
 	FileWrite(buffer->handle, buffer->data, buffer->current_index);
 	buffer->current_index = 0;
 }
 
-static void BufferWriteByte(OutputBuffer* buffer, char c)
-{
+static void BufferWriteByte(OutputBuffer* buffer, char c) {
 	if (buffer->current_index >= OUTPUT_BUFFER_SIZE) COLD
 	{
 		BufferFlush(buffer);
@@ -122,8 +111,7 @@ static void BufferWriteByte(OutputBuffer* buffer, char c)
 	buffer->data[buffer->current_index++] = c;
 }
 
-static void BufferWriteData(OutputBuffer* buffer, const char* src, u64 size)
-{
+static void BufferWriteData(OutputBuffer* buffer, const char* src, u64 size) {
 	if (buffer->current_index + size <= OUTPUT_BUFFER_SIZE) HOT
 	{
 		CopyMemory(buffer->data + buffer->current_index, src, size);
@@ -143,13 +131,11 @@ static void BufferWriteData(OutputBuffer* buffer, const char* src, u64 size)
 	buffer->current_index = size;
 }
 
-static inline void BufferWriteString(OutputBuffer* buffer, String string)
-{
+static inline void BufferWriteString(OutputBuffer* buffer, String string) {
 	BufferWriteData(buffer, string.data, string.length);
 }
 
-static bool FileDoesExist(String path)
-{
+static bool FileDoesExist(String path) {
 	char cpath[path.length+1];
 	CopyMemory(cpath, path.data, path.length);
 	cpath[path.length] = 0;
@@ -160,8 +146,7 @@ static bool FileDoesExist(String path)
 	return SystemCall(21, (s64)cpath, 0) == 0;
 }
 
-static Array<byte> FileLoad(String path, u64 left, u64 right)
-{
+static Array<byte> FileLoad(String path, u64 left, u64 right) {
 	Array<byte> result = { null, 0 };
 	FileHandle handle = FileOpen(path, FILE_MODE_OPEN, FILE_ACCESS_READ);
 
@@ -206,8 +191,7 @@ struct Linux_Directory_Entry
 	char name[];
 };
 
-static String GetCurrentDirectoryString()
-{
+static String GetCurrentDirectoryString() {
 	char buffer[4096];
 	u64 length = SystemCall(79, (s64)buffer, 4096);
 	String string = AllocateString(length, 0);
@@ -216,14 +200,12 @@ static String GetCurrentDirectoryString()
 	return string;
 }
 
-static DirectoryHandle OpenDirectory(String path)
-{
+static DirectoryHandle OpenDirectory(String path) {
 	DirectoryHandle directory = NULL_DIRECTORY_HANDLE;
 	return directory;
 }
 
-static Array<Linux_Directory_Entry> QueryLinuxDirectoryEntries(String path)
-{
+static Array<Linux_Directory_Entry> QueryLinuxDirectoryEntries(String path) {
 	char cpath[path.length+1];
 	CopyMemory(cpath, path.data, path.length);
 	cpath[path.length] = 0;
@@ -237,8 +219,7 @@ static Array<Linux_Directory_Entry> QueryLinuxDirectoryEntries(String path)
 	return entries;
 }
 
-static DirectoryHandle OpenCurrentDirectory()
-{
+static DirectoryHandle OpenCurrentDirectory() {
 	// @FixMe @Optimization
 	return OpenDirectory(GetCurrentDirectoryString());
 }

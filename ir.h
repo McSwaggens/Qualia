@@ -22,8 +22,7 @@ static const u16 IR_OPCNT1 = (1 << (16-IR_AUX_BITCNT));
 static const u16 IR_OPCNT2 = (2 << (16-IR_AUX_BITCNT));
 static const u16 IR_OPCNT3 = (3 << (16-IR_AUX_BITCNT));
 
-enum OpCode : u16
-{
+enum OpCode : u16 {
 	// ---------------- 0 Operands ---------------- //
 	IR_NOP    = 0  | IR_OPCNT0,
 	IR_STACK  = 1  | IR_OPCNT0 | IR_RETBIT,
@@ -105,10 +104,8 @@ enum OpCode : u16
 	IR_BRANCH = 1  | IR_OPCNT3,
 };
 
-static bool IsControlFlowInstruction(OpCode opcode)
-{
-	switch (opcode)
-	{
+static bool IsControlFlowInstruction(OpCode opcode) {
+	switch (opcode) {
 		case IR_RET:
 		case IR_RETV:
 		case IR_BRANCH:
@@ -119,10 +116,8 @@ static bool IsControlFlowInstruction(OpCode opcode)
 	}
 }
 
-static String ToString(OpCode opcode)
-{
-	switch (opcode)
-	{
+static String ToString(OpCode opcode) {
+	switch (opcode) {
 		case IR_NOP:     return "nop";
 		case IR_PHI:     return "phi";
 		case IR_STACK:   return "stack";
@@ -185,8 +180,7 @@ static String ToString(OpCode opcode)
 	}
 }
 
-enum ValueKind : u8
-{
+enum ValueKind : u8 {
 	IR_NONE = 0,
 	IR_INSTRUCTION,
 	IR_BLOCK,
@@ -196,8 +190,7 @@ enum ValueKind : u8
 	IR_CONST_FLOAT64,
 };
 
-struct Value
-{
+struct Value {
 	ValueKind kind;
 
 	union
@@ -229,8 +222,7 @@ struct Value
 	Value(float64      f) : kind(IR_CONST_FLOAT64), const_f64(f)   { }
 };
 
-struct Procedure
-{
+struct Procedure {
 	Ast_Function* function;
 	List<Block*> blocks;
 	Block* entry;
@@ -240,8 +232,7 @@ struct Procedure
 	Block* NewBlock();
 };
 
-struct Block
-{
+struct Block {
 	Procedure* procedure;
 	u64 id;
 
@@ -277,14 +268,12 @@ struct Block
 	void Remove();
 };
 
-struct PhiEntry
-{
+struct PhiEntry {
 	Block* block;
 	Value value;
 };
 
-struct Instruction
-{
+struct Instruction {
 	OpCode opcode;
 	Block* block;
 	TypeID type;
@@ -298,13 +287,11 @@ struct Instruction
 
 	List<Instruction*> users;
 
-	bool DoesReturn()
-	{
+	bool DoesReturn() {
 		return opcode & IR_RETBIT;
 	}
 
-	u64 GetOperandCount()
-	{
+	u64 GetOperandCount() {
 		return ((u64)opcode >> IR_OPCODE_BITCNT) & ((1<<IR_AUX_OPCNT_BITCNT)-1);
 	}
 };

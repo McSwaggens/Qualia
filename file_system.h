@@ -13,8 +13,7 @@ static inline bool IsDirectoryHandleValid(DirectoryHandle handle) { return handl
 
 static const u64 OUTPUT_BUFFER_SIZE = 4096 * 2;
 
-struct OutputBuffer
-{
+struct OutputBuffer {
 	FileHandle handle;
 	u64 current_index;
 	byte data[OUTPUT_BUFFER_SIZE];
@@ -27,8 +26,7 @@ static const FileHandle UNIX_ERROR_FILE_HANDLE  = 2;
 static OutputBuffer unix_output_buffer { .handle = UNIX_OUTPUT_FILE_HANDLE, .current_index = 0 };
 static OutputBuffer unix_error_buffer  { .handle = UNIX_ERROR_FILE_HANDLE,  .current_index = 0 };
 
-enum FileMode
-{
+enum FileMode {
 	FILE_MODE_OPEN,     // Open an existing file.
 	FILE_MODE_APPEND,   // Open an existing file and go to the end.
 	FILE_MODE_TRUNCATE, // Open and truncate an existing file.

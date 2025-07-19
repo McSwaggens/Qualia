@@ -2,8 +2,7 @@
 #include "general.h"
 #include "assert.h"
 
-static byte* AllocateVirtualPage(u64 size, PageFlags flags)
-{
+static byte* AllocateVirtualPage(u64 size, PageFlags flags) {
 	Assert(size && (size & 4095) == 0, "Invalid page size detected.");
 	size = (size+4095) & -4096;
 
@@ -20,8 +19,7 @@ static byte* AllocateVirtualPage(u64 size, PageFlags flags)
 	return page;
 }
 
-static void DeAllocateVirtualPage(byte* page, u64 size)
-{
+static void DeAllocateVirtualPage(byte* page, u64 size) {
 	Assert(size);
 	Assert((size & 4095) == 0, "Invalid page size detected.");
 	SystemCall(11, (s64)page, size);
@@ -45,14 +43,12 @@ struct Arena
 
 static Arena arena;
 
-static void InitGlobalArena()
-{
+static void InitGlobalArena() {
 	ZeroMemory(&arena);
 	byte* pages = AllocateVirtualPage((1<<21) * ARENA_POOL_COUNT, PAGE_FLAG_WRITE);
 	// byte* pages = (byte*)AllocateVirtualPage((1<<21) * ARENA_POOL_COUNT, PAGE_FLAG_WRITE);
 
-	for (u32 index = 0; index < ARENA_POOL_COUNT; index++)
-	{
+	for (u32 index = 0; index < ARENA_POOL_COUNT; index++) {
 		ArenaPool* pool = &arena.pools[index];
 
 		u32 pow = index + ARENA_MIN_POW;
@@ -67,13 +63,11 @@ static void InitGlobalArena()
 	}
 }
 
-static u64 GetArenaEffectiveSize(u64 size)
-{
+static u64 GetArenaEffectiveSize(u64 size) {
 	return RaisePow2(size-1 | ARENA_MIN_SIZE-1);
 }
 
-static byte* AllocateMemory(u64 size)
-{
+static byte* AllocateMemory(u64 size) {
 	byte* result = null;
 
 	Assert(size);
@@ -87,14 +81,12 @@ static byte* AllocateMemory(u64 size)
 	{
 		ArenaPool* pool = &arena.pools[index];
 
-		if (pool->head)
-		{
+		if (pool->head) {
 			byte* result = (byte*)pool->head;
 			pool->head = *(byte**)result;
 			return result;
 		}
-		else if (!pool->count)
-		{
+		else if (!pool->count) {
 			pool->data = AllocateVirtualPage(1<<21, PAGE_FLAG_WRITE);
 			pool->count = 1<<(21-pow);
 		}
@@ -112,8 +104,7 @@ static byte* AllocateMemory(u64 size)
 	return result;
 }
 
-static void DeAllocateMemory(void* px, u64 size)
-{
+static void DeAllocateMemory(void* px, u64 size) {
 	byte* p = (byte*)px; // Sepples
 	// Check if p is not null? Or leave that up to the caller?
 	Assert(p && size);
@@ -122,8 +113,7 @@ static void DeAllocateMemory(void* px, u64 size)
 	u32 pow = CountTrailingZeroes64(size);
 	u32 index = pow - ARENA_MIN_POW;
 
-	if (index < ARENA_POOL_COUNT)
-	{
+	if (index < ARENA_POOL_COUNT) {
 		ArenaPool* pool = &arena.pools[index];
 		*(void**)p = pool->head;
 		pool->head = p;
@@ -134,8 +124,7 @@ static void DeAllocateMemory(void* px, u64 size)
 	}
 }
 
-static byte* ReAllocateMemory(void* px, u64 old_size, u64 new_size)
-{
+static byte* ReAllocateMemory(void* px, u64 old_size, u64 new_size) {
 	byte* p = (byte*)px; // Sepples
 	// @Todo: Deal with shrinking
 	Assert(new_size > old_size); // @RemoveMe @FixMe
@@ -143,16 +132,14 @@ static byte* ReAllocateMemory(void* px, u64 old_size, u64 new_size)
 	Assert(new_size != old_size, "Redundant ReAllocation\n");
 
 
-	if (new_size <= GetArenaEffectiveSize(old_size))
-	{
+	if (new_size <= GetArenaEffectiveSize(old_size)) {
 		// Print("[SAME]   ReAllocate(%, %)\n", GetArenaEffectiveSize(old_size), GetArenaEffectiveSize(new_size));
 		return p;
 	}
 
 	byte* result = (byte*)AllocateMemory(new_size);
 
-	if (old_size)
-	{
+	if (old_size) {
 		CopyMemory(result, p, old_size);
 		DeAllocateMemory(p, old_size);
 	}
@@ -162,8 +149,7 @@ static byte* ReAllocateMemory(void* px, u64 old_size, u64 new_size)
 	return result;
 }
 
-static Stack CreateStack(u64 size)
-{
+static Stack CreateStack(u64 size) {
 	Assert((size & 4095) == 0);
 
 	Stack stack;
@@ -175,8 +161,7 @@ static Stack CreateStack(u64 size)
 	return stack;
 }
 
-static void* StackAllocate(Stack* stack, u64 size)
-{
+static void* StackAllocate(Stack* stack, u64 size) {
 	// Print("StackAllocate(%)\n", size);
 	byte* result = stack->head;
 	stack->head += size;
@@ -204,12 +189,10 @@ static void* StackAllocate(Stack* stack, u64 size)
 }
 
 // Remove this functionality?
-static void FreeStack(Stack* stack)
-{
+static void FreeStack(Stack* stack) {
 	Stack_Block* block = stack->block;
 
-	while (block)
-	{
+	while (block) {
 		DeAllocateVirtualPage((byte*)block, block->size);
 		block = block->previous;
 	}

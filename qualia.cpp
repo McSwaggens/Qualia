@@ -22,10 +22,8 @@ static List<Ast_Module*> modules;
 #include "interpreter.cpp"
 #include "ir.cpp"
 
-static void CompileFile(String file_path)
-{
-	if (!FileDoesExist(file_path))
-	{
+static void CompileFile(String file_path) {
+	if (!FileDoesExist(file_path)) {
 		Print("File does not exist: %\n", file_path);
 		return;
 	}
@@ -46,8 +44,7 @@ static void CompileFile(String file_path)
 	GenerateIR(module);
 }
 
-int main(int argc, char** args)
-{
+int main(int argc, char** args) {
 	modules = null;
 
 	InitGlobalArena();
@@ -64,8 +61,7 @@ int main(int argc, char** args)
 		// "test_literals.q"
 	};
 
-	for (u32 i = 0; i < COUNT(files); i++)
-	{
+	for (u32 i = 0; i < COUNT(files); i++) {
 		Print("Compiling: %\n", files[i]);
 		CompileFile(files[i]);
 	}

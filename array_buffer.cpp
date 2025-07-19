@@ -4,13 +4,11 @@
 
 static List<Array_Buffer_Entry> array_buffers;
 
-static void InitArrayBufferPool()
-{
+static void InitArrayBufferPool() {
 	ZeroMemory(&array_buffers);
 }
 
-static Array_Buffer_Entry GetArrayBufferEntry(u64 min_size)
-{
+static Array_Buffer_Entry GetArrayBufferEntry(u64 min_size) {
 	if (array_buffers.count && array_buffers.Last().size > min_size) HOT
 	{
 		Array_Buffer_Entry entry = array_buffers[array_buffers.count-1];
@@ -32,8 +30,7 @@ static Array_Buffer_Entry GetArrayBufferEntry(u64 min_size)
 	return entry;
 }
 
-static void ReleaseArrayBuffer(void* data, u64 size)
-{
+static void ReleaseArrayBuffer(void* data, u64 size) {
 	if (size < 512) // Buffer not worth keeping
 		return; // @Todo: Release to global allocator
 

@@ -2,8 +2,7 @@
 
 #include "int.h"
 
-enum TypeKind : u32
-{
+enum TypeKind : u32 {
 	TYPE_PRIMITIVE   = 0,
 
 	TYPE_TUPLE       = 1,
@@ -32,8 +31,7 @@ static const u32 TYPE_ARRAY_TO_PRIMITIVE_OFFSET    = PRIMITIVE_COUNT*3;
 static const u32 TYPE_EXTRA_OFFSET                 = PRIMITIVE_COUNT*4 + 1;
 static const u32 CORE_TYPES_COUNT                  = TYPE_EXTRA_OFFSET + 2 + 1;
 
-enum TypeID : u32
-{
+enum TypeID : u32 {
 
 	TYPE_NULL    = 0,
 	TYPE_BYTE    = (TYPE_PRIMITIVE << TYPE_INDEX_BITCOUNT) | 1,
@@ -94,76 +92,63 @@ enum TypeID : u32
 static TypeID type_int = TYPE_INT64;
 static TypeID type_uint = TYPE_INT64;
 
-struct PrimitiveTypeInfo
-{
+struct PrimitiveTypeInfo {
 };
 
-struct PointerTypeInfo
-{
+struct PointerTypeInfo {
 	TypeID subtype;
 };
 
-struct OptionalTypeInfo
-{
+struct OptionalTypeInfo {
 	TypeID subtype;
 };
 
-struct ArrayTypeInfo
-{
+struct ArrayTypeInfo {
 	TypeID subtype;
 };
 
-struct FixedArrayTypeInfo
-{
+struct FixedArrayTypeInfo {
 	TypeID subtype;
 	u64 length;
 };
 
-struct FunctionTypeInfo
-{
+struct FunctionTypeInfo {
 	TypeID input;
 	TypeID output;
 };
 
-struct TupleTypeInfo
-{
+struct TupleTypeInfo {
 	TypeID* elements;
 	u64  count;
 };
 
-struct EnumTypeInfo
-{
+struct EnumTypeInfo {
 	struct Ast_Enum* ast;
 	TypeID backing_type;
 };
 
-struct StructTypeInfo
-{
+struct StructTypeInfo {
 	struct Ast_Struct* ast;
 };
 
-struct ExtensionEntry
-{
+struct ExtensionEntry {
 	TypeID type;
 	union { TypeID output; u64 length; };
 };
 
-struct ExtensionTable
-{
+struct ExtensionTable {
 	u32 count;
 	ExtensionEntry* entries;
 };
 
-struct TypeInfo
-{
+struct TypeInfo {
 	TypeID pointer;
 	TypeID optional;
 	TypeID array;
 	ExtensionTable extensions;
 	u64 size;
 
-	union
-	{
+	union {
 		PrimitiveTypeInfo  primitive_info;
 		PointerTypeInfo    pointer_info;
 		OptionalTypeInfo   optional_info;
@@ -176,42 +161,33 @@ struct TypeInfo
 	};
 };
 
-struct TypeSystem
-{
+struct TypeSystem {
 	TypeInfo* infos;
 	u64 info_count;
 	u64 info_capacity;
-};
+} static type_system;
 
-static TypeSystem type_system;
-
-static inline TypeID CreateTypeID(TypeKind kind, u32 index)
-{
+static inline TypeID CreateTypeID(TypeKind kind, u32 index) {
 	Assume(index < (1<<TYPE_INDEX_BITCOUNT));
 	return (TypeID)((kind << TYPE_INDEX_BITCOUNT) | index);
 }
 
-static inline TypeKind GetTypeKind(TypeID id)
-{
+static inline TypeKind GetTypeKind(TypeID id) {
 	return (TypeKind)((s32)id >> TYPE_INDEX_BITCOUNT);
 }
 
-static inline s32 GetTypeIndex(TypeID id)
-{
+static inline s32 GetTypeIndex(TypeID id) {
 	return (u32)id & (-1u >> TYPE_KIND_BITCOUNT);
 }
 
-static inline TypeInfo* GetTypeInfo(TypeID type)
-{
+static inline TypeInfo* GetTypeInfo(TypeID type) {
 	Assert(GetTypeIndex(type) < type_system.info_count);
 	return &type_system.infos[GetTypeIndex(type)];
 }
 
-static TypeID GetSubType(TypeID type)
-{
+static TypeID GetSubType(TypeID type) {
 	TypeInfo* info = GetTypeInfo(type);
-	switch (GetTypeKind(type))
-	{
+	switch (GetTypeKind(type)) {
 		case TYPE_POINTER:     return info->pointer_info.subtype;
 		case TYPE_OPTIONAL:    return info->optional_info.subtype;
 		case TYPE_ARRAY:       return info->array_info.subtype;
@@ -235,10 +211,8 @@ static const u8 PRIMITIVE_SIZE_LUT[PRIMITIVE_COUNT+1] = {
 	[TYPE_FLOAT64] = 8,
 };
 
-static inline u64 GetTypeSize(TypeID type)
-{
-	switch (GetTypeKind(type))
-	{
+static inline u64 GetTypeSize(TypeID type) {
+	switch (GetTypeKind(type)) {
 		case TYPE_PRIMITIVE:   return PRIMITIVE_SIZE_LUT[type];
 		case TYPE_TUPLE:       return GetTypeInfo(type)->size;
 		case TYPE_FUNCTION:    return 0;
@@ -258,10 +232,8 @@ enum CastKind : s32
 	CAST_EXPLICIT,
 };
 
-static bool IsInteger(TypeID type)
-{
-	switch (type)
-	{
+static bool IsInteger(TypeID type) {
+	switch (type) {
 		case TYPE_UINT8:
 		case TYPE_UINT16:
 		case TYPE_UINT32:
@@ -277,10 +249,8 @@ static bool IsInteger(TypeID type)
 	}
 }
 
-static bool IsSignedInteger(TypeID type)
-{
-	switch (type)
-	{
+static bool IsSignedInteger(TypeID type) {
+	switch (type) {
 		case TYPE_INT8:
 		case TYPE_INT16:
 		case TYPE_INT32:
@@ -292,10 +262,8 @@ static bool IsSignedInteger(TypeID type)
 	}
 }
 
-static bool IsUnsignedInteger(TypeID type)
-{
-	switch (type)
-	{
+static bool IsUnsignedInteger(TypeID type) {
+	switch (type) {
 		case TYPE_UINT8:
 		case TYPE_UINT16:
 		case TYPE_UINT32:
@@ -307,10 +275,8 @@ static bool IsUnsignedInteger(TypeID type)
 	}
 }
 
-static bool IsFloat(TypeID type)
-{
-	switch (type)
-	{
+static bool IsFloat(TypeID type) {
+	switch (type) {
 		case TYPE_FLOAT32:
 		case TYPE_FLOAT64:
 			return true;
@@ -320,33 +286,27 @@ static bool IsFloat(TypeID type)
 	}
 }
 
-static bool IsPointer(TypeID type)
-{
+static bool IsPointer(TypeID type) {
 	return GetTypeKind(type) == TYPE_POINTER;
 }
 
-static bool IsFunctionPointer(TypeID type)
-{
+static bool IsFunctionPointer(TypeID type) {
 	return GetTypeKind(type) == TYPE_POINTER && GetTypeKind(GetSubType(type)) == TYPE_FUNCTION;
 }
 
-static inline bool IsArray(TypeID type)
-{
+static inline bool IsArray(TypeID type) {
 	return GetTypeKind(type) == TYPE_ARRAY;
 }
 
-static inline bool IsFixedArray(TypeID type)
-{
+static inline bool IsFixedArray(TypeID type) {
 	return GetTypeKind(type) == TYPE_FIXED_ARRAY;
 }
 
-static TypeID GetFunctionInputType(TypeID type)
-{
+static TypeID GetFunctionInputType(TypeID type) {
 	return GetTypeInfo(type)->function_info.input;
 }
 
-static TypeID GetFunctionOutputType(TypeID type)
-{
+static TypeID GetFunctionOutputType(TypeID type) {
 	return GetTypeInfo(type)->function_info.output;
 }
 

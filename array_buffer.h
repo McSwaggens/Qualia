@@ -7,8 +7,7 @@
 #define POOL_SIZE 1024
 #define BUCKET_SIZE (4096 * 1024)
 
-struct Array_Buffer_Entry
-{
+struct Array_Buffer_Entry {
 	void* data;
 	u64 size;
 };
@@ -18,21 +17,17 @@ static void ReleaseArrayBuffer(void* data, u64 size);
 static void InitArrayBufferPool();
 
 template<typename T>
-struct Array_Buffer
-{
+struct Array_Buffer {
 	T* data;
 	u64 count;
 	u64 capacity;
 	u64 size;
 
-	void Add(T value)
-	{
-		if (count+1 >= capacity) COLD
-		{
+	void Add(T value) {
+		if (count+1 >= capacity) COLD {
 			Array_Buffer_Entry entry = GetArrayBufferEntry(size + sizeof(T));
 
-			if (count) COLD
-			{
+			if (count) COLD {
 				CopyMemory((T*)entry.data, data, count);
 				ReleaseArrayBuffer(data, size);
 			}
@@ -46,30 +41,22 @@ struct Array_Buffer
 		count++;
 	}
 
-	Array<T> Lock()
-	{
-		if (data)
-		{
-			ReleaseArrayBuffer(data + count, size - count * sizeof(T));
-		}
-
+	Array<T> Lock() {
+		if (data) ReleaseArrayBuffer(data + count, size - count * sizeof(T));
 		return Array(data, count);
 	}
 
-	void Release()
-	{
+	void Release() {
 		ReleaseArrayBuffer((void*)data, size);
 	}
 
-	void Reset()
-	{
+	void Reset() {
 		count = 0;
 	}
 };
 
 template<typename T>
-static Array_Buffer<T> CreateArrayBuffer()
-{
+static Array_Buffer<T> CreateArrayBuffer() {
 	Array_Buffer<T> result;
 	result.data = null;
 	result.count = 0;

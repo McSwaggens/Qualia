@@ -27,8 +27,8 @@ static inline void Assume(bool b) { __builtin_assume(b); }
 #define Unreachable() __builtin_unreachable()
 #define AssertUnreachable() { Assert(); Unreachable(); }
 
-#define GetInternalFunctionName() ToString(__builtin_FUNCTION())
-#define GetInternalFileName()     ToString(__builtin_FILE())
+#define GetInternalFunctionName() __builtin_FUNCTION()
+#define GetInternalFileName()     __builtin_FILE()
 #define GetInternalLineNumber()   __builtin_LINE()
 #define GetInternalColumnNumber() __builtin_COLUMN()
 

@@ -106,8 +106,12 @@ static byte* AllocateMemory(u64 size) {
 
 static void DeAllocateMemory(void* px, u64 size) {
 	byte* p = (byte*)px; // Sepples
+
+	if (!p)
+		return;
+
 	// Check if p is not null? Or leave that up to the caller?
-	Assert(p && size);
+	Assert(size);
 
 	size = GetArenaEffectiveSize(size);
 	u32 pow = CountTrailingZeroes64(size);

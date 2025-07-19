@@ -51,12 +51,12 @@ static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset) {
 static TypeID FindUserType(String name, Ast_Scope* scope) {
 	while (scope) {
 		for (Ast_Struct* ast = scope->structs; ast < scope->structs.End(); ast++) {
-			if (CompareString(name, ast->name))
+			if (name == ast->name)
 				return ast->type;
 		}
 
 		for (Ast_Enum* ast = scope->enums; ast < scope->enums.End(); ast++) {
-			if (CompareString(name, ast->name))
+			if (name == ast->name)
 				return ast->type;
 		}
 
@@ -208,7 +208,7 @@ static IntrinsicID FindIntrinsic(String name, TypeID input_type) {
 	for (u64 id = 0; id < INTRINSIC_COUNT; id++) {
 		TypeInfo* info = GetTypeInfo(intrinsic_type_lut[id]);
 
-		if (CompareString(name, intrinsic_name_lut[id]) && CanCast(CAST_IMPLICIT, input_type, info->function_info.input))
+		if (name == intrinsic_name_lut[id] && CanCast(CAST_IMPLICIT, input_type, info->function_info.input))
 			return (IntrinsicID)id;
 	}
 
@@ -220,7 +220,7 @@ static Ast_Function* FindFunction(Ast_Scope* scope, String name, TypeID input_ty
 		for (Ast_Function* function = scope->functions; function < scope->functions.End(); function++) {
 			TypeInfo* info = GetTypeInfo(function->type);
 
-			if (CompareString(name, function->name) && CanCast(CAST_IMPLICIT, input_type, info->function_info.input))
+			if (name == function->name && CanCast(CAST_IMPLICIT, input_type, info->function_info.input))
 				return function;
 		}
 
@@ -235,7 +235,7 @@ static Ast_Variable* FindVariable(Ast_Scope* scope, String name) {
 		for (u32 i = 0; i < scope->variables.count; i++) {
 			Ast_Variable* variable = scope->variables[i];
 
-			if (CompareString(name, variable->name))
+			if (name == variable->name)
 				return variable;
 		}
 
@@ -247,7 +247,7 @@ static Ast_Variable* FindVariable(Ast_Scope* scope, String name) {
 
 static Ast_Struct_Member* FindStructMember(Ast_Struct* ast_struct, String name) {
 	for (Ast_Struct_Member* member = ast_struct->members; member < ast_struct->members.End(); member++) {
-		if (CompareString(name, member->name))
+		if (name == member->name)
 			return member;
 	}
 
@@ -256,7 +256,7 @@ static Ast_Struct_Member* FindStructMember(Ast_Struct* ast_struct, String name) 
 
 static Ast_Enum_Member* FindEnumMember(Ast_Enum* ast_enum, String name) {
 	for (Ast_Enum_Member* member = ast_enum->members; member < ast_enum->members.End(); member++) {
-		if (CompareString(name, member->name))
+		if (name == member->name)
 			return member;
 	}
 
@@ -741,7 +741,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 				else if (GetTypeKind(type) == TYPE_ARRAY || GetTypeKind(type) == TYPE_FIXED_ARRAY) {
 					bool fixed = GetTypeKind(type) == TYPE_FIXED_ARRAY;
 
-					if (CompareString(name, "begin") || CompareString(name, "data")) {
+					if (name == "begin" || name == "data") {
 						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_BEGIN;
 						binary->flags = binary->left->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
@@ -751,12 +751,12 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 
 						binary->type = GetPointer(GetSubType(binary->left->type));
 					}
-					else if (CompareString(name, "end")) {
+					else if (name == "end") {
 						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_END;
 						binary->flags = binary->left->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 						binary->type = GetPointer(GetSubType(binary->left->type));
 					}
-					else if (CompareString(name, "length") || CompareString(name, "count")) {
+					else if (name == "length" || name == "count") {
 						binary->right->kind = AST_EXPRESSION_TERMINAL_ARRAY_LENGTH;
 						binary->flags = binary->left->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
@@ -1110,7 +1110,7 @@ static void CalculateStructSize(Ast_Struct* ast_struct) {
 static void CheckForEnumMemberDiplicates(Ast_Module* module, Ast_Enum* ast) {
 	for (Ast_Enum_Member* m0 = ast->members; m0 < ast->members.End(); m0++) {
 		for (Ast_Enum_Member* m1 = ast->members; m1 < m0; m1++) {
-			if (CompareString(m0->name, m1->name))
+			if (m0->name == m1->name)
 				Error(module, m0->name_token->location, "Duplicate member called '%' in enum %\n", m0->name, ast->name);
 		}
 	}
@@ -1119,7 +1119,7 @@ static void CheckForEnumMemberDiplicates(Ast_Module* module, Ast_Enum* ast) {
 static void CheckForStructMemberDuplicates(Ast_Module* module, Ast_Struct* ast) {
 	for (Ast_Struct_Member* m0 = ast->members; m0 < ast->members.End(); m0++) {
 		for (Ast_Struct_Member* m1 = ast->members; m1 < m0; m1++) {
-			if (CompareString(m0->name, m1->name))
+			if (m0->name == m1->name)
 				Error(module, m0->name_token->location, "Duplicate member called '%' in struct %\n", m0->name, ast->name);
 		}
 	}
@@ -1132,12 +1132,12 @@ static void ScanScope(Ast_Scope* scope, Ast_Module* module) {
 		TypeInfo* type_info = GetTypeInfo(ast_struct->type);
 
 		for (Ast_Struct* other = scope->structs; other < ast_struct; other++) {
-			if (CompareString(ast_struct->name, other->name))
+			if (ast_struct->name == other->name)
 				Error(module, ast_struct->name_token->location, "Duplicate struct called '%'\n", ast_struct->name);
 		}
 
 		for (Ast_Enum* ast_enum = scope->enums; ast_enum < scope->enums.End(); ast_enum++) {
-			if (CompareString(ast_struct->name, ast_enum->name)) {
+			if (ast_struct->name == ast_enum->name) {
 				Token* name_token = ast_struct->name_token;
 
 				if (ast_struct->name_token->location.line < ast_enum->name_token->location.line)
@@ -1156,7 +1156,7 @@ static void ScanScope(Ast_Scope* scope, Ast_Module* module) {
 		ast_enum->type = CreateEnumType(ast_enum, ast_enum->underlying_type);
 
 		for (Ast_Enum* eo = scope->enums; eo < ast_enum; eo++) {
-			if (CompareString(ast_enum->name, eo->name))
+			if (ast_enum->name == eo->name)
 				Error(module, ast_enum->name_token->location, "Duplicate enum called '%'\n", ast_enum->name);
 		}
 
@@ -1188,7 +1188,7 @@ static void ScanScope(Ast_Scope* scope, Ast_Module* module) {
 		ScanFunction(function, scope, module);
 
 		for (Ast_Function* other = scope->functions; other < function; other++) {
-			if (function->type == other->type && CompareString(function->name, other->name))
+			if (function->type == other->type && function->name == other->name)
 				Error(module, function->name_token->location, "Function '%' with type % already exists.\n", function->name, function->type);
 		}
 	}
@@ -1403,7 +1403,7 @@ static void ScanVarDecl(Ast_Statement* statement, Ast_Code* code, Ast_Function* 
 	Ast_Variable* var = &statement->variable_declaration;
 
 	for (Ast_Variable** other_variable = code->scope.variables.Begin(); other_variable < code->scope.variables.End(); other_variable++) {
-		if (CompareString(var->name, (*other_variable)->name))
+		if (var->name == (*other_variable)->name)
 			Error(module, var->name_token->location, "Variable with name '%' already declared in this scope.\n", var->name);
 	}
 
@@ -1545,7 +1545,7 @@ static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* m
 			Error(module, param->ast_type->basetype.token->location, "Unknown type '%'\n", param->ast_type->basetype.token);
 
 		for (Ast_Variable* param_other = function->parameters; param_other < param; param_other++) {
-			if (CompareString(param_other->name, param->name))
+			if (param_other->name == param->name)
 				Error(module, param->name_token->location, "Duplicate parameter called '%'\n", param->name);
 		}
 	}

@@ -6,8 +6,7 @@
 #include "list.h"
 #include "ascii.h"
 
-struct IntFormat
-{
+struct IntFormat {
 	Base base;
 	u64 value;
 };

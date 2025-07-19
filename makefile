@@ -18,7 +18,7 @@ qualia_xxx: *.cpp *.h *.asm
 		# -nostdlib\
 		# -O3 -DDEBUG -Og 
 
-run: qualia
+run: qualia_xxx
 	./qualia
 
 time: qualia

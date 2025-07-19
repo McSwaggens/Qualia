@@ -2,9 +2,12 @@
 
 #include "memory.h"
 
+#include "assert.h"
+
 struct String {
-	char* data;
+	// @todo Short String Optimization!
 	u32 length;
+	char* data;
 	u32 capacity;
 
 	String() = default;
@@ -15,16 +18,38 @@ struct String {
 
 	template<u64 N>
 	constexpr String(const char (&s)[N]) : data(const_cast<char*>(s)), length(N-1), capacity(0) { }
-	constexpr operator bool() const { return data != null; }
-
-	constexpr char& operator[](u32 n) { return data[n]; }
-	constexpr char  operator[](u32 n) const { return data[n]; }
 
 	constexpr char* Begin() { return data; }
 	constexpr char* End()   { return data + length; }
-
 	constexpr const char* Begin() const { return data; }
 	constexpr const char* End()   const { return data + length; }
+
+	constexpr char* begin() { return data; }
+	constexpr char* end()   { return data + length; }
+	constexpr const char* begin() const { return data; }
+	constexpr const char* end()   const { return data + length; }
+
+	constexpr operator bool() const { return data != null; }
+
+	char& operator[](u32 n)       { Assert(n < length); return data[n]; }
+	char  operator[](u32 n) const { Assert(n < length); return data[n]; }
+
+	constexpr bool operator ==(String o) {
+		if (length != o.length)
+			return false;
+
+		if (data == o.data)
+			return true;
+
+		if (!CompareMemory(data, o.data, length))
+			return false;
+
+		return true;
+	}
+
+	constexpr bool operator !=(String o) {
+		return !(*this == o);
+	}
 
 	constexpr void Clear() {
 		length = 0;
@@ -50,6 +75,40 @@ struct String {
 
 		data[length++] = c;
 	}
+
+	constexpr bool StartsWith(String s) {
+		if (length < s.length)
+			return false;
+
+		if (!CompareMemory(data, s.data, s.length))
+			return false;
+
+		return true;
+	}
+
+	constexpr bool EndsWith(String s) {
+		if (length < s.length)
+			return false;
+
+		if (!CompareMemory(End() - s.length, s.data, s.length))
+			return false;
+
+		return true;
+	}
+
+	String Duplicate() {
+		String copy = String(Allocate<char>(length), length, capacity);
+		CopyMemory(copy.data, data, length);
+		return copy;
+	}
+
+	void Free() {
+		DeAllocate(data, capacity);
+
+		data = null;
+		length = 0;
+		capacity = 0;
+	}
 };
 
 static inline String AllocateString(u64 length, u64 extra_capacity) {
@@ -60,35 +119,12 @@ static inline String StackAllocateString(Stack* stack, u64 length) {
 	return String(StackAllocate<char>(stack, length), length, 0);
 }
 
-static inline void DeAllocateString(String string) {
-	DeAllocate(string.data, string.length);
-}
-
-static String DuplicateString(String string) {
-	String copy = String(Allocate<char>(string.length), string.length, string.capacity);
-	CopyMemory(copy.data, string.data, string.length);
-	return copy;
-}
-
-static String DuplicateString(char* s, u64 length) {
-	String copy = AllocateString(length, 0);
-	CopyMemory(copy.data, s, length);
-	return copy;
-}
-
-static constexpr bool CompareString(String a, String b) {
-	return a.length == b.length && CompareMemory(a.data, b.data, a.length);
-}
-
 template<u64 N>
 static inline bool CompareStringRaw(const char* a, const char (&b)[N]) {
 	return CompareMemory(a, b, N-1);
 }
 
 static constexpr u64 CStringLength(const char* s) {
-	// What kind of demented "person" would "design" a string like this?
-	// It's an extremely simple concept, but still they managed to fuck it up somehow.
-	//                    C was a mistake.
 	const char* start = s;
 	while (*s) s++;
 	return s - start;

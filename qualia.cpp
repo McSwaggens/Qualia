@@ -9,6 +9,7 @@ struct Ast_Module;
 static List<Ast_Module*> modules;
 
 #include "thread.cpp"
+#include "assert.cpp"
 #include "file_system.cpp"
 #include "general.cpp"
 #include "error.cpp"

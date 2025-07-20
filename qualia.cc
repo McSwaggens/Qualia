@@ -8,20 +8,20 @@ struct Ast_Module;
 
 static List<Ast_Module*> modules;
 
-#include "thread.cpp"
-#include "assert.cpp"
-#include "file_system.cpp"
-#include "general.cpp"
-#include "error.cpp"
-#include "type_system.cpp"
-#include "lexer.cpp"
-#include "memory.cpp"
-#include "array_buffer.cpp"
-#include "print.cpp"
-#include "semantic.cpp"
-#include "parser.cpp"
-#include "interpreter.cpp"
-#include "ir.cpp"
+#include "thread.cc"
+#include "assert.cc"
+#include "file_system.cc"
+#include "general.cc"
+#include "error.cc"
+#include "type_system.cc"
+#include "lexer.cc"
+#include "memory.cc"
+#include "array_buffer.cc"
+#include "print.cc"
+#include "semantic.cc"
+#include "parser.cc"
+#include "interpreter.cc"
+#include "ir.cc"
 
 static void CompileFile(String file_path) {
 	if (!FileDoesExist(file_path)) {

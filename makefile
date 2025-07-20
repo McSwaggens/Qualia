@@ -1,4 +1,4 @@
-qualia_xxx: *.cpp *.h *.asm
+qualia_xxx: *.cc *.h *.asm
 	mkdir -p bin
 
 	# nasm -felf64 linux_bootstrap.asm -o linux_bootstrap.o
@@ -10,7 +10,7 @@ qualia_xxx: *.cpp *.h *.asm
 		-nostdinc -nostdinc++ \
 		-fno-rtti -fno-exceptions -Wno-vla-cxx-extension \
 		-Wno-all \
-		qualia.cpp general.o -lm \
+		qualia.cc general.o -lm \
 		-O0 -ggdb -DDEBUG -MJ compile_commands.json
 		# -O3
 		# -ggdb -g3 -fno-omit-frame-pointer -DDEBUG
@@ -27,7 +27,4 @@ time: qualia
 clean:
 	rm -f qualia
 	rm -f *.o
-
-tags: *.cpp *.h
-	ctags -R --language-force=c++ --fields=+S *.cpp *.h
 

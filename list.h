@@ -161,7 +161,7 @@ struct List {
 	}
 
 	void Free() {
-		DeAllocate(data, count * sizeof(T));
+		DeAllocate(data, count);
 	}
 };
 

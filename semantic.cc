@@ -23,7 +23,7 @@ static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset) {
 		// Print("Variable %:\n\tsize = %\n\toffset = %\n", variable->name, variable->type->size, variable->offset);
 	}
 
-	for (u32 i = 0; i < code->statements.count; i++) {
+	for (u32 i = 0; i < code->statements.length; i++) {
 		Ast_Statement* statement = &code->statements[i];
 
 		switch (statement->kind) {
@@ -96,7 +96,7 @@ static TypeID GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Ast_Module* m
 
 		case AST_BASETYPE_TUPLE:
 		{
-			u32 tuple_count = basetype.tuple.count;
+			u32 tuple_count = basetype.tuple.length;
 
 			if (!tuple_count)
 				Error(module, basetype.token->location, "Empty tuple is an invalid type.\n");
@@ -138,7 +138,7 @@ static TypeID GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module) 
 	if (!result)
 		return result;
 
-	for (s32 i = ast_type->specifiers.count-1; i >= 0; i--) {
+	for (s32 i = ast_type->specifiers.length-1; i >= 0; i--) {
 		Ast_Specifier* specifier = &ast_type->specifiers[i];
 
 		switch (specifier->kind) {
@@ -336,7 +336,7 @@ static void ScanExpressionFixedArray(Ast_Expression_Fixed_Array* fixed_array, As
 
 	Ast_Expression_Flags flags = AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
-	for (u32 i = 0; i < fixed_array->elements.count; i++) {
+	for (u32 i = 0; i < fixed_array->elements.length; i++) {
 		Ast_Expression* element = fixed_array->elements[i];
 		ScanExpression(element, scope, module);
 
@@ -351,7 +351,7 @@ static void ScanExpressionFixedArray(Ast_Expression_Fixed_Array* fixed_array, As
 		else
 		{
 			subtype = element->type;
-			fixed_array->type = GetFixedArray(subtype, fixed_array->elements.count);
+			fixed_array->type = GetFixedArray(subtype, fixed_array->elements.length);
 		}
 	}
 
@@ -432,9 +432,9 @@ static void ScanExpressionLiteral(Ast_Expression_Literal* literal, Ast_Scope* sc
 }
 
 static void ScanExpressionTuple(Ast_Expression_Tuple* tuple, Ast_Scope* scope, Ast_Module* module) {
-	tuple->recursive_count = tuple->elements.count;
+	tuple->recursive_count = tuple->elements.length;
 
-	TypeID types[tuple->elements.count];
+	TypeID types[tuple->elements.length];
 
 	Ast_Expression_Flags element_flags =
 		AST_EXPRESSION_FLAG_REFERENTIAL |
@@ -446,7 +446,7 @@ static void ScanExpressionTuple(Ast_Expression_Tuple* tuple, Ast_Scope* scope, A
 		AST_EXPRESSION_FLAG_PURE |
 		AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
-	for (u32 i = 0; i < tuple->elements.count; i++) {
+	for (u32 i = 0; i < tuple->elements.length; i++) {
 		Ast_Expression* element = tuple->elements[i];
 		ScanExpression(element, scope, module);
 		types[i] = element->type;
@@ -460,7 +460,7 @@ static void ScanExpressionTuple(Ast_Expression_Tuple* tuple, Ast_Scope* scope, A
 			element_flags &= element->flags;
 		}
 
-		if (element->type == TYPE_EMPTY_TUPLE && (element->kind != AST_EXPRESSION_TUPLE || tuple->elements.count > 1))
+		if (element->type == TYPE_EMPTY_TUPLE && (element->kind != AST_EXPRESSION_TUPLE || tuple->elements.length > 1))
 			Error(module, element, "Tuple elements aren't allowed to be of type %.\n", element->type);
 	}
 
@@ -470,7 +470,7 @@ static void ScanExpressionTuple(Ast_Expression_Tuple* tuple, Ast_Scope* scope, A
 		tuple->flags |= (tuple_flags & AST_EXPRESSION_FLAG_INTERNALLY_REFERENTIAL);
 	}
 
-	tuple->type = GetTuple(types, tuple->elements.count);
+	tuple->type = GetTuple(types, tuple->elements.length);
 }
 
 static void ScanExpressionCall(Ast_Expression_Call* call, Ast_Scope* scope, Ast_Module* module) {
@@ -504,11 +504,11 @@ static void ScanExpressionCall(Ast_Expression_Call* call, Ast_Scope* scope, Ast_
 		dcall->type = function->return_type;
 		dcall->flags = 0;
 
-		Assert(dcall->parameters->elements.count == function->parameters.count-1);
+		Assert(dcall->parameters->elements.length == function->parameters.length-1);
 
 		dot->left = ImplicitCast(dot->left, function->parameters[0].type, module);
 
-		for (u32 i = 0; i < dcall->parameters->elements.count; i++)
+		for (u32 i = 0; i < dcall->parameters->elements.length; i++)
 			call->parameters->elements[i] = ImplicitCast(call->parameters->elements[i], function->parameters[i+1].type, module);
 
 		return;
@@ -1019,7 +1019,7 @@ static void GenerateClosure(Ast_Struct* target, Ast_Struct* ast_struct);
 static void GenerateClosure(Ast_Struct* target, Array<TypeID> tuple);
 
 static void GenerateClosure(Ast_Struct* target, Array<TypeID> tuple) {
-	for (u32 i = 0; i < tuple.count; i++) {
+	for (u32 i = 0; i < tuple.length; i++) {
 		TypeID type = tuple[i];
 		TypeInfo* type_info = GetTypeInfo(type);
 
@@ -1307,7 +1307,7 @@ static void ScanVerboseFor(Ast_Module* module, Ast_Function* function, Ast_Code*
 }
 
 static void ScanBranchBlock(Ast_Module* module, Ast_Function* function, Ast_Code* code, Ast_BranchBlock* branch_block) {
-	for (u32 i = 0; i < branch_block->branches.count; i++) {
+	for (u32 i = 0; i < branch_block->branches.length; i++) {
 		Ast_Branch* branch = &branch_block->branches[i];
 
 		branch->code.scope.parent = &code->scope; // @Hack
@@ -1528,12 +1528,12 @@ static void ScanCode(Ast_Code* code, Ast_Scope* scope, Ast_Function* function, A
 }
 
 static TypeID GetTypeFromParams(Array<Ast_Variable> params, Ast_Module* module) {
-	TypeID types[params.count];
-	for (u32 i = 0; i < params.count; i++) {
+	TypeID types[params.length];
+	for (u32 i = 0; i < params.length; i++) {
 		types[i] = params[i].type;
 	}
 
-	return GetTuple(types, params.count);
+	return GetTuple(types, params.length);
 }
 
 static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* module) {

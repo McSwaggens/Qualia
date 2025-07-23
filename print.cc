@@ -423,7 +423,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 
 			BufferWriteString(buffer, "{ ");
 
-			for (u32 i = 0; i < fixed_array->elements.count; i++) {
+			for (u32 i = 0; i < fixed_array->elements.length; i++) {
 				if (!i) BufferWriteString(buffer, ", ");
 
 				Write(buffer, fixed_array->elements[i]);
@@ -517,7 +517,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 		{
 			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
 			BufferWriteString(buffer, "(");
-			for (u32 i = 0; i < tuple->elements.count; i++) {
+			for (u32 i = 0; i < tuple->elements.length; i++) {
 				if (i) BufferWriteString(buffer, ", ");
 				Write(buffer, tuple->elements[i]);
 			}

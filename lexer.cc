@@ -408,9 +408,9 @@ static Token_Kind GetMatchingParen(Token_Kind kind) {
 
 static void LexerParse(Ast_Module* module) {
 	Array<char> data = FileLoad(module->file_path, 16, 64);
-	String code = String(data.elements, data.count);
+	String code = String(data.data, data.length);
 
-	Token* tokens = (Token*)AllocateMemory(sizeof(Token) * (data.count+1));
+	Token* tokens = (Token*)AllocateMemory(sizeof(Token) * (data.length+1));
 	List<Line> lines = AllocateList<Line>(Min(code.length, 4096u));
 
 	s64 line_number = 0;

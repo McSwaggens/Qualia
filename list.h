@@ -3,21 +3,43 @@
 #include "memory.h"
 
 template<typename T>
-struct List
-{
-	T*  data;
-	u32 count;
-	u32 capacity;
+struct List {
+	T*  data = null;
+	u32 count = 0;
+	u32 capacity = 0;
 
 	List() = default;
 	List(Null) : data(null), count(0), capacity(0) { }
 	T& operator[](u32 n) { return data[n]; }
 	T  operator[](u32 n) const { return data[n]; }
 
-	T* Begin() { return data; }
-	T* End() { return data + count; }
+	constexpr T* Begin() { return data; }
+	constexpr T* End()   { return data + count; }
+	constexpr const T* Begin() const { return data; }
+	constexpr const T* End()   const { return data + count; }
 
-	T& Last() { return data[count-1]; }
+	constexpr T* begin() { return data; }
+	constexpr T* end()   { return data + count; }
+	constexpr const T* begin() const { return data; }
+	constexpr const T* end()   const { return data + count; }
+
+	constexpr bool operator ==(List<T> o) {
+		if (count != o.count)
+			return false;
+
+		if (data == o.data)
+			return true;
+
+		for (u32 i = 0; i < count; i++)
+			if (!Compare(data[i], o.data[i]))
+				return false;
+
+		return true;
+	}
+
+	constexpr bool operator !=(List<T> o) { return !(*this == o); }
+
+	constexpr T& Last() { return data[count-1]; }
 
 	T& Force(u32 n) {
 		if (capacity <= n) {
@@ -137,12 +159,11 @@ struct List
 	Array<T> ToArray() {
 		return Array<T>(data, count);
 	}
-};
 
-template<typename T>
-static inline Array<T> ToArray(List<T> list) {
-	return Array<T>(list.data, list.count);
-}
+	void Free() {
+		DeAllocate(data, count * sizeof(T));
+	}
+};
 
 template<typename T>
 static inline List<T> AllocateList(u32 capacity = 16) {
@@ -177,12 +198,7 @@ static inline void AppendListToList(List<T>* list, const List<T> other) {
 }
 
 template<typename T>
-static inline void FreeList(List<T> list) {
-	DeAllocate(list.data, list.capacity);
-}
-
-template<typename T>
 static inline void Free(List<T> list) {
-	FreeList(list);
+	list.Free();
 }
 

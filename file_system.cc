@@ -156,12 +156,12 @@ static Array<byte> FileLoad(String path, u64 left, u64 right) {
 	}
 
 	u64 size = FileQuerySize(handle);
-	result.count = size;
+	result.length = size;
 
 	if (size) HOT
 	{
 		byte* data = AllocateMemory(size + left + right);
-		result.elements = data + left;
+		result.data = data + left;
 
 		FileRead(handle, data + left, size);
 
@@ -214,7 +214,7 @@ static Array<Linux_Directory_Entry> QueryLinuxDirectoryEntries(String path) {
 	ZeroMemory(&file);
 
 	Array<Linux_Directory_Entry> entries = AllocateArray<Linux_Directory_Entry>(256);
-	SystemCall(217, (s64)cpath, (s64)entries.elements, entries.count);
+	SystemCall(217, (s64)cpath, (s64)entries.data, entries.length);
 
 	return entries;
 }

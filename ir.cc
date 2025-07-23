@@ -210,15 +210,15 @@ Value Block::Cast(Value value, TypeID from, TypeID to) {
 
 
 void Block::Remove() {
-	Procedure* proc = this->procedure;
+	Procedure* proc = procedure;
 
-	FreeList(this->users);
-	FreeList(this->instructions);
-	FreeList(this->phis);
+	Free(users);
+	Free(instructions);
+	Free(phis);
 
-	this->users = null;
-	this->instructions = null;
-	this->phis = null;
+	users = null;
+	instructions = null;
+	phis = null;
 
 	if (proc->entry == this) {
 		Assert();
@@ -556,7 +556,7 @@ static Block* StatementToIR(Ast_Statement* statement, Block* block, Block* bbrea
 
 static void CodeToIR(Ast_Code* code, Block* block, Block* bexit, Block* bbreak, IrGenHelper* helper) {
 	Procedure* proc = helper->procedure;
-	for (u64 i = 0; i < code->statements.count; i++) {
+	for (u64 i = 0; i < code->statements.length; i++) {
 		Ast_Statement* statement = &code->statements[i];
 		block = StatementToIR(statement, block, bbreak, helper);
 
@@ -575,7 +575,7 @@ static Procedure* FunctionToIR(Ast_Function* function) {
 
 	Block* binit = proc->NewBlock();
 
-	for (u64 i = 0; i < function->parameters.count; i++) {
+	for (u64 i = 0; i < function->parameters.length; i++) {
 		Ast_Variable* var = &function->parameters[i];
 		Instruction* stack = binit->Stack(GetTypeSize(var->type));
 		var->ir_stack = stack;

@@ -29,7 +29,7 @@ struct String {
 	constexpr const char* begin() const { return data; }
 	constexpr const char* end()   const { return data + length; }
 
-	constexpr operator bool() const { return data != null; }
+	constexpr operator bool() const { return length != 0; }
 
 	char& operator[](u32 n)       { Assert(n < length); return data[n]; }
 	char  operator[](u32 n) const { Assert(n < length); return data[n]; }
@@ -96,7 +96,7 @@ struct String {
 		return true;
 	}
 
-	String Duplicate() {
+	String Copy() {
 		String copy = String(Allocate<char>(length), length, capacity);
 		CopyMemory(copy.data, data, length);
 		return copy;

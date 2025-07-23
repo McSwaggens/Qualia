@@ -20,7 +20,7 @@ static void LexerError(Ast_Module* module, SourceLocation where, String format, 
 
 	// Only way to fix this is to continue lexing, which is what I'm going to do soon anyways.
 
-	// for (u64 line = begin; line < begin + number_of_lines && line < module->lines.count; line++)
+	// for (u64 line = begin; line < begin + number_of_lines && line < module->lines.length; line++)
 	// {
 	// 	Print(&unix_error_buffer, "%\n", String(module->lines[line], module->lines[line].length));
 	// }
@@ -39,7 +39,7 @@ static void Error(Ast_Module* module, SourceLocation where, String format, Args&
 	Print(&unix_error_buffer, "%:%:%: error: ", module->file_path, (where.line+1), (where.offset+1));
 	Print(&unix_error_buffer, format, message_args...);
 
-	for (s64 line = begin; line < begin + number_of_lines && line < module->lines.count; line++) {
+	for (s64 line = begin; line < begin + number_of_lines && line < module->lines.length; line++) {
 		Print(&unix_error_buffer, "%\n", module->lines[line].string);
 	}
 
@@ -63,7 +63,7 @@ static void Error(Ast_Module* module, Ast_Expression* expr, String format, Args&
 
 	// @Todo: Coloring/Highlighting
 
-	for (s64 line = line_begin; line < line_begin + number_of_lines && line < module->lines.count; line++) {
+	for (s64 line = line_begin; line < line_begin + number_of_lines && line < module->lines.length; line++) {
 		Print(&unix_error_buffer, "%\n", module->lines[line].string);
 	}
 

@@ -1,12 +1,9 @@
 #include "int.h"
-
-#include "array.h"
 #include "list.h"
-#include "memory.h"
 
 struct Ast_Module;
 
-static List<Ast_Module*> modules;
+static List<Ast_Module*> modules = null;
 
 #include "thread.cc"
 #include "assert.cc"
@@ -24,8 +21,8 @@ static List<Ast_Module*> modules;
 #include "ir.cc"
 
 static void CompileFile(String file_path) {
-	if (!FileDoesExist(file_path)) {
-		Print("File does not exist: %\n", file_path);
+	if (!File::DoesExist(file_path)) {
+		Print("error: File does not exist: %\n", file_path);
 		return;
 	}
 
@@ -46,11 +43,7 @@ static void CompileFile(String file_path) {
 }
 
 int main(int argc, char** args) {
-	modules = null;
-
 	InitGlobalArena();
-	InitArrayBufferPool();
-	InitThread();
 	InitTypeSystem();
 	InitIntrinsics();
 
@@ -69,9 +62,9 @@ int main(int argc, char** args) {
 
 	Print("Compiler finished.\n");
 
-	BufferFlush(&unix_output_buffer);
-	BufferFlush(&unix_error_buffer);
+	output_buffer.Flush();
+	error_buffer.Flush();
 
-	ExitProcess(true);
+	OS::Terminate(true);
 }
 

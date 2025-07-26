@@ -145,9 +145,6 @@ static u64 RaisePow2(u64 n) {
 	return IsPow2(n) ? n : NextPow2(n);
 }
 
-[[noreturn]]
-static void ExitProcess(bool success);
-
 CFUNC s64 SystemCall(s64 rax, s64 rdi = 0, s64 rsi = 0, s64 rdx = 0, s64 r10 = 0, s64 r8 = 0, s64 r9 = 0);
 
 static inline u64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc

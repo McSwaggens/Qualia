@@ -371,11 +371,6 @@ static bool CheckIfHexadecimal(char* p) {
 
 // -------------------------------------------- //
 
-// @Todo: Hash identifiers
-// @Todo: Hash strings
-// @Todo: Hash Literals
-// @Todo: Error continuation
-
 static inline bool IsKeyword(char* p, Token_Kind kind) {
 	char post = p[ToString(kind).length];
 
@@ -407,7 +402,7 @@ static Token_Kind GetMatchingParen(Token_Kind kind) {
 }
 
 static void LexerParse(Ast_Module* module) {
-	Array<char> data = FileLoad(module->file_path, 16, 64);
+	Array<char> data = File::Load(module->file_path, 16, 64);
 	String code = String(data.data, data.length);
 
 	Token* tokens = (Token*)AllocateMemory(sizeof(Token) * (data.length+1));

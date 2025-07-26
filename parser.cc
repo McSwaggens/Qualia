@@ -337,7 +337,7 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Ast_Module* module) {
 	CheckScope(token, indent, module);
 	token += 1;
 
-	Array_Buffer<Ast_Struct_Member> members = CreateArrayBuffer<Ast_Struct_Member>();
+	ArrayBuffer<Ast_Struct_Member> members = CreateArrayBuffer<Ast_Struct_Member>();
 
  	while (IsCorrectScope(token, indent+1)) {
 		if (token->kind == TOKEN_IDENTIFIER_CASUAL) {
@@ -401,7 +401,7 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Ast_Module* module) {
 	CheckScope(token, indent, module);
 	token += 1;
 
-	Array_Buffer<Ast_Enum_Member> members = CreateArrayBuffer<Ast_Enum_Member>();
+	ArrayBuffer<Ast_Enum_Member> members = CreateArrayBuffer<Ast_Enum_Member>();
 
 	while (IsCorrectScope(token, indent+1)) {
 		if (token->kind == TOKEN_IDENTIFIER_FORMAL) {
@@ -536,7 +536,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 
 		token += 1;
 
-		Array_Buffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
+		ArrayBuffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
 
 		if (closure[-1].kind == TOKEN_COMMA)
 			Error(module, token->location, "Expected expression after ','\n");
@@ -566,7 +566,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 		fixed_array->kind = AST_EXPRESSION_FIXED_ARRAY;
 
 		Token* closure = token->closure;
-		Array_Buffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
+		ArrayBuffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
 
 		CheckScope(closure, indent, module);
 
@@ -752,7 +752,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Ast_Module* module) {
 	Ast_Type type;
 	ZeroMemory(&type);
 
-	Array_Buffer<Ast_Specifier> specifiers = CreateArrayBuffer<Ast_Specifier>();
+	ArrayBuffer<Ast_Specifier> specifiers = CreateArrayBuffer<Ast_Specifier>();
 
 	while (IsSpecifier(token->kind)) {
 		Ast_Specifier specifier;
@@ -887,7 +887,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Ast_Module* module) {
 static void ParseParameters(Ast_Function* function, Token* open_paren, u32 indent, Ast_Module* module) {
 	Token* closure = open_paren->closure;
 	Token* token = open_paren+1;
-	Array_Buffer<Ast_Variable> params = CreateArrayBuffer<Ast_Variable>(); // @Todo: Get lexer to count commas in parens?
+	ArrayBuffer<Ast_Variable> params = CreateArrayBuffer<Ast_Variable>(); // @Todo: Get lexer to count commas in parens?
 
 	CheckScope(open_paren, indent, module);
 	CheckScope(closure, indent, module);
@@ -940,7 +940,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Ast_Module* module) {
 	Ast_BranchBlock branch_block;
 	ZeroMemory(&branch_block);
-	Array_Buffer<Ast_Branch> branches = CreateArrayBuffer<Ast_Branch>();
+	ArrayBuffer<Ast_Branch> branches = CreateArrayBuffer<Ast_Branch>();
 
 	Token* branch_block_begin_token = token;
 
@@ -1251,10 +1251,10 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Ast_Module* module) {
 	Ast_Code code;
 	ZeroMemory(&code);
 
-	Array_Buffer<Ast_Statement> statements = CreateArrayBuffer<Ast_Statement>();
-	Array_Buffer<Ast_Struct>    structs    = CreateArrayBuffer<Ast_Struct>();
-	Array_Buffer<Ast_Enum>      enums      = CreateArrayBuffer<Ast_Enum>();
-	Array_Buffer<Ast_Function>  functions  = CreateArrayBuffer<Ast_Function>();
+	ArrayBuffer<Ast_Statement> statements = CreateArrayBuffer<Ast_Statement>();
+	ArrayBuffer<Ast_Struct>    structs    = CreateArrayBuffer<Ast_Struct>();
+	ArrayBuffer<Ast_Enum>      enums      = CreateArrayBuffer<Ast_Enum>();
+	ArrayBuffer<Ast_Function>  functions  = CreateArrayBuffer<Ast_Function>();
 
 	if (token->newline && token->indent > indent) {
 	}
@@ -1360,10 +1360,10 @@ static Ast_Import ParseImport(Token*& token, u32 indent, Ast_Module* module) {
 static void ParseGlobalScope(Ast_Module* module) {
 	Token* token = &module->tokens[0];
 
-	Array_Buffer<Ast_Import>   imports    = CreateArrayBuffer<Ast_Import>();
-	Array_Buffer<Ast_Struct>   structs    = CreateArrayBuffer<Ast_Struct>();
-	Array_Buffer<Ast_Enum>     enums      = CreateArrayBuffer<Ast_Enum>();
-	Array_Buffer<Ast_Function> functions  = CreateArrayBuffer<Ast_Function>();
+	ArrayBuffer<Ast_Import>   imports    = CreateArrayBuffer<Ast_Import>();
+	ArrayBuffer<Ast_Struct>   structs    = CreateArrayBuffer<Ast_Struct>();
+	ArrayBuffer<Ast_Enum>     enums      = CreateArrayBuffer<Ast_Enum>();
+	ArrayBuffer<Ast_Function> functions  = CreateArrayBuffer<Ast_Function>();
 
 	while (token->kind != TOKEN_EOF) {
 		if (token->kind == TOKEN_IMPORT) {

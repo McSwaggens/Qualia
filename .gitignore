@@ -3,4 +3,5 @@ compile_commands.json
 .kakrc
 *.o
 qualia
+.cache/
 

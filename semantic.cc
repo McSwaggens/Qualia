@@ -7,47 +7,6 @@
 
 static TypeID GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module);
 
-static u64 CalculateStackFrameSize(Ast_Function* function) {
-	return CalculateStackFrameSize(&function->code, 0);
-}
-
-// @Note: This doesn't calculate the minimum memory needed to represent the stackframe which would be ideal for producing optimized binaries.
-//        Another function needs to created for that.
-static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset) {
-	u64 initial_offset = offset;
-
-	for (u32 i = 0; i < code->scope.variables.count; i++) {
-		Ast_Variable* variable = code->scope.variables[i];
-		variable->offset = offset;
-		offset += GetTypeSize(variable->type);
-		// Print("Variable %:\n\tsize = %\n\toffset = %\n", variable->name, variable->type->size, variable->offset);
-	}
-
-	for (u32 i = 0; i < code->statements.length; i++) {
-		Ast_Statement* statement = &code->statements[i];
-
-		switch (statement->kind) {
-			case AST_STATEMENT_BRANCH_BLOCK:
-			{
-				for (Ast_Branch* branch = statement->branch_block.branches; branch < statement->branch_block.branches.End(); branch++) {
-					offset = CalculateStackFrameSize(&branch->code, offset);
-				}
-			} break;
-
-			case AST_STATEMENT_DEFER:
-			{
-				offset = CalculateStackFrameSize(&statement->defer.code, offset);
-			} break;
-
-			default: break;
-		}
-	}
-
-	code->frame_size = offset - initial_offset;
-
-	return offset;
-}
-
 static TypeID FindUserType(String name, Ast_Scope* scope) {
 	while (scope) {
 		for (Ast_Struct* ast = scope->structs; ast < scope->structs.End(); ast++) {
@@ -69,8 +28,7 @@ static TypeID GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Ast_Module* m
 	TypeID result = TYPE_NULL;
 
 	switch (basetype.kind) {
-		case AST_BASETYPE_PRIMITIVE:
-		{
+		case AST_BASETYPE_PRIMITIVE: {
 			switch (basetype.token->kind) {
 				case TOKEN_BOOL:    result = TYPE_BOOL;    break;
 				case TOKEN_BYTE:    result = TYPE_BYTE;    break;
@@ -94,8 +52,7 @@ static TypeID GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Ast_Module* m
 			}
 		} break;
 
-		case AST_BASETYPE_TUPLE:
-		{
+		case AST_BASETYPE_TUPLE: {
 			u32 tuple_count = basetype.tuple.length;
 
 			if (!tuple_count)
@@ -110,16 +67,14 @@ static TypeID GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Ast_Module* m
 			result = GetTuple(types, tuple_count);
 		} break;
 
-		case AST_BASETYPE_FUNCTION:
-		{
+		case AST_BASETYPE_FUNCTION: {
 			TypeID input  = GetType(basetype.function.input, scope, module);
 			TypeID output = GetType(basetype.function.output, scope, module);
 
 			result = GetFunctionType(input, output);
 		} break;
 
-		case AST_BASETYPE_USERTYPE:
-		{
+		case AST_BASETYPE_USERTYPE: {
 			result = FindUserType(basetype.token->identifier_string, scope);
 		} break;
 	}
@@ -146,8 +101,7 @@ static TypeID GetType(Ast_Type* ast_type, Ast_Scope* scope, Ast_Module* module) 
 			case AST_SPECIFIER_OPTIONAL:    result = GetOptional(result); break;
 			case AST_SPECIFIER_ARRAY:       result = GetArray(result);    break;
 
-			case AST_SPECIFIER_FIXED_ARRAY:
-			{
+			case AST_SPECIFIER_FIXED_ARRAY: {
 				ScanExpression(specifier->size_expression, scope, module);
 
 				if (!(specifier->size_expression->flags & AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE))
@@ -324,8 +278,7 @@ static void ScanExpressionTerminalName(Ast_Expression_Terminal* terminal, Ast_Sc
 			terminal->kind = AST_EXPRESSION_TERMINAL_PRIMITIVE; // @FixMe
 		}
 	}
-	else
-	{
+	else {
 		Assert();
 		Error(module, terminal->token->location, "Unknown variable '%'\n", terminal->token);
 	}
@@ -348,8 +301,7 @@ static void ScanExpressionFixedArray(Ast_Expression_Fixed_Array* fixed_array, As
 
 			fixed_array->elements[i] = ImplicitCast(element, subtype, module);
 		}
-		else
-		{
+		else {
 			subtype = element->type;
 			fixed_array->type = GetFixedArray(subtype, fixed_array->elements.length);
 		}
@@ -376,8 +328,7 @@ static void ScanExpressionArray(Ast_Expression_Array* array, Ast_Scope* scope, A
 	else if (CanCast(CAST_IMPLICIT, array->right->type, TYPE_UINT64)) {
 		array->right = ImplicitCast(array->right, TYPE_UINT64, module);
 	}
-	else
-	{
+	else {
 		Error(module, array->right, "Array end must be a % or an uint, not: %\n", array->left->type, array->right->type);
 	}
 
@@ -399,20 +350,17 @@ static void ScanExpressionLiteral(Ast_Expression_Literal* literal, Ast_Scope* sc
 		case TOKEN_LITERAL_UINT32: literal->type = TYPE_UINT32; literal->value_int = literal->token->literal_int; break;
 		case TOKEN_LITERAL_UINT64: literal->type = TYPE_UINT64; literal->value_int = literal->token->literal_int; break;
 
-		case TOKEN_LITERAL_FLOAT:
-		{
+		case TOKEN_LITERAL_FLOAT: {
 			literal->type = TYPE_FLOAT32; // @Fixme?
 			literal->value_f32 = literal->token->literal_float;
 		} break;
 
-		case TOKEN_LITERAL_FLOAT32:
-		{
+		case TOKEN_LITERAL_FLOAT32: {
 			literal->type = TYPE_FLOAT32;
 			literal->value_f32 = literal->token->literal_float;
 		} break;
 
-		case TOKEN_LITERAL_FLOAT64:
-		{
+		case TOKEN_LITERAL_FLOAT64: {
 			literal->type = TYPE_FLOAT64;
 			literal->value_f64 = literal->token->literal_float;
 		} break;
@@ -421,8 +369,7 @@ static void ScanExpressionLiteral(Ast_Expression_Literal* literal, Ast_Scope* sc
 		case TOKEN_FALSE: literal->type = TYPE_BOOL; literal->value_int = 0; break;
 		case TOKEN_NULL:  literal->type = GetPointer(TYPE_BYTE); literal->value_int = 0; break;
 
-		case TOKEN_LITERAL_STRING:
-		{
+		case TOKEN_LITERAL_STRING: {
 			literal->flags |= AST_EXPRESSION_FLAG_REFERENTIAL;
 			literal->type = GetFixedArray(TYPE_UINT8, literal->token->literal_string.length);
 		} break;
@@ -455,8 +402,7 @@ static void ScanExpressionTuple(Ast_Expression_Tuple* tuple, Ast_Scope* scope, A
 			tuple->recursive_count += ((Ast_Expression_Tuple*)element)->recursive_count-1;
 			tuple_flags &= element->flags;
 		}
-		else
-		{
+		else {
 			element_flags &= element->flags;
 		}
 
@@ -600,8 +546,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 		case AST_EXPRESSION_TERMINAL_LITERAL: ScanExpressionLiteral((Ast_Expression_Literal*)expression,        scope, module); break;
 		case AST_EXPRESSION_TUPLE:            ScanExpressionTuple((Ast_Expression_Tuple*)expression,            scope, module); break;
 
-		case AST_EXPRESSION_UNARY_ADDRESS_OF:
-		{
+		case AST_EXPRESSION_UNARY_ADDRESS_OF: {
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 
@@ -613,8 +558,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 			unary->type = GetPointer(unary->subexpression->type);
 		} break;
 
-		case AST_EXPRESSION_UNARY_REFERENCE_OF:
-		{
+		case AST_EXPRESSION_UNARY_REFERENCE_OF: {
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 
@@ -627,8 +571,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 			unary->type = GetSubType(unary->subexpression->type);
 		} break;
 
-		case AST_EXPRESSION_UNARY_BITWISE_NOT:
-		{
+		case AST_EXPRESSION_UNARY_BITWISE_NOT: {
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
@@ -643,8 +586,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 			else Error(module, unary->subexpression, "Type % is not an integer or pointer.\n", unary->subexpression->type);
 		} break;
 
-		case AST_EXPRESSION_UNARY_MINUS:
-		{
+		case AST_EXPRESSION_UNARY_MINUS: {
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
@@ -656,8 +598,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 			unary->type = unary->subexpression->type;
 		} break;
 
-		case AST_EXPRESSION_UNARY_PLUS:
-		{
+		case AST_EXPRESSION_UNARY_PLUS: {
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
@@ -668,8 +609,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 			unary->type = unary->subexpression->type;
 		} break;
 
-		case AST_EXPRESSION_UNARY_NOT:
-		{
+		case AST_EXPRESSION_UNARY_NOT: {
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 			unary->flags = unary->subexpression->flags & (AST_EXPRESSION_FLAG_PURE | AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
@@ -681,8 +621,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 			unary->type = TYPE_BOOL;
 		} break;
 
-		case AST_EXPRESSION_BINARY_DOT:
-		{
+		case AST_EXPRESSION_BINARY_DOT: {
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 
@@ -774,8 +713,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 		} break;
 
 		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
-		{
+		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL: {
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -796,8 +734,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 		case AST_EXPRESSION_BINARY_COMPARE_LESS:
 		case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:
 		case AST_EXPRESSION_BINARY_COMPARE_GREATER:
-		case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
-		{
+		case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: {
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -821,8 +758,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 		case AST_EXPRESSION_BINARY_SUBTRACT:
 		case AST_EXPRESSION_BINARY_MULTIPLY:
 		case AST_EXPRESSION_BINARY_DIVIDE:
-		case AST_EXPRESSION_BINARY_MODULO:
-		{
+		case AST_EXPRESSION_BINARY_MODULO: {
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -878,8 +814,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 
 				binary->type = dominant;
 			}
-			else
-			{
+			else {
 				// int + int
 				// int - int
 				// int * int
@@ -900,8 +835,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 
 		case AST_EXPRESSION_BINARY_BITWISE_OR:
 		case AST_EXPRESSION_BINARY_BITWISE_XOR:
-		case AST_EXPRESSION_BINARY_BITWISE_AND:
-		{
+		case AST_EXPRESSION_BINARY_BITWISE_AND: {
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -921,8 +855,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 		} break;
 
 		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
-		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
-		{
+		case AST_EXPRESSION_BINARY_RIGHT_SHIFT: {
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -942,8 +875,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 
 
 		case AST_EXPRESSION_BINARY_AND:
-		case AST_EXPRESSION_BINARY_OR:
-		{
+		case AST_EXPRESSION_BINARY_OR: {
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -961,8 +893,7 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 			binary->type = TYPE_BOOL;
 		} break;
 
-		case AST_EXPRESSION_IF_ELSE:
-		{
+		case AST_EXPRESSION_IF_ELSE: {
 			Ast_Expression_Ternary* ternary = (Ast_Expression_Ternary*)expression;
 			ScanExpression(ternary->left,   scope, module);
 			ScanExpression(ternary->middle, scope, module);
@@ -989,15 +920,13 @@ static void ScanExpression(Ast_Expression* expression, Ast_Scope* scope, Ast_Mod
 
 		case AST_EXPRESSION_CALL: ScanExpressionCall((Ast_Expression_Call*)expression, scope, module); break;
 		
-		case AST_EXPRESSION_LAMBDA:
-		{
+		case AST_EXPRESSION_LAMBDA: {
 			Assert();
 		} break;
 
 		case AST_EXPRESSION_SUBSCRIPT: ScanExpressionSubscript((Ast_Expression_Subscript*)expression, scope, module); break;
 
-		case AST_EXPRESSION_AS:
-		{
+		case AST_EXPRESSION_AS: {
 			Ast_Expression_As* as = (Ast_Expression_As*)expression;
 			ScanExpression(as->expression, scope, module);
 			as->type = GetType(&as->ast_type, scope, module);
@@ -1313,8 +1242,7 @@ static void ScanBranchBlock(Ast_Module* module, Ast_Function* function, Ast_Code
 		branch->code.scope.parent = &code->scope; // @Hack
 
 		switch (branch->kind) {
-			case AST_BRANCH_NAKED:
-			{
+			case AST_BRANCH_NAKED: {
 				branch->code.is_inside_loop = code->is_inside_loop;
 				code->contains_break = code->contains_break || branch->code.contains_break;
 			} break;
@@ -1487,8 +1415,7 @@ static void ScanBinAssignment(Ast_Statement* statement, Ast_Code* code, Ast_Func
 
 		assignment->right = ImplicitCast(assignment->right, TYPE_INT64, module);
 	}
-	else
-	{
+	else {
 		if (!CanCast(CAST_IMPLICIT, assignment->right->type, assignment->left->type))
 			Error(module, assignment->right, "Cannot implicitly cast '%' to '%'.\n", assignment->right->type, assignment->left->type);
 
@@ -1556,8 +1483,7 @@ static void ScanFunction(Ast_Function* function, Ast_Scope* scope, Ast_Module* m
 		if (!function->return_type)
 			Error(module, function->ast_return_type->basetype.token->location, "Unknown type: %\n", function->ast_return_type);
 	}
-	else
-	{
+	else {
 		function->return_type = TYPE_EMPTY_TUPLE;
 	}
 

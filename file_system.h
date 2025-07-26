@@ -1,30 +1,45 @@
 #pragma once
 
+#include "memory.h"
 #include "string.h"
 
-typedef s32 FileHandle;
-typedef s32 DirectoryHandle;
+#include "os.h"
 
-static const FileHandle      NULL_FILE_HANDLE      = -1;
-static const DirectoryHandle NULL_DIRECTORY_HANDLE = -1;
+struct File {
+	OS::FileHandle handle = -1;
 
-static inline bool IsFileHandleValid(FileHandle handle)           { return handle >= 0; }
-static inline bool IsDirectoryHandleValid(DirectoryHandle handle) { return handle >= 0; }
+	File() = default;
+	File(OS::FileHandle handle) : handle(handle) { }
+
+	static File Open(String path);
+	static Array<byte> Load(String path, u64 padding_left = 0, u64 padding_right = 0);
+	static bool DoesExist(String path);
+
+	void Write(byte* data, u64 size);
+	void Write(Array<byte> data);
+	void Read(byte* data, u64 size);
+	void Read(Array<byte> data);
+	u64  Size();
+	bool IsValid() { return handle != OS::INVALID_FILE_HANDLE; }
+	void Close();
+
+};
 
 static const u64 OUTPUT_BUFFER_SIZE = 4096 * 2;
 
 struct OutputBuffer {
-	FileHandle handle;
-	u64 current_index;
+	File file;
+	u64  head;
 	byte data[OUTPUT_BUFFER_SIZE];
+
+	void Flush();
+	void Write(char c);
+	void Write(const char* src, u64 size);
+	void Write(String string);
 };
 
-static const FileHandle UNIX_INPUT_FILE_HANDLE  = 0;
-static const FileHandle UNIX_OUTPUT_FILE_HANDLE = 1;
-static const FileHandle UNIX_ERROR_FILE_HANDLE  = 2;
-
-static OutputBuffer unix_output_buffer { .handle = UNIX_OUTPUT_FILE_HANDLE, .current_index = 0 };
-static OutputBuffer unix_error_buffer  { .handle = UNIX_ERROR_FILE_HANDLE,  .current_index = 0 };
+static OutputBuffer output_buffer { .file = OS::OUTPUT_FILE_HANDLE, .head = 0 };
+static OutputBuffer error_buffer  { .file = OS::ERROR_FILE_HANDLE,  .head = 0 };
 
 enum FileMode {
 	FILE_MODE_OPEN,     // Open an existing file.
@@ -39,24 +54,4 @@ enum FileMode {
 };
 
 
-typedef u32 FileAccessFlags;
-static const FileAccessFlags FILE_ACCESS_READ  = 0x1;
-static const FileAccessFlags FILE_ACCESS_WRITE = 0x2;
-
-static Array<byte> FileLoad(String path, u64 padding_left, u64 padding_right);
-static FileHandle  FileOpen(String path, FileMode mode, FileAccessFlags access_flags);
-static void        FileClose(FileHandle file);
-static bool        FileDoesExist(String path);
-static void        FileRead(FileHandle file, byte* dest, u64 size);
-static void        FileWrite(FileHandle file, const byte* data, u64 size);
-static u64      FileQuerySize(FileHandle file);
-
-static void BufferWriteString(OutputBuffer* buffer, String string);
-static void BufferWriteData(OutputBuffer* buffer, const char* src, u64 size);
-static void BufferWriteByte(OutputBuffer* buffer, byte b);
-static void BufferFlush(OutputBuffer* buffer);
-
-static String GetCurrentDirectoryString();
-static DirectoryHandle OpenDirectory(String path);
-static DirectoryHandle OpenCurrentDirectory();
 

@@ -4,7 +4,7 @@
 #include "parser.h"
 #include "ir.h"
 
-static void Write(OutputBuffer* buffer, char c) { BufferWriteByte(buffer, c); }
+static void Write(OutputBuffer* buffer, char c) { buffer->Write(c); }
 
 static void Write(OutputBuffer* buffer, s8  n)  { Write(buffer, (s64)n); }
 static void Write(OutputBuffer* buffer, s16 n)  { Write(buffer, (s64)n); }
@@ -26,11 +26,11 @@ static void Write(OutputBuffer* buffer, u64 n) {
 		digits[max - count - 1] = '0' + n % 10;
 	} while (++count < max && (n /= 10));
 
-	BufferWriteData(buffer, digits + (max - count), count);
+	buffer->Write(digits + (max - count), count);
 }
 
 static void Write(OutputBuffer* buffer, s64 n) {
-	if (n < 0) { BufferWriteByte(buffer, '-'); n = -n; }
+	if (n < 0) { buffer->Write('-'); n = -n; }
 	Write(buffer, (u64)n);
 }
 
@@ -67,12 +67,12 @@ static void GenericWriteHex(OutputBuffer* buffer, u64 n) {
 	}
 
 	character_buffer[digits] = 'h';
-	BufferWriteData(buffer, character_buffer, digits+1);
+	buffer->Write(character_buffer, digits+1);
 }
 
 static void GenericWriteBin(OutputBuffer* buffer, u64 n) {
 	if (!n) {
-		BufferWriteString(buffer, "0b");
+		buffer->Write("0b");
 		return;
 	}
 
@@ -103,7 +103,7 @@ static void GenericWriteBin(OutputBuffer* buffer, u64 n) {
 	}
 
 	character_buffer[64] = 'b';
-	BufferWriteData(buffer, character_buffer+lz, 65-lz);
+	buffer->Write(character_buffer+lz, 65-lz);
 }
 
 static void Write(OutputBuffer* buffer, IntFormat format) {
@@ -117,10 +117,10 @@ static void Write(OutputBuffer* buffer, IntFormat format) {
 static void Write(OutputBuffer* buffer, String str) {
 	if (!str.data) COLD
 	{
-		BufferWriteString(buffer, "<null-string>");
+		buffer->Write("<null-string>");
 	}
 
-	BufferWriteData(buffer, str.data, str.length);
+	buffer->Write(str.data, str.length);
 }
 
 static void Write(OutputBuffer* buffer, float32 f) {
@@ -130,7 +130,7 @@ static void Write(OutputBuffer* buffer, float32 f) {
 static void Write(OutputBuffer* buffer, float64 f) {
 	// @FixMe: This really isn't that great, but it's good enough for now.
 	Write(buffer, (s64)f);
-	BufferWriteByte(buffer, '.');
+	buffer->Write('.');
 	Write(buffer, (s64)Abs((f-(s64)f) * Pow(10, 9)));
 }
 
@@ -140,7 +140,7 @@ static void Write(OutputBuffer* buffer, Token_Kind kind) {
 
 static void Write(OutputBuffer* buffer, Token* token) {
 	if (!token) {
-		BufferWriteString(buffer, "null");
+		buffer->Write("null");
 		return;
 	}
 
@@ -158,9 +158,9 @@ static void Write(OutputBuffer* buffer, Token token) {
 
 		case TOKEN_LITERAL_STRING:
 		{
-			BufferWriteByte(buffer, '"');
+			buffer->Write('"');
 			Write(buffer, token.literal_string);
-			BufferWriteByte(buffer, '"');
+			buffer->Write('"');
 		} break;
 
 		case TOKEN_LITERAL_INT:
@@ -195,7 +195,7 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 	TypeInfo* info = GetTypeInfo(type);
 
 	if (!type) {
-		BufferWriteString(buffer, "TYPE_NULL");
+		buffer->Write("TYPE_NULL");
 		return;
 	}
 
@@ -203,18 +203,18 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 		case TYPE_PRIMITIVE:
 		{
 			switch (type) {
-				case TYPE_BYTE:    BufferWriteString(buffer, "byte");    break;
-				case TYPE_BOOL:    BufferWriteString(buffer, "bool");    break;
-				case TYPE_UINT8:   BufferWriteString(buffer, "uint8");   break;
-				case TYPE_UINT16:  BufferWriteString(buffer, "uint16");  break;
-				case TYPE_UINT32:  BufferWriteString(buffer, "uint32");  break;
-				case TYPE_UINT64:  BufferWriteString(buffer, "uint64");  break;
-				case TYPE_INT8:    BufferWriteString(buffer, "int8");    break;
-				case TYPE_INT16:   BufferWriteString(buffer, "int16");   break;
-				case TYPE_INT32:   BufferWriteString(buffer, "int32");   break;
-				case TYPE_INT64:   BufferWriteString(buffer, "int64");   break;
-				case TYPE_FLOAT32: BufferWriteString(buffer, "float32"); break;
-				case TYPE_FLOAT64: BufferWriteString(buffer, "float64"); break;
+				case TYPE_BYTE:    buffer->Write("byte");    break;
+				case TYPE_BOOL:    buffer->Write("bool");    break;
+				case TYPE_UINT8:   buffer->Write("uint8");   break;
+				case TYPE_UINT16:  buffer->Write("uint16");  break;
+				case TYPE_UINT32:  buffer->Write("uint32");  break;
+				case TYPE_UINT64:  buffer->Write("uint64");  break;
+				case TYPE_INT8:    buffer->Write("int8");    break;
+				case TYPE_INT16:   buffer->Write("int16");   break;
+				case TYPE_INT32:   buffer->Write("int32");   break;
+				case TYPE_INT64:   buffer->Write("int64");   break;
+				case TYPE_FLOAT32: buffer->Write("float32"); break;
+				case TYPE_FLOAT64: buffer->Write("float64"); break;
 				default: break;
 			}
 		} return;
@@ -222,14 +222,14 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 		case TYPE_TUPLE:
 		{
 			TupleTypeInfo tuple_info = info->tuple_info;
-			BufferWriteByte(buffer, '(');
+			buffer->Write('(');
 
 			for (s32 i = 0; i < tuple_info.count; i++) {
-				if (i) BufferWriteString(buffer, ", ");
+				if (i) buffer->Write(", ");
 				Write(buffer, tuple_info.elements[i]);
 			}
 
-			BufferWriteByte(buffer, ')');
+			buffer->Write(')');
 		} return;
 
 		case TYPE_FUNCTION:
@@ -239,14 +239,14 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 			bool is_input_type_tuple = GetTypeKind(function_info.input) == TYPE_TUPLE;
 
 			if (!is_input_type_tuple)
-				BufferWriteByte(buffer, '(');
+				buffer->Write('(');
 
 			Write(buffer, function_info.input);
 
 			if (!is_input_type_tuple)
-				BufferWriteByte(buffer, ')');
+				buffer->Write(')');
 
-			BufferWriteString(buffer, " -> ");
+			buffer->Write(" -> ");
 
 			Write(buffer, function_info.output);
 		} return;
@@ -255,40 +255,40 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 		{
 			StructTypeInfo struct_info = info->struct_info;
 			Ast_Struct* ast = struct_info.ast;
-			BufferWriteString(buffer, ast->name);
+			buffer->Write(ast->name);
 		} return;
 
 		case TYPE_ENUM:
 		{
 			EnumTypeInfo enum_info = info->enum_info;
 			Ast_Enum* ast = enum_info.ast;
-			BufferWriteString(buffer, ast->name);
+			buffer->Write(ast->name);
 		} return;
 
 		case TYPE_POINTER:
 		{
 			PointerTypeInfo* ptr_info = &info->pointer_info;
-			BufferWriteByte(buffer, '*');
+			buffer->Write('*');
 			Write(buffer, ptr_info->subtype);
 		} return;
 
 		case TYPE_OPTIONAL:
 		{
-			BufferWriteByte(buffer, '?');
+			buffer->Write('?');
 			Write(buffer, info->optional_info.subtype);
 		} return;
 
 		case TYPE_ARRAY:
 		{
-			BufferWriteString(buffer, "[]");
+			buffer->Write("[]");
 			Write(buffer, info->array_info.subtype);
 		} return;
 
 		case TYPE_FIXED_ARRAY:
 		{
-			BufferWriteByte(buffer, '[');
+			buffer->Write('[');
 			Write(buffer, info->fixed_info.length);
-			BufferWriteByte(buffer, ']');
+			buffer->Write(']');
 			Write(buffer, info->fixed_info.subtype);
 		} return;
 	}
@@ -300,20 +300,20 @@ static void Write(OutputBuffer* buffer, Ast_Type& type) {
 
 static void Write(OutputBuffer* buffer, Ast_Type* type) {
 	if (!type) {
-		BufferWriteString(buffer, "null");
+		buffer->Write("null");
 		return;
 	}
 
 	for (Ast_Specifier* specifier = type->specifiers; specifier < type->specifiers.End(); specifier++) {
 		switch (specifier->kind) {
-			case AST_SPECIFIER_POINTER:   BufferWriteString(buffer, "*"); break;
-			case AST_SPECIFIER_OPTIONAL:  BufferWriteString(buffer, "?"); break;
-			case AST_SPECIFIER_ARRAY:     BufferWriteString(buffer, "[]");
+			case AST_SPECIFIER_POINTER:   buffer->Write("*"); break;
+			case AST_SPECIFIER_OPTIONAL:  buffer->Write("?"); break;
+			case AST_SPECIFIER_ARRAY:     buffer->Write("[]");
 			case AST_SPECIFIER_FIXED_ARRAY:
 			{
-				BufferWriteString(buffer, "[");
+				buffer->Write("[");
 				Write(buffer, specifier->size_expression);
-				BufferWriteString(buffer, "]");
+				buffer->Write("]");
 			} break;
 		}
 	}
@@ -324,30 +324,30 @@ static void Write(OutputBuffer* buffer, Ast_Type* type) {
 
 		case AST_BASETYPE_TUPLE:
 		{
-			BufferWriteString(buffer, "(");
+			buffer->Write("(");
 
 			for (Ast_Type* t = type->basetype.tuple; t < type->basetype.tuple.End(); t++) {
-				if (t != type->basetype.tuple) BufferWriteString(buffer, ", ");
+				if (t != type->basetype.tuple) buffer->Write(", ");
 				Write(buffer, t);
 			}
 
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_BASETYPE_FUNCTION:
 		{
-			BufferWriteString(buffer, "(");
+			buffer->Write("(");
 			Write(buffer, type->basetype.function.input);
-			BufferWriteString(buffer, ") -> (");
+			buffer->Write(") -> (");
 			Write(buffer, type->basetype.function.output);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 	}
 }
 
 static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 	if (!expression) {
-		BufferWriteString(buffer, "null");
+		buffer->Write("null");
 		return;
 	}
 
@@ -355,81 +355,81 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 		case AST_EXPRESSION_TERMINAL_VARIABLE:
 		{
 			Ast_Expression_Variable* variable = (Ast_Expression_Variable*)expression;
-			BufferWriteString(buffer, "(Variable: ");
+			buffer->Write("(Variable: ");
 			Write(buffer, variable->token);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_FUNCTION:
 		{
 			Ast_Expression_Function* function = (Ast_Expression_Function*)expression;
-			BufferWriteString(buffer, "(Function: ");
+			buffer->Write("(Function: ");
 			Write(buffer, function->token);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_INTRINSIC:
 		{
 			Ast_Expression_Intrinsic* intrinsic = (Ast_Expression_Intrinsic*)expression;
-			BufferWriteString(buffer, "(Intrinsic: ");
+			buffer->Write("(Intrinsic: ");
 			Write(buffer, intrinsic->token);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_STRUCT:
 		{
 			Ast_Expression_Struct* structure = (Ast_Expression_Struct*)expression;
-			BufferWriteString(buffer, "(Struct: ");
+			buffer->Write("(Struct: ");
 			Write(buffer, structure->token);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_ENUM:
 		{
 			Ast_Expression_Enum* enumeration = (Ast_Expression_Enum*)expression;
-			BufferWriteString(buffer, "(Enum: ");
+			buffer->Write("(Enum: ");
 			Write(buffer, enumeration->token);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER:
 		{
 			Ast_Expression_Struct_Member* member = (Ast_Expression_Struct_Member*)expression;
-			BufferWriteString(buffer, "(Struct_Member: ");
+			buffer->Write("(Struct_Member: ");
 			Write(buffer, member->token);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER:
 		{
 			Ast_Expression_Enum_Member* member = (Ast_Expression_Enum_Member*)expression;
-			BufferWriteString(buffer, "(Enum_Member: ");
+			buffer->Write("(Enum_Member: ");
 			Write(buffer, member->token);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_ARRAY:
 		{
 			Ast_Expression_Array* array = (Ast_Expression_Array*)expression;
-			BufferWriteString(buffer, "[ ");
+			buffer->Write("[ ");
 			Write(buffer, array->left);
-			BufferWriteString(buffer, " .. ");
+			buffer->Write(" .. ");
 			Write(buffer, array->right);
-			BufferWriteString(buffer, " ]");
+			buffer->Write(" ]");
 		}
 		case AST_EXPRESSION_FIXED_ARRAY:
 		{
 			Ast_Expression_Fixed_Array* fixed_array = (Ast_Expression_Fixed_Array*)expression;
 
-			BufferWriteString(buffer, "{ ");
+			buffer->Write("{ ");
 
 			for (u32 i = 0; i < fixed_array->elements.length; i++) {
-				if (!i) BufferWriteString(buffer, ", ");
+				if (!i) buffer->Write(", ");
 
 				Write(buffer, fixed_array->elements[i]);
 			}
 
-			BufferWriteString(buffer, " }");
+			buffer->Write(" }");
 		} break;
 
 		case AST_EXPRESSION_TERMINAL_NAME:
@@ -464,13 +464,13 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 		case AST_EXPRESSION_BINARY_OR:
 		{
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
-			BufferWriteString(buffer, "(");
+			buffer->Write("(");
 			Write(buffer, binary->left);
-			BufferWriteString(buffer, " ");
+			buffer->Write(" ");
 			Write(buffer, binary->op);
-			BufferWriteString(buffer, " ");
+			buffer->Write(" ");
 			Write(buffer, binary->right);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_UNARY_REFERENCE_OF:
@@ -481,20 +481,20 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 		case AST_EXPRESSION_UNARY_NOT:
 		{
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
-			BufferWriteString(buffer, "(");
+			buffer->Write("(");
 			Write(buffer, unary->op);
-			BufferWriteString(buffer, " ");
+			buffer->Write(" ");
 			Write(buffer, unary->subexpression);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_SUBSCRIPT:
 		{
 			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
 			Write(buffer, subscript->array);
-			BufferWriteString(buffer, "[");
+			buffer->Write("[");
 			Write(buffer, subscript->index);
-			BufferWriteString(buffer, "]");
+			buffer->Write("]");
 		} break;
 
 		case AST_EXPRESSION_DOT_CALL:
@@ -503,9 +503,9 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
 			Write(buffer, call->function);
 			if (call->parameters->kind != AST_EXPRESSION_TUPLE) {
-				BufferWriteString(buffer, "(");
+				buffer->Write("(");
 				Write(buffer, call->parameters);
-				BufferWriteString(buffer, ")");
+				buffer->Write(")");
 			}
 			else
 			{
@@ -516,50 +516,50 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 		case AST_EXPRESSION_TUPLE:
 		{
 			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
-			BufferWriteString(buffer, "(");
+			buffer->Write("(");
 			for (u32 i = 0; i < tuple->elements.length; i++) {
-				if (i) BufferWriteString(buffer, ", ");
+				if (i) buffer->Write(", ");
 				Write(buffer, tuple->elements[i]);
 			}
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_IF_ELSE:
 		{
 			Ast_Expression_Ternary* ternary = (Ast_Expression_Ternary*)expression;
-			BufferWriteString(buffer, "(");
+			buffer->Write("(");
 			Write(buffer, ternary->left);
-			BufferWriteString(buffer, " if ");
+			buffer->Write(" if ");
 			Write(buffer, ternary->middle);
-			BufferWriteString(buffer, " else ");
+			buffer->Write(" else ");
 			Write(buffer, ternary->right);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_AS:
 		{
 			Ast_Expression_As* as = (Ast_Expression_As*)expression;
 
-			BufferWriteString(buffer, "(");
+			buffer->Write("(");
 			Write(buffer, as->expression);
-			BufferWriteString(buffer, " as ");
+			buffer->Write(" as ");
 			Write(buffer, as->type);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_IMPLICIT_CAST:
 		{
 			Ast_Expression_Implicit_Cast* cast = (Ast_Expression_Implicit_Cast*)expression;
-			BufferWriteString(buffer, "(Implicit_Cast: ");
+			buffer->Write("(Implicit_Cast: ");
 			Write(buffer, cast->type);
-			BufferWriteString(buffer, ", ");
+			buffer->Write(", ");
 			Write(buffer, cast->subexpression);
-			BufferWriteString(buffer, ")");
+			buffer->Write(")");
 		} break;
 
 		case AST_EXPRESSION_LAMBDA:
 		{
-			BufferWriteString(buffer, "(LAMBDA)");
+			buffer->Write("(LAMBDA)");
 		} break;
 	}
 }
@@ -571,11 +571,11 @@ static void Write(OutputBuffer* buffer, OpCode kind) {
 static void WriteGenericName(OutputBuffer* buffer, Instruction* instruction) {
 	switch (instruction->opcode) {
 		case IR_STACK:
-			BufferWriteString(buffer, "s");
+			buffer->Write("s");
 			break;
 
 		default:
-			BufferWriteString(buffer, "i");
+			buffer->Write("i");
 			break;
 	}
 
@@ -584,7 +584,7 @@ static void WriteGenericName(OutputBuffer* buffer, Instruction* instruction) {
 
 static void Write(OutputBuffer* buffer, Value value) {
 	if (value.kind == IR_NONE) {
-		BufferWriteString(buffer, "IR_NONE");
+		buffer->Write("IR_NONE");
 		return;
 	}
 
@@ -610,15 +610,15 @@ static void Write(OutputBuffer* buffer, Value value) {
 
 static void Write(OutputBuffer* buffer, Instruction* instruction) {
 	if (!instruction) {
-		BufferWriteString(buffer, "null\n");
+		buffer->Write("null\n");
 		return;
 	}
 
-	BufferWriteString(buffer, "  ");
+	buffer->Write("  ");
 
 	if (instruction->DoesReturn()) {
 		WriteGenericName(buffer, instruction);
-		BufferWriteString(buffer, " = ");
+		buffer->Write(" = ");
 	}
 
 	Write(buffer, instruction->opcode);
@@ -630,7 +630,7 @@ static void Write(OutputBuffer* buffer, Instruction* instruction) {
 		default:
 		{
 			for (u32 i = 0; i < num_ops; i++) {
-				if (i) BufferWriteString(buffer, ", ");
+				if (i) buffer->Write(", ");
 				Write(buffer, instruction->ops[i]);
 			}
 		} break;
@@ -639,7 +639,7 @@ static void Write(OutputBuffer* buffer, Instruction* instruction) {
 		{
 			for (u32 i = 0; i < num_ops; i++) {
 				PhiEntry* entry = &instruction->entries[i];
-				if (i) BufferWriteString(buffer, ", ");
+				if (i) buffer->Write(", ");
 				Print(buffer, "[%: %]", entry->block, entry->value);
 			}
 		} break;
@@ -649,21 +649,21 @@ static void Write(OutputBuffer* buffer, Instruction* instruction) {
 
 	if (verbose) {
 		if (instruction->type) {
-			BufferWriteString(buffer, " | ");
+			buffer->Write(" | ");
 			Write(buffer, instruction->type);
 		}
 
 		if (instruction->users.count) {
-			BufferWriteString(buffer, " |  ");
+			buffer->Write(" |  ");
 
 			for (u32 j = 0; j < instruction->users.count; j++) {
-				if (j) BufferWriteString(buffer, ", ");
+				if (j) buffer->Write(", ");
 				Write(buffer, instruction->users[j]);
 			}
 		}
 	}
 
-	BufferWriteString(buffer, "\n");
+	buffer->Write("\n");
 }
 
 static void Write(OutputBuffer* buffer, Block* block) {

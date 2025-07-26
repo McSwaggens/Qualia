@@ -1,5 +1,6 @@
 #include "assert.h"
 
+#include "os.h"
 #include "print.h"
 #include "string.h"
 
@@ -13,6 +14,9 @@ static void Assert(bool b, const char* desc, InternalLocation loc) {
 		Print("%:%: error: %\n", ToString(loc.file), loc.line, ToString(desc));
 
 	DebugBreak();
-	ExitProcess(false);
+
+	output_buffer.Flush();
+	error_buffer.Flush();
+	OS::Terminate(false);
 }
 

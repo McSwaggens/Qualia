@@ -1,22 +1,37 @@
-qualia_xxx: *.cc *.h *.asm
-	mkdir -p bin
+DEBUG   = -DDEBUG -O0 -ggdb
+RELEASE = -O3
 
-	# nasm -felf64 linux_bootstrap.asm -o linux_bootstrap.o
+OS_NAME := $(shell uname)
+
+IS_MACOS := 0
+IS_LINUX := 0
+OS_FILE :=
+
+ifeq ($(OS_NAME), Darwin)
+	IS_MACOS=1
+	OS_FILE=macos
+endif
+
+ifeq ($(OS_NAME), Linux)
+	IS_LINUX=1
+	OS_FILE=linux
+	RELEASE+=-march=x86-64-v3
+endif
+
+FLAGS := $(DEBUG)
+FLAGS += -std=c++23
+FLAGS += -nostdinc++ -fno-rtti -fno-exceptions -Wno-vla-cxx-extension
+FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wno-all
+FLAGS += -MJ compile_commands.json
+
+qualia_xxx: *.cc *.h $(OS_FILE).o general.o
+	clang -lm $(FLAGS) qualia.cc $(OS_FILE).o general.o -o qualia
+
+$(OS_FILE).o: $(OS_FILE).cc
+	clang $(FLAGS) -c $^ -o $@
+
+general.o: general.asm
 	nasm -felf64 general.asm -o general.o
-
-	clang -o qualia \
-		-march=znver3 \
-		-std=c++20 -Wno-c99-designator -Wno-reorder-init-list \
-		-nostdinc -nostdinc++ \
-		-fno-rtti -fno-exceptions -Wno-vla-cxx-extension \
-		-Wno-all \
-		qualia.cc general.o -lm \
-		-O0 -ggdb -DDEBUG -MJ compile_commands.json
-		# -O3
-		# -ggdb -g3 -fno-omit-frame-pointer -DDEBUG
-		# -fno-stack-protector\
-		# -nostdlib\
-		# -O3 -DDEBUG -Og 
 
 run: qualia_xxx
 	./qualia

@@ -42,14 +42,14 @@ static void Write(OutputBuffer* buffer, List<T> list) {
 
 template<typename T>
 static void Write(OutputBuffer* buffer, Array<T> array) {
-	BufferWriteString(buffer, "{ ");
+	buffer->Write("{ ");
 
 	for (u64 i = 0; i < array.count; i++) {
-		if (i != 0) BufferWriteString(buffer, ", ");
+		if (i != 0) buffer->Write(", ");
 		Write(buffer, array[i]);
 	}
 
-	BufferWriteString(buffer, " }");
+	buffer->Write(" }");
 }
 
 template<typename ...Args>
@@ -60,11 +60,11 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args) {
 	auto internal_print = [=, &p]<typename T>(T&& t) {
 		char* start = p;
 
-		while (p < end && *p != '%') p++;
+		while (p < end && *p != '%')
+			p++;
 
-		if (start != p) {
-			BufferWriteData(buffer, start, p-start);
-		}
+		if (start != p)
+			buffer->Write(start, p-start);
 
 		if (p < end) {
 			Write(buffer, t);
@@ -74,18 +74,17 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args) {
 
 	(internal_print(args),...);
 
-	if (p < end) {
-		BufferWriteData(buffer, p, end - p);
-	}
+	if (p < end)
+		buffer->Write(p, end - p);
 }
 
 template<typename ...Args>
 static void Print(String format, Args&&... args) {
-	Print(&unix_output_buffer, format, args...);
+	Print(&output_buffer, format, args...);
 }
 
 static void Write(OutputBuffer* buffer, bool b) {
-	if (b) BufferWriteString(buffer, "true");
-	else   BufferWriteString(buffer, "false");
+	if (b) buffer->Write("true");
+	else   buffer->Write("false");
 }
 

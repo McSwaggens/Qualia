@@ -335,8 +335,7 @@ struct Ast_Branch {
 	Ast_Branch_Clause_Kind clause;
 	Block* entry_block;
 
-	union
-	{
+	union {
 		Ast_Expression* if_condition;
 		Ast_Expression* while_condition;
 		Ast_Branch_For_Range for_range;
@@ -398,7 +397,6 @@ struct Ast_Variable {
 	Ast_Type* ast_type;
 	Ast_Expression* assignment;
 	Value ir_stack;
-	u64 offset; // @RemoveMe?
 	// @Todo: Add span
 	Ast_Variable() = default;
 };
@@ -410,10 +408,6 @@ struct StackFrame
 	bool do_return;
 	bool do_break;
 };
-
-static inline char* StackFrameGetVariable(StackFrame* frame, Ast_Variable* variable) {
-	return frame->data + variable->offset;
-}
 
 struct Ast_Assignment {
 	Token* token;

@@ -4,19 +4,12 @@
 #include "general.h"
 #include "array.h"
 
+// @cleanme Move Allocators into separate file(s)
+// @cleanme Move other functions into general.h?
+
 // ------------------------------------------- //
 
-enum PageFlags
-{
-	PAGE_FLAG_WRITE   = 0x01,
-	PAGE_FLAG_EXECUTE = 0x02,
-	PAGE_FLAG_STACK   = 0x04,
-};
-
 static void InitGlobalArena();
-
-static byte* AllocateVirtualPage(u64 size, PageFlags flags);
-static void  DeAllocateVirtualPage(byte* page, u64 size);
 
 // ------------------------------------------- //
 
@@ -93,21 +86,26 @@ static Array<T> StackAllocateArray(Stack* stack, u64 count) {
 
 // ------------------------------------------- //
 
+// @cleanme Change to Copy
 template<typename T>
 static void CopyMemory(T* dest, const T* src, u64 count = 1) {
 	__builtin_memcpy(dest, src, sizeof(T) * count);
 }
 
+// @cleanme Change to Fill
 template<typename T>
 static void FillMemory(T* dest, u64 count, T value) {
 	for (u64 i = 0; i < count; i++) dest[i] = value;
 }
 
+// @cleanme Change to Fill
 template<typename T>
 static void FillMemory(T* begin, T* end, T value) {
 	for (; begin < end; begin++) *begin = value;
 }
 
+// @cleanme Change to Compare
+// @cleanme return int? Or maybe use <=> operator now?
 template<typename T>
 static inline bool CompareMemory(const T* a, const T* b, u64 count = 1) {
 	return __builtin_memcmp(a, b, sizeof(T) * count) == 0;

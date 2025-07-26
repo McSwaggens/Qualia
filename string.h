@@ -19,20 +19,36 @@ struct String {
 	template<u64 N>
 	constexpr String(const char (&s)[N]) : data(const_cast<char*>(s)), length(N-1), capacity(0) { }
 
-	constexpr char* Begin() { return data; }
-	constexpr char* End()   { return data + length; }
-	constexpr const char* Begin() const { return data; }
-	constexpr const char* End()   const { return data + length; }
+	constexpr  operator       char*() { return data; }
+	constexpr  operator const char*() const { return data; }
 
-	constexpr char* begin() { return data; }
-	constexpr char* end()   { return data + length; }
+	constexpr       char* Begin()       { return data; }
+	constexpr const char* Begin() const { return data; }
+
+	constexpr       char* End()       { return data + length; }
+	constexpr const char* End() const { return data + length; }
+
+	constexpr       char* begin()       { return data; }
 	constexpr const char* begin() const { return data; }
-	constexpr const char* end()   const { return data + length; }
+
+	constexpr       char* end()       { return data + length; }
+	constexpr const char* end() const { return data + length; }
 
 	constexpr operator bool() const { return length != 0; }
 
 	char& operator[](u32 n)       { Assert(n < length); return data[n]; }
 	char  operator[](u32 n) const { Assert(n < length); return data[n]; }
+
+	template<u64 N>
+	constexpr bool operator ==(const char (&s)[N]) {
+		if (length != N-1)
+			return false;
+
+		if (!CompareMemory(data, s, N-1))
+			return false;
+
+		return true;
+	}
 
 	constexpr bool operator ==(String o) {
 		if (length != o.length)
@@ -100,6 +116,10 @@ struct String {
 		String copy = String(Allocate<char>(length), length, capacity);
 		CopyMemory(copy.data, data, length);
 		return copy;
+	}
+
+	void Copy(char* out) {
+		CopyMemory(out, data, length);
 	}
 
 	void Free() {

@@ -15,11 +15,11 @@ void OS::Terminate(bool success) {
 byte* OS::AllocateVirtualMemory(u64 size, PageFlags flags) {
 	u64 protection = PROT_READ; // Pages are always readable on x86.
 	if (flags & PAGE_FLAG_WRITE)   protection |= PROT_WRITE;
-	if (flags & PAGE_FLAG_STACK)   protection |= PROT_GROWSDOWN;
+	// if (flags & PAGE_FLAG_STACK)   protection |= PROT_GROWSDOWN;
 	if (flags & PAGE_FLAG_EXECUTE) protection |= PROT_EXEC;
 
 	u64 mflags = MAP_ANONYMOUS | MAP_PRIVATE;
-	if (flags & PAGE_FLAG_STACK) protection |= PROT_GROWSDOWN;
+	// if (flags & PAGE_FLAG_STACK) protection |= PROT_GROWSDOWN;
 
 	byte* page = (byte*)mmap(0, size, protection, mflags, -1, 0);
 

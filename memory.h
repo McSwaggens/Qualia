@@ -48,44 +48,6 @@ static inline Array<T> AllocateArray(u64 count) {
 
 // ------------------------------------------- //
 
-struct Stack_Block
-{
-	Stack_Block* previous;
-	u64 size;
-	char data[];
-};
-
-struct Stack
-{
-	Stack_Block* block;
-	byte* head;
-	byte* end;
-};
-
-static Stack CreateStack(u64 size);
-static void  FreeStack(Stack* stack);
-static void* StackAllocate(Stack* stack, u64 size);
-
-template<typename T>
-static inline T* StackAllocate(Stack* stack) {
-	return (T*)StackAllocate(stack, sizeof(T));
-}
-
-template<typename T>
-static inline T* StackAllocate(Stack* stack, u64 count) {
-	return (T*)StackAllocate(stack, count * sizeof(T));
-}
-
-template<typename T>
-static Array<T> StackAllocateArray(Stack* stack, u64 count) {
-	Array<T> array;
-	array.data = count ? StackAllocate<T>(stack, count) : null;
-	array.count = count;
-	return array;
-}
-
-// ------------------------------------------- //
-
 // @cleanme Change to Copy
 template<typename T>
 static void CopyMemory(T* dest, const T* src, u64 count = 1) {

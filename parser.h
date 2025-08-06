@@ -70,7 +70,7 @@ struct Ast_BaseType {
 };
 
 struct Ast_Type {
-	Array<Ast_Specifier> specifiers;
+	Array<Ast_Specifier> specifiers = { };
 	Ast_BaseType basetype;
 };
 
@@ -333,7 +333,7 @@ struct Ast_Branch_For_Verbose {
 struct Ast_Branch {
 	Ast_Branch_Kind kind;
 	Ast_Branch_Clause_Kind clause;
-	Block* entry_block;
+	// Block* entry_block;
 
 	union {
 		Ast_Expression* if_condition;
@@ -396,7 +396,7 @@ struct Ast_Variable {
 	TypeID type;
 	Ast_Type* ast_type;
 	Ast_Expression* assignment;
-	Value ir_stack;
+	// Value ir_stack;
 	// @Todo: Add span
 	Ast_Variable() = default;
 };
@@ -440,7 +440,7 @@ struct Ast_Function {
 	TypeID return_type;
 	List<Ast_Return*> returns; // @Todo: Infer return type.
 	Ast_Type* ast_return_type;
-	Procedure* procedure;
+	// Procedure* procedure;
 	bool is_pure;
 	bool is_global;
 };
@@ -456,7 +456,7 @@ struct Ast_Struct_Member {
 	String name;
 	Token* name_token;
 	TypeID type;
-	Ast_Type ast_type;
+	Ast_Type ast_type = { };
 	u64 offset;
 	u32 index;
 };

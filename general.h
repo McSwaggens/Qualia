@@ -33,51 +33,11 @@ static inline void Assume(bool b) { __builtin_assume(b); }
 #define GetInternalColumnNumber() __builtin_COLUMN()
 
 template<typename T>
-static inline T Abs(T n) { return n >= 0 ? n : -n; }
-
-template<typename T>
 static inline void Swap(T* a, T* b) {
 	T tmp = *a;
 	*a = *b;
 	*b = tmp;
 }
-
-static inline s8  Min(s8 a,  s8 b)        { return a <= b ? a : b; }
-static inline s16 Min(s16 a, s16 b)       { return a <= b ? a : b; }
-static inline s32 Min(s32 a, s32 b)       { return a <= b ? a : b; }
-static inline s64 Min(s64 a, s64 b)       { return a <= b ? a : b; }
-
-static inline u8  Min(u8 a,  u8 b)     { return a <= b ? a : b; }
-static inline u16 Min(u16 a, u16 b)    { return a <= b ? a : b; }
-static inline u32 Min(u32 a, u32 b)    { return a <= b ? a : b; }
-static inline u64 Min(u64 a, u64 b)    { return a <= b ? a : b; }
-
-static inline float32 Min(float32 a, float32 b) { return a <= b ? a : b; }
-static inline float64 Min(float64 a, float64 b) { return a <= b ? a : b; }
-
-static inline s8  Max(s8 a,  s8 b)        { return a <= b ? a : b; }
-static inline s16 Max(s16 a, s16 b)       { return a <= b ? a : b; }
-static inline s32 Max(s32 a, s32 b)       { return a <= b ? a : b; }
-static inline s64 Max(s64 a, s64 b)       { return a <= b ? a : b; }
-
-static inline u8  Max(u8 a,  u8 b)     { return a <= b ? a : b; }
-static inline u16 Max(u16 a, u16 b)    { return a <= b ? a : b; }
-static inline u32 Max(u32 a, u32 b)    { return a <= b ? a : b; }
-static inline u64 Max(u64 a, u64 b)    { return a <= b ? a : b; }
-
-static inline float32 Max(float32 a, float32 b) { return a <= b ? a : b; }
-static inline float64 Max(float64 a, float64 b) { return a <= b ? a : b; }
-
-template<typename T>
-static inline T Clamp(T v, T min, T max) { return v < min ? min : v > max ? max : v; }
-
-static double Pow(double base, double exponent) { return __builtin_powl(base, exponent); } // @Bug @FixMe: This isn't correct.
-static float  Pow(float  base, float  exponent) { return __builtin_powl(base, exponent); } // @Bug @FixMe: This isn't correct.
-
-static u64 Pow(u64 base, u64 exponent) { return __builtin_powl(base, exponent); }
-static s64 Pow(s64 base, s64 exponent) { return __builtin_powl(base, exponent); }
-static u32 Pow(u32 base, u32 exponent) { return __builtin_powl(base, exponent); }
-static s32 Pow(s32 base, s32 exponent) { return __builtin_powl(base, exponent); }
 
 static u64 MaskLowerBits64(u64 n, u64 bits)   { return n & (-1 >> (sizeof(n) * 8 - bits)); }
 static u64 MaskUpperBits64(u64 n, u64 bits)   { return n >> (sizeof(n) * 8 - bits); }

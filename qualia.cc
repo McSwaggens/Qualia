@@ -27,25 +27,27 @@ static void CompileFile(String file_path) {
 	}
 
 	Stack stack = CreateStack(1 << 21);
-	Ast_Module* module = StackAllocate<Ast_Module>(&stack);
+	Ast_Module* module = stack.Allocate<Ast_Module>();
 	ZeroMemory(module);
 
 	modules.Add(module);
 
-	module->stack = stack;
-	module->file_path = file_path;
-	module->name = file_path; // @FixMe
+	*module = {
+		.stack = stack,
+		.file_path = file_path,
+		.name = file_path, // @FixMe get the real name
+	};
 
 	LexerParse(module);
 	ParseGlobalScope(module);
 	SemanticParse(module);
-	GenerateIR(module);
 }
 
 int main(int argc, char** args) {
 	InitGlobalArena();
 	InitTypeSystem();
 	InitIntrinsics();
+	IR::Init();
 
 	// @Todo: Process user args.
 	// @Todo: Find files in current directory or the directory that the user specified.

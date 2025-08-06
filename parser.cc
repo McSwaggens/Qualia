@@ -454,7 +454,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 	Token* begin = token;
 
 	if (IsUnaryOperator(token->kind)) {
-		Ast_Expression_Unary* unary = StackAllocate<Ast_Expression_Unary>(&module->stack);
+		Ast_Expression_Unary* unary = module->stack.Allocate<Ast_Expression_Unary>();
 		ZeroMemory(unary);
 
 		switch (token->kind) {
@@ -475,7 +475,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 		left = unary;
 	}
 	else if (IsLiteral(token->kind)) {
-		Ast_Expression_Literal* literal = StackAllocate<Ast_Expression_Literal>(&module->stack);
+		Ast_Expression_Literal* literal = module->stack.Allocate<Ast_Expression_Literal>();
 		ZeroMemory(literal);
 		literal->kind  = AST_EXPRESSION_TERMINAL_LITERAL;
 		literal->flags |= AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | AST_EXPRESSION_FLAG_PURE;
@@ -484,7 +484,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 		left = literal;
 	}
 	else if (IsIdentifier(token->kind)) {
-		Ast_Expression_Terminal* term = StackAllocate<Ast_Expression_Terminal>(&module->stack);
+		Ast_Expression_Terminal* term = module->stack.Allocate<Ast_Expression_Terminal>();
 		ZeroMemory(term);
 		term->kind = AST_EXPRESSION_TERMINAL_NAME;
 		term->token = token;
@@ -494,7 +494,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 	else if (token->kind == TOKEN_OPEN_BRACKET) {
 		Token* closure = token->closure;
 
-		Ast_Expression_Array* array = StackAllocate<Ast_Expression_Array>(&module->stack);
+		Ast_Expression_Array* array = module->stack.Allocate<Ast_Expression_Array>();
 		ZeroMemory(array);
 
 		array->kind = AST_EXPRESSION_ARRAY;
@@ -527,7 +527,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 		left = array;
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN) {
-		Ast_Expression_Tuple* tuple = StackAllocate<Ast_Expression_Tuple>(&module->stack);
+		Ast_Expression_Tuple* tuple = module->stack.Allocate<Ast_Expression_Tuple>();
 		ZeroMemory(tuple);
 
 		Token* closure = token->closure;
@@ -560,7 +560,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 		left = tuple;
 	}
 	else if (token->kind == TOKEN_OPEN_BRACE) {
-		Ast_Expression_Fixed_Array* fixed_array = StackAllocate<Ast_Expression_Fixed_Array>(&module->stack);
+		Ast_Expression_Fixed_Array* fixed_array = module->stack.Allocate<Ast_Expression_Fixed_Array>();
 		ZeroMemory(fixed_array);
 
 		fixed_array->kind = AST_EXPRESSION_FIXED_ARRAY;
@@ -606,7 +606,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 	while (CanTakeNextOp(token, assignment_break, parent_precedence) && IsCorrectScope(token, indent)) {
 		// @Indent does unary operators need to be treated differently? (Error check)
 		if (token->kind == TOKEN_IF) {
-			Ast_Expression_Ternary* if_else = StackAllocate<Ast_Expression_Ternary>(&module->stack);
+			Ast_Expression_Ternary* if_else = module->stack.Allocate<Ast_Expression_Ternary>();
 			ZeroMemory(if_else);
 
 			if_else->kind = AST_EXPRESSION_IF_ELSE;
@@ -628,7 +628,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 			left = if_else;
 		}
 		else if (token->kind == TOKEN_AS) {
-			Ast_Expression_As* as = StackAllocate<Ast_Expression_As>(&module->stack);
+			Ast_Expression_As* as = module->stack.Allocate<Ast_Expression_As>();
 			ZeroMemory(as);
 
 			CheckScope(token, indent, module);
@@ -641,7 +641,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 			left = as;
 		}
 		else if (token->kind == TOKEN_OPEN_PAREN) {
-			Ast_Expression_Call* call = StackAllocate<Ast_Expression_Call>(&module->stack);
+			Ast_Expression_Call* call = module->stack.Allocate<Ast_Expression_Call>();
 			ZeroMemory(call);
 
 			Token* open = token;
@@ -661,7 +661,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 			Token* open = token++;
 			Token* closure = open->closure;
 
-			Ast_Expression_Subscript* subscript = StackAllocate<Ast_Expression_Subscript>(&module->stack);
+			Ast_Expression_Subscript* subscript = module->stack.Allocate<Ast_Expression_Subscript>();
 			ZeroMemory(subscript);
 
 			subscript->kind  = AST_EXPRESSION_SUBSCRIPT;
@@ -684,7 +684,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 		else
 		{
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
-			Ast_Expression_Binary* binary = StackAllocate<Ast_Expression_Binary>(&module->stack);
+			Ast_Expression_Binary* binary = module->stack.Allocate<Ast_Expression_Binary>();
 			ZeroMemory(binary);
 
 			switch (token->kind) {
@@ -749,8 +749,7 @@ static Token* GetEndOfTypeIfValid(Token* token) {
 }
 
 static Ast_Type ParseType(Token*& token, u32 indent, Ast_Module* module) {
-	Ast_Type type;
-	ZeroMemory(&type);
+	Ast_Type type = { };
 
 	ArrayBuffer<Ast_Specifier> specifiers = CreateArrayBuffer<Ast_Specifier>();
 
@@ -834,7 +833,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Ast_Module* module) {
 		}
 		else
 		{
-			type.basetype.function.input = StackAllocate<Ast_Type>(&module->stack);
+			type.basetype.function.input = module->stack.Allocate<Ast_Type>();
 			ZeroMemory(type.basetype.function.input);
 			type.basetype.function.input->basetype.kind = AST_BASETYPE_TUPLE;
 			type.basetype.function.input->basetype.tuple = params.ToArray();
@@ -847,7 +846,7 @@ static Ast_Type ParseType(Token*& token, u32 indent, Ast_Module* module) {
 		}
 		else
 		{
-			type.basetype.function.output = StackAllocate<Ast_Type>(&module->stack);
+			type.basetype.function.output = module->stack.Allocate<Ast_Type>();
 			*type.basetype.function.output = ParseType(token, indent, module);
 		}
 
@@ -920,7 +919,7 @@ static void ParseParameters(Ast_Function* function, Token* open_paren, u32 inden
 		CheckScope(token, indent+1, module);
 		token += 1;
 
-		param.ast_type = StackAllocate<Ast_Type>(&module->stack);
+		param.ast_type = module->stack.Allocate<Ast_Type>();
 		*param.ast_type = ParseType(token, indent+2, module);
 
 		params.Add(param);
@@ -998,7 +997,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Ast_Module* m
 				if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_IN) {
 					branch.kind = AST_BRANCH_FOR_RANGE;
 
-					Ast_Variable* iterator = StackAllocate<Ast_Variable>(&module->stack);
+					Ast_Variable* iterator = module->stack.Allocate<Ast_Variable>();
 					ZeroMemory(iterator);
 					iterator->name_token = token;
 					iterator->name = token->identifier_string;
@@ -1025,7 +1024,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Ast_Module* m
 				else if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON) {
 					branch.kind = AST_BRANCH_FOR_VERBOSE;
 
-					Ast_Variable* variable = StackAllocate<Ast_Variable>(&module->stack);
+					Ast_Variable* variable = module->stack.Allocate<Ast_Variable>();
 					ZeroMemory(variable);
 
 					variable->name_token = token;
@@ -1039,7 +1038,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Ast_Module* m
 
 					if (token->kind != TOKEN_EQUAL) {
 						CheckScope(token, indent+1, module);
-						variable->ast_type = StackAllocate<Ast_Type>(&module->stack);
+						variable->ast_type = module->stack.Allocate<Ast_Type>();
 						*variable->ast_type = ParseType(token, indent, module);
 					}
 
@@ -1132,7 +1131,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Ast_Module* modul
 
 		if (token->kind != TOKEN_EQUAL) {
 			CheckScope(token, indent+1, module);
-			statement.variable_declaration.ast_type = StackAllocate<Ast_Type>(&module->stack);
+			statement.variable_declaration.ast_type = module->stack.Allocate<Ast_Type>();
 			*statement.variable_declaration.ast_type = ParseType(token, indent+1, module);
 		}
 
@@ -1303,11 +1302,11 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Ast_Module* module) {
 }
 
 static Ast_Function ParseFunction(Token*& token, u32 indent, Ast_Module* module) {
-	Ast_Function function;
-	ZeroMemory(&function);
-	function.name = token->identifier_string;
-	function.name_token = token;
-	function.procedure = MakeProcedure(function.name);
+	Ast_Function function = {
+		.name       = token->identifier_string,
+		.name_token = token,
+	};
+
 	token += 1;
 	ParseParameters(&function, token, indent, module);
 	token = token->closure+1;
@@ -1318,7 +1317,7 @@ static Ast_Function ParseFunction(Token*& token, u32 indent, Ast_Module* module)
 	if (token->kind == TOKEN_ARROW) {
 		CheckScope(token, indent+1, module);
 		token += 1;
-		function.ast_return_type = StackAllocate<Ast_Type>(&module->stack);
+		function.ast_return_type = module->stack.Allocate<Ast_Type>();
 		*function.ast_return_type = ParseType(token, indent, module);
 	}
 

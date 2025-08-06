@@ -223,7 +223,7 @@ static Ast_Expression* ImplicitCast(Ast_Expression* expression, TypeID type, Ast
 	if (expression->type == type)
 		return expression;
 
-	Ast_Expression_Implicit_Cast* cast = StackAllocate<Ast_Expression_Implicit_Cast>(&module->stack);
+	Ast_Expression_Implicit_Cast* cast = module->stack.Allocate<Ast_Expression_Implicit_Cast>();
 	cast->kind = AST_EXPRESSION_IMPLICIT_CAST;
 	cast->subexpression = expression;
 	cast->type  = type;

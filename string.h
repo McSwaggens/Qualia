@@ -135,10 +135,6 @@ static inline String AllocateString(u64 length, u64 extra_capacity) {
 	return String(Allocate<char>(length+extra_capacity), length, length+extra_capacity);
 }
 
-static inline String StackAllocateString(Stack* stack, u64 length) {
-	return String(StackAllocate<char>(stack, length), length, 0);
-}
-
 template<u64 N>
 static inline bool CompareStringRaw(const char* a, const char (&b)[N]) {
 	return CompareMemory(a, b, N-1);

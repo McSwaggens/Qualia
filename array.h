@@ -4,8 +4,8 @@
 
 template<typename T>
 struct Array {
-	T*  data;
-	u64 length;
+	T*  data = null;
+	u64 length = 0;
 
 	constexpr Array() = default;
 	constexpr Array(T* elements, u64 count) : data(elements), length(count) { }

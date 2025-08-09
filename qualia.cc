@@ -5,10 +5,11 @@ struct Ast_Module;
 
 static List<Ast_Module*> modules = null;
 
+#include "general.cc"
 #include "thread.cc"
 #include "assert.cc"
 #include "file_system.cc"
-#include "general.cc"
+#include "stack.cc"
 #include "error.cc"
 #include "type_system.cc"
 #include "lexer.cc"

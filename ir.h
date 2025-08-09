@@ -12,9 +12,6 @@ namespace IR {
 		u32 handle;
 	};
 
-	static LargeValue* CreateLargeValue(u64 bitcount) {
-	}
-
 	static void Init() {
 		stack = CreateStack(1<<30llu);
 	}

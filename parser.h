@@ -485,8 +485,7 @@ struct Ast_Enum {
 	Array<Ast_Enum_Member> members;
 };
 
-struct Line
-{
+struct Line {
 	Indent16 indent;
 	String   string;
 	Token*   tokens_begin;
@@ -497,17 +496,17 @@ struct Ast_Module {
 	Stack stack;
 	Ast_Scope scope;
 
-	String code;
+	Array<char> code;
 	String file_path;
 	String name;
 
 	Array<Token> tokens;
 	Array<Line> lines;
+
 	Array<Ast_Module*> users;
 	Array<Ast_Import> imports;
 };
 
-static void LexerParse(Ast_Module* module);
 static void InitIntrinsicFunctions(Ast_Module* module);
 static Ast_Module* ParseFile(String file_path);
 static void SemanticParse(Ast_Module* module);

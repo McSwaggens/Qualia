@@ -134,7 +134,7 @@ static void Write(OutputBuffer* buffer, float64 f) {
 	Write(buffer, (s64)Abs((f-(s64)f) * Pow(10, 9)));
 }
 
-static void Write(OutputBuffer* buffer, Token_Kind kind) {
+static void Write(OutputBuffer* buffer, TokenKind kind) {
 	Write(buffer, ToString(kind));
 }
 

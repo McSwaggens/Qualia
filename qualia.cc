@@ -38,7 +38,13 @@ static void CompileFile(String file_path) {
 		.name = file_path, // @FixMe get the real name
 	};
 
-	LexerParse(module);
+	Lexer lexer = CreateLexer(module, file_path);
+	lexer.Parse();
+
+	for (Token token : lexer.tokens)
+		Print("\t%\n", token);
+
+
 	ParseGlobalScope(module);
 	SemanticParse(module);
 }

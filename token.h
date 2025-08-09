@@ -1,8 +1,9 @@
 #pragma once
 
+#include "ascii.h"
 #include "string.h"
 
-enum Token_Kind : u8 {
+enum TokenKind : u8 {
 	TOKEN_EOF = 0,
 	TOKEN_IDENTIFIER_FORMAL,
 	TOKEN_IDENTIFIER_CASUAL,
@@ -60,10 +61,6 @@ enum Token_Kind : u8 {
 	TOKEN_UINT64,
 	TOKEN_FLOAT32,
 	TOKEN_FLOAT64,
-	TOKEN_BITWISE_OR,
-	TOKEN_BITWISE_AND,
-	TOKEN_BITWISE_XOR,
-	TOKEN_BITWISE_NOT,
 	TOKEN_MOD,
 	TOKEN_LESS,
 	TOKEN_LESS_OR_EQUAL,
@@ -78,6 +75,7 @@ enum Token_Kind : u8 {
 	TOKEN_CARET,
 	TOKEN_AMPERSAND,
 	TOKEN_BAR,
+	TOKEN_TILDE,
 	TOKEN_EXCLAMATION_MARK,
 	TOKEN_QUESTION_MARK,
 	TOKEN_QUESTION_MARK_DOT,
@@ -103,7 +101,7 @@ enum Token_Kind : u8 {
 	TOKEN_SEMICOLON,
 };
 
-static constexpr String ToString(Token_Kind kind) {
+static constexpr String ToString(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_EOF:                 return "<eof>";
 		case TOKEN_IDENTIFIER_FORMAL:   return "<formal_identifier>";
@@ -142,8 +140,8 @@ static constexpr String ToString(Token_Kind kind) {
 		case TOKEN_ALIAS:               return "alias";
 		case TOKEN_AS:                  return "as";
 		case TOKEN_IN:                  return "in";
-		case TOKEN_OR:                  return "or";
-		case TOKEN_AND:                 return "and";
+		case TOKEN_OR:                  return "||";
+		case TOKEN_AND:                 return "&&";
 		case TOKEN_NOT:                 return "not";
 		case TOKEN_NULL:                return "null";
 		case TOKEN_TRUE:                return "true";
@@ -162,11 +160,7 @@ static constexpr String ToString(Token_Kind kind) {
 		case TOKEN_UINT64:              return "uint64";
 		case TOKEN_FLOAT32:             return "float32";
 		case TOKEN_FLOAT64:             return "float64";
-		case TOKEN_BITWISE_OR:          return "OR";
-		case TOKEN_BITWISE_AND:         return "AND";
-		case TOKEN_BITWISE_XOR:         return "XOR";
-		case TOKEN_BITWISE_NOT:         return "NOT";
-		case TOKEN_MOD:                 return "MOD";
+		case TOKEN_MOD:                 return "%";
 		case TOKEN_EQUAL:               return "=";
 		case TOKEN_NOT_EQUAL:           return "!=";
 		case TOKEN_LESS:                return "<";
@@ -182,6 +176,7 @@ static constexpr String ToString(Token_Kind kind) {
 		case TOKEN_CARET:               return "^";
 		case TOKEN_AMPERSAND:           return "&";
 		case TOKEN_BAR:                 return "|";
+		case TOKEN_TILDE:               return "~";
 		case TOKEN_EXCLAMATION_MARK:    return "!";
 		case TOKEN_QUESTION_MARK:       return "?";
 		case TOKEN_QUESTION_MARK_DOT:   return "?.";
@@ -215,12 +210,20 @@ struct SourceLocation {
 	s64 extent;
 };
 
-// @Todo: SOA! (Make sure to measure!)
+using TokenFlags = u8;
+static const TokenFlags TOKEN_FLAG_NEWLINE           = 0x01;
+static const TokenFlags TOKEN_FLAG_LEFT_SPACED       = 0x02;
+static const TokenFlags TOKEN_FLAG_RIGHT_SPACED      = 0x04;
+static const TokenFlags TOKEN_FLAG_KEYWORD_PRIMITIVE = 0x08;
 
 struct Token {
-	Token_Kind kind;
-	bool newline;
-	Indent16 indent;
+	TokenKind  kind;
+	TokenFlags flags;
+	Indent16   indent;
+
+	bool IsNewLine()     { return flags & TOKEN_FLAG_NEWLINE;      }
+	bool IsLeftSpaced()  { return flags & TOKEN_FLAG_LEFT_SPACED;  }
+	bool IsRightSpaced() { return flags & TOKEN_FLAG_RIGHT_SPACED; }
 
 	union {
 		struct {
@@ -230,14 +233,14 @@ struct Token {
 
 		String  identifier_string;
 		String  literal_string;
-		s64   literal_int;
+		s64     literal_int;
 		float64 literal_float;
 	};
 
 	SourceLocation location;
 };
 
-static void Write(struct OutputBuffer* buffer, Token_Kind kind);
+static void Write(struct OutputBuffer* buffer, TokenKind kind);
 static void Write(struct OutputBuffer* buffer, Token* token);
 static void Write(struct OutputBuffer* buffer, Token token);
 

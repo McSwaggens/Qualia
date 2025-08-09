@@ -6,7 +6,7 @@
 #include "assert.h"
 #include "array_buffer.h"
 
-static bool IsSpecifier(Token_Kind kind) {
+static bool IsSpecifier(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_ASTERISK:
 		case TOKEN_QUESTION_MARK:
@@ -18,7 +18,7 @@ static bool IsSpecifier(Token_Kind kind) {
 	}
 }
 
-static bool IsTernaryOperator(Token_Kind kind) {
+static bool IsTernaryOperator(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_IF:
 			return true;
@@ -28,7 +28,7 @@ static bool IsTernaryOperator(Token_Kind kind) {
 	}
 }
 
-static bool IsIdentifier(Token_Kind kind) {
+static bool IsIdentifier(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_IDENTIFIER_CASUAL:
 		case TOKEN_IDENTIFIER_FORMAL:
@@ -39,7 +39,7 @@ static bool IsIdentifier(Token_Kind kind) {
 	}
 }
 
-static bool IsBinaryOperator(Token_Kind kind) {
+static bool IsBinaryOperator(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_DOT:
 		case TOKEN_ASTERISK:
@@ -50,9 +50,8 @@ static bool IsBinaryOperator(Token_Kind kind) {
 		case TOKEN_OR:
 		case TOKEN_CARET:
 		case TOKEN_MOD:
-		case TOKEN_BITWISE_AND:
-		case TOKEN_BITWISE_OR:
-		case TOKEN_BITWISE_XOR:
+		case TOKEN_AMPERSAND:
+		case TOKEN_BAR:
 		case TOKEN_LEFT_SHIFT:
 		case TOKEN_RIGHT_SHIFT:
 		case TOKEN_AS:
@@ -69,13 +68,13 @@ static bool IsBinaryOperator(Token_Kind kind) {
 	}
 }
 
-static bool IsUnaryOperator(Token_Kind kind) {
+static bool IsUnaryOperator(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_ASTERISK:
 		case TOKEN_AMPERSAND:
 		case TOKEN_PLUS:
 		case TOKEN_MINUS:
-		case TOKEN_BITWISE_NOT:
+		case TOKEN_TILDE:
 		case TOKEN_NOT:
 		case TOKEN_EXCLAMATION_MARK:
 			return true;
@@ -85,7 +84,7 @@ static bool IsUnaryOperator(Token_Kind kind) {
 	}
 }
 
-static bool IsAssignment(Token_Kind kind) {
+static bool IsAssignment(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_EQUAL:
 		case TOKEN_PLUS_EQUAL:
@@ -100,7 +99,7 @@ static bool IsAssignment(Token_Kind kind) {
 	}
 }
 
-static bool IsPrimitive(Token_Kind kind) {
+static bool IsPrimitive(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_BYTE:
 		case TOKEN_BOOL:
@@ -123,7 +122,7 @@ static bool IsPrimitive(Token_Kind kind) {
 	}
 }
 
-static bool IsTerm(Token_Kind kind) {
+static bool IsTerm(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_IDENTIFIER_CASUAL:
 		case TOKEN_IDENTIFIER_FORMAL:
@@ -151,7 +150,7 @@ static bool IsTerm(Token_Kind kind) {
 	}
 }
 
-static bool IsLiteral(Token_Kind kind) {
+static bool IsLiteral(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_LITERAL_INT:
 		case TOKEN_LITERAL_INT8:
@@ -177,7 +176,7 @@ static bool IsLiteral(Token_Kind kind) {
 	}
 }
 
-static bool IsExpressionStarter(Token_Kind kind) {
+static bool IsExpressionStarter(TokenKind kind) {
 	return IsUnaryOperator(kind)
 		|| IsTerm(kind)
 		|| kind == TOKEN_OPEN_PAREN
@@ -185,18 +184,19 @@ static bool IsExpressionStarter(Token_Kind kind) {
 		|| kind == TOKEN_OPEN_BRACE;
 }
 
-static u32 GetTernaryPrecedence(Token_Kind kind) {
+static u32 GetTernaryPrecedence(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_IF:
 			return 7;
 
-		default:
+		default: {
 			Assert("Invalid ternary operator.");
 			Unreachable();
+		}
 	}
 }
 
-static u32 GetBinaryPrecedence(Token_Kind kind) {
+static u32 GetBinaryPrecedence(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_DOT:
 			return 0;
@@ -211,9 +211,8 @@ static u32 GetBinaryPrecedence(Token_Kind kind) {
 			return 4;
 
 		case TOKEN_CARET:
-		case TOKEN_BITWISE_AND:
-		case TOKEN_BITWISE_OR:
-		case TOKEN_BITWISE_XOR:
+		case TOKEN_AMPERSAND:
+		case TOKEN_BAR:
 		case TOKEN_LEFT_SHIFT:
 		case TOKEN_RIGHT_SHIFT:
 			return 5;
@@ -238,62 +237,62 @@ static u32 GetBinaryPrecedence(Token_Kind kind) {
 		case TOKEN_OR:
 			return 11;
 
-		default:
+		default: {
 			Assert("Invalid binary operator.");
-			// Unreachable();
-			return -1;
+			Unreachable();
+		}
 	}
 }
 
-static u32 GetUnaryPrecedence(Token_Kind kind) {
+static u32 GetUnaryPrecedence(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_ASTERISK:
 		case TOKEN_AMPERSAND:
 		case TOKEN_EXCLAMATION_MARK:
 		case TOKEN_PLUS:
 		case TOKEN_MINUS:
-		case TOKEN_BITWISE_NOT:
+		case TOKEN_TILDE:
 			return 1;
 
 		case TOKEN_NOT:
 			return 10;
 
-		default:
+		default: {
 			Assert("Invalid unary operator.");
-			// Unreachable();
-			return -1;
+			Unreachable();
+		}
 	}
 }
 
-static u32 GetPostfixPrecedence(Token_Kind kind) {
+static u32 GetPostfixPrecedence(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_OPEN_PAREN:
 		case TOKEN_OPEN_BRACKET:
 			return 0;
 
-		default:
+		default: {
 			Assert("Invalid postfix operator.");
-			// Unreachable();
-			return -1;
+			Unreachable();
+		}
 	}
 }
 
-static bool IsOperatorRightToLeft(Token_Kind kind) {
+static bool IsOperatorRightToLeft(TokenKind kind) {
 	return false;
 }
 
-static bool IsPostfixOperator(Token_Kind kind) {
+static bool IsPostfixOperator(TokenKind kind) {
 	return kind == TOKEN_OPEN_PAREN
 		|| kind == TOKEN_OPEN_BRACKET;
 }
 
-static bool IsOperator(Token_Kind kind) {
+static bool IsOperator(TokenKind kind) {
 	return IsBinaryOperator(kind)
 		|| IsPostfixOperator(kind)
 		|| IsTernaryOperator(kind);
 }
 
-static u32 GetOperatorPrecedence(Token_Kind kind) {
+static u32 GetOperatorPrecedence(TokenKind kind) {
 	if (IsBinaryOperator(kind))  return GetBinaryPrecedence(kind);
 	if (IsTernaryOperator(kind)) return GetTernaryPrecedence(kind);
 	if (IsPostfixOperator(kind)) return GetPostfixPrecedence(kind);
@@ -301,7 +300,7 @@ static u32 GetOperatorPrecedence(Token_Kind kind) {
 }
 
 static bool IsCorrectScope(Token* token, u32 indent) {
-	return !token->newline || token->indent == indent;
+	return !token->IsNewLine() || token->indent == indent;
 }
 
 static void CheckScope(Token* token, u32 indent, Ast_Module* module) {
@@ -356,7 +355,7 @@ static Ast_Struct ParseStruct(Token*& token, u32 indent, Ast_Module* module) {
 			member.ast_type = ParseType(token, indent+2, module);
 			members.Add(member);
 
-			if (!token->newline && token->kind != TOKEN_SEMICOLON)
+			if (!token->IsNewLine() && token->kind != TOKEN_SEMICOLON)
 				Error(module, token->location, "Unexpected token: % after struct member.\n", token);
 
 			if (token->kind == TOKEN_SEMICOLON) {
@@ -423,7 +422,7 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Ast_Module* module) {
 			CheckScope(token, indent+2, module);
 			member.expression = ParseExpression(token, indent+2, module);
 
-			if (!token->newline && token->kind != TOKEN_SEMICOLON)
+			if (!token->IsNewLine() && token->kind != TOKEN_SEMICOLON)
 				Error(module, token->location, "Unexpected token: '%' after enum member.\n", token);
 
 			if (token->kind == TOKEN_SEMICOLON) {
@@ -445,11 +444,20 @@ static Ast_Enum ParseEnum(Token*& token, u32 indent, Ast_Module* module) {
 }
 
 static bool CanTakeNextOp(Token* token, bool assignment_break, u32 parent_precedence) {
-	return !(!IsOperator(token->kind) || (token->kind == TOKEN_EQUAL && assignment_break)) && GetOperatorPrecedence(token->kind) < parent_precedence + IsOperatorRightToLeft(token->kind);
+	if (!IsOperator(token->kind))
+		return false;
+
+	if (token->kind == TOKEN_EQUAL && assignment_break)
+		return false;
+
+	if (GetOperatorPrecedence(token->kind) >= parent_precedence + IsOperatorRightToLeft(token->kind))
+		return false;
+
+	return true;
 }
 
 static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* module, bool assignment_break, u32 parent_precedence) {
-	Ast_Expression* left;
+	Ast_Expression* left = null;
 
 	Token* begin = token;
 
@@ -460,7 +468,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 		switch (token->kind) {
 			case TOKEN_ASTERISK:         unary->kind = AST_EXPRESSION_UNARY_REFERENCE_OF; break;
 			case TOKEN_AMPERSAND:        unary->kind = AST_EXPRESSION_UNARY_ADDRESS_OF;   break;
-			case TOKEN_BITWISE_NOT:      unary->kind = AST_EXPRESSION_UNARY_BITWISE_NOT;  break;
+			case TOKEN_TILDE:            unary->kind = AST_EXPRESSION_UNARY_BITWISE_NOT;  break;
 			case TOKEN_NOT:              unary->kind = AST_EXPRESSION_UNARY_NOT;          break;
 			case TOKEN_MINUS:            unary->kind = AST_EXPRESSION_UNARY_MINUS;        break;
 			case TOKEN_PLUS:             unary->kind = AST_EXPRESSION_UNARY_PLUS;         break;
@@ -704,9 +712,8 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 				case TOKEN_DIVIDE:           binary->kind = AST_EXPRESSION_BINARY_DIVIDE;                   break;
 				case TOKEN_MOD:              binary->kind = AST_EXPRESSION_BINARY_MODULO;                   break;
 				case TOKEN_CARET:            binary->kind = AST_EXPRESSION_BINARY_BITWISE_XOR;              break;
-				case TOKEN_BITWISE_OR:       binary->kind = AST_EXPRESSION_BINARY_BITWISE_OR;               break;
-				case TOKEN_BITWISE_XOR:      binary->kind = AST_EXPRESSION_BINARY_BITWISE_XOR;              break;
-				case TOKEN_BITWISE_AND:      binary->kind = AST_EXPRESSION_BINARY_BITWISE_AND;              break;
+				case TOKEN_BAR:              binary->kind = AST_EXPRESSION_BINARY_BITWISE_OR;               break;
+				case TOKEN_AMPERSAND:        binary->kind = AST_EXPRESSION_BINARY_BITWISE_AND;              break;
 				case TOKEN_LEFT_SHIFT:       binary->kind = AST_EXPRESSION_BINARY_LEFT_SHIFT;               break;
 				case TOKEN_RIGHT_SHIFT:      binary->kind = AST_EXPRESSION_BINARY_RIGHT_SHIFT;              break;
 				default: Assert(); Unreachable();
@@ -943,8 +950,7 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Ast_Module* m
 
 	Token* branch_block_begin_token = token;
 
-	do
-	{
+	do {
 		Ast_Branch branch;
 		ZeroMemory(&branch);
 
@@ -958,30 +964,26 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Ast_Module* m
 			branch.clause = AST_BRANCH_CLAUSE_THEN;
 			token += 1;
 		}
-		else
-		{
+		else {
 			branch.clause = AST_BRANCH_CLAUSE_INIT;
 		}
 
 		switch (token->kind) {
-			case TOKEN_IF:
-			{
+			case TOKEN_IF: {
 				branch.kind = AST_BRANCH_IF;
 				CheckScope(token, indent, module);
 				token += 1;
 				branch.if_condition = ParseExpression(token, indent+1, module, false);
 			} break;
 
-			case TOKEN_WHILE:
-			{
+			case TOKEN_WHILE: {
 				branch.kind = AST_BRANCH_WHILE;
 				CheckScope(token, indent, module);
 				token += 1;
 				branch.while_condition = ParseExpression(token, indent+1, module, false);
 			} break;
 
-			case TOKEN_FOR:
-			{
+			case TOKEN_FOR: {
 				CheckScope(token, indent, module);
 				token += 1;
 
@@ -1102,12 +1104,8 @@ static Ast_BranchBlock ParseBranchBlock(Token*& token, u32 indent, Ast_Module* m
 		branch->else_branch = else_branch;
 		branch->then_branch = then_branch;
 
-		if (branch->clause == AST_BRANCH_CLAUSE_ELSE) {
-			else_branch = branch;
-		}
-		else if (branch->clause == AST_BRANCH_CLAUSE_THEN) {
-			then_branch = branch;
-		}
+		if (branch->clause == AST_BRANCH_CLAUSE_ELSE) else_branch = branch;
+		if (branch->clause == AST_BRANCH_CLAUSE_THEN) then_branch = branch;
 	}
 
 	return branch_block;
@@ -1148,12 +1146,12 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Ast_Module* modul
 		Ast_Expression* expression = ParseExpression(token, indent+1, module, true);
 
 		if (IsAssignment(token->kind)) {
-			if      (token->kind == TOKEN_EQUAL)        statement.kind = AST_STATEMENT_ASSIGNMENT;
-			else if (token->kind == TOKEN_PLUS_EQUAL)   statement.kind = AST_STATEMENT_ASSIGNMENT_ADD;
-			else if (token->kind == TOKEN_MINUS_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_SUBTRACT;
-			else if (token->kind == TOKEN_TIMES_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_MULTIPLY;
-			else if (token->kind == TOKEN_DIVIDE_EQUAL) statement.kind = AST_STATEMENT_ASSIGNMENT_DIVIDE;
-			else if (token->kind == TOKEN_CARET_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_XOR;
+			if (token->kind == TOKEN_EQUAL)        statement.kind = AST_STATEMENT_ASSIGNMENT;
+			if (token->kind == TOKEN_PLUS_EQUAL)   statement.kind = AST_STATEMENT_ASSIGNMENT_ADD;
+			if (token->kind == TOKEN_MINUS_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_SUBTRACT;
+			if (token->kind == TOKEN_TIMES_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_MULTIPLY;
+			if (token->kind == TOKEN_DIVIDE_EQUAL) statement.kind = AST_STATEMENT_ASSIGNMENT_DIVIDE;
+			if (token->kind == TOKEN_CARET_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_XOR;
 
 			CheckScope(token, indent+1, module);
 			token += 1;
@@ -1164,8 +1162,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Ast_Module* modul
 			CheckScope(token, indent+1, module);
 			statement.assignment.right = ParseExpression(token, indent+1, module, false);
 		}
-		else
-		{
+		else {
 			statement.kind = AST_STATEMENT_EXPRESSION;
 			statement.expression = expression;
 		}
@@ -1220,9 +1217,8 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Ast_Module* modul
 		statement.ret.expression = null;
 		token += 1;
 
-		if (IsCorrectScope(token, indent+1)) {
+		if (IsCorrectScope(token, indent+1))
 			statement.ret.expression = ParseExpression(token, indent+1, module, false);
-		}
 
 		return statement;
 	}
@@ -1242,7 +1238,7 @@ static Ast_Statement ParseStatement(Token*& token, u32 indent, Ast_Module* modul
 		Error(module, token->location, "Invalid statement starting with '%'\n", token);
 }
 
-static bool IsScopeTerminator(Token_Kind kind) {
+static bool IsScopeTerminator(TokenKind kind) {
 	return kind == TOKEN_SEMICOLON || kind == TOKEN_ELSE || kind == TOKEN_THEN;
 }
 
@@ -1255,7 +1251,7 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Ast_Module* module) {
 	ArrayBuffer<Ast_Enum>      enums      = CreateArrayBuffer<Ast_Enum>();
 	ArrayBuffer<Ast_Function>  functions  = CreateArrayBuffer<Ast_Function>();
 
-	if (token->newline && token->indent > indent) {
+	if (token->IsNewLine() && token->indent > indent) {
 	}
 
 	while (IsCorrectScope(token, indent) && !IsScopeTerminator(token->kind)) {
@@ -1267,8 +1263,7 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Ast_Module* module) {
 			Ast_Enum enumeration = ParseEnum(token, indent, module);
 			enums.Add(enumeration);
 		}
-		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN
-			&&  (token[1].closure[1].kind == TOKEN_COLON || token[1].closure[1].kind == TOKEN_ARROW)) {
+		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN && (token[1].closure[1].kind == TOKEN_COLON || token[1].closure[1].kind == TOKEN_ARROW)) {
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
 
@@ -1281,12 +1276,11 @@ static Ast_Code ParseCode(Token*& token, u32 indent, Ast_Module* module) {
 			Ast_Statement statement = ParseStatement(token, indent, module);
 			statements.Add(statement);
 
-			if (!token->newline && !IsScopeTerminator(token->kind))
+			if (!token->IsNewLine() && !IsScopeTerminator(token->kind))
 				Error(module, token->location, "Expected ';' before end of statement, not: '%'.\n", token);
 
-			if (token->kind == TOKEN_SEMICOLON && IsCorrectScope(token, indent)) {
+			if (token->kind == TOKEN_SEMICOLON && IsCorrectScope(token, indent))
 				token += 1;
-			}
 		}
 	}
 

@@ -69,36 +69,33 @@ static inline u16 ReverseBits16(u16 n) { return __builtin_bitreverse16(n); }
 static inline u8  ReverseBits8(u8 n)   { return __builtin_bitreverse16(n) >> 8u; }
 
 // popcnt
-static inline u64 CountBits64(u64 n) { return __builtin_popcountll(n); }
-static inline u32 CountBits32(u32 n) { return __builtin_popcount(n); }
-static inline u16 CountBits16(u16 n) { return __builtin_popcount((u32)n); }
-static inline u8  CountBits8(u8 n)   { return __builtin_popcount((u32)n); }
-
-CFUNC u64 LzCnt(u64 rax); // lzcnt 0 = 64
-CFUNC u64 TzCnt(u64 rax); // tzcnt 0 = 64
+static inline u64 PopCount64(u64 n) { return __builtin_popcountll(n); }
+static inline u32 PopCount32(u32 n) { return __builtin_popcount(n); }
+static inline u16 PopCount16(u16 n) { return __builtin_popcount((u32)n); }
+static inline u8  PopCount8(u8 n)   { return __builtin_popcount((u32)n); }
 
 // lzcnt
 // `n == 0` check is here to prevent clang from braking the program. Branch is removed.
-static inline u64 CountLeadingZeroes64(u64 n) { return n == (u64)0 ? (u64)64 : __builtin_clzll(n); }
-static inline u32 CountLeadingZeroes32(u32 n) { return n == 0 ? 32 : __builtin_clz(n); }
-static inline u32 CountLeadingZeroes16(u16 n) { return n == 0 ? 16 : CountLeadingZeroes32(n) - (32-16); }
-static inline u32 CountLeadingZeroes8(u8 n)   { return n == 0 ? 8  : CountLeadingZeroes32(n) - (32-8); }
+static inline u64 Clz64(u64 n) { return n == (u64)0 ? (u64)64 : __builtin_clzll(n); }
+static inline u32 Clz32(u32 n) { return n == 0 ? 32 : __builtin_clz(n); }
+static inline u32 Clz16(u16 n) { return n == 0 ? 16 : Clz32(n) - (32-16); }
+static inline u32 Clz8(u8 n)   { return n == 0 ? 8  : Clz32(n) - (32-8); }
 
 // tzcnt
-static inline u64 CountTrailingZeroes64(u64 n) { return n == (u64)0 ? (u64)64 : __builtin_ctzll(n); }
-static inline u32 CountTrailingZeroes32(u32 n) { return n == 0 ? 32 : __builtin_ctz(n); }
-static inline u32 CountTrailingZeroes16(u16 n) { return n == 0 ? 16 : CountTrailingZeroes32(n); }
-static inline u32 CountTrailingZeroes8(u8 n)   { return n == 0 ? 8  : CountTrailingZeroes32(n); }
+static inline u64 Ctz64(u64 n) { return n == (u64)0 ? (u64)64 : __builtin_ctzll(n); }
+static inline u32 Ctz32(u32 n) { return n == 0 ? 32 : __builtin_ctz(n); }
+static inline u32 Ctz16(u16 n) { return n == 0 ? 16 : Ctz32(n); }
+static inline u32 Ctz8(u8 n)   { return n == 0 ? 8  : Ctz32(n); }
 
-static inline u64 BitsOfInformation64(u64 n) { return 64llu-CountLeadingZeroes64(n); }
-static inline u32 BitsOfInformation32(u32 n) { return 32-CountLeadingZeroes32(n); }
-static inline u32 BitsOfInformation16(u16 n) { return 16-CountLeadingZeroes16(n); }
-static inline u32 BitsOfInformation8(u8 n)   { return 8-CountLeadingZeroes8(n); }
+static inline u64 Boi64(u64 n) { return 64llu-Clz64(n); }
+static inline u32 Boi32(u32 n) { return 32-Clz32(n); }
+static inline u32 Boi16(u16 n) { return 16-Clz16(n); }
+static inline u32 Boi8(u8 n)   { return 8-Clz8(n); }
 
-static inline bool IsPow2(u64 n) { return CountBits64(n) == 1; }
+static inline bool IsPow2(u64 n) { return PopCount64(n) == 1; }
 
 // @Note: 2^n -> 2^(n+1)
-static inline u64 NextPow2(u64 n) { return 1 << BitsOfInformation64(n); }
+static inline u64 NextPow2(u64 n) { return 1 << Boi64(n); }
 
 // @Note: NextPow2(2^n) = 2^n
 static u64 RaisePow2(u64 n) {

@@ -28,7 +28,7 @@ struct ArrayBuffer {
 			ArrayBuffer_Entry entry = GetArrayBufferEntry(size + sizeof(T));
 
 			if (count) COLD {
-				CopyMemory((T*)entry.data, data, count);
+				Copy((T*)entry.data, data, count);
 				ReleaseArrayBuffer(data, size);
 			}
 

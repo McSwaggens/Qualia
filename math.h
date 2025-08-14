@@ -79,4 +79,9 @@ static inline u32 CarryAdd32(u32 a, u32 b, u32 carry_in, u32* carry_out) { retur
 static inline u16 CarryAdd16(u16 a, u16 b, u16 carry_in, u16* carry_out) { return __builtin_addcs (a, b, carry_in, carry_out); }
 static inline u8  CarryAdd8 (u8  a, u8  b, u8  carry_in, u8*  carry_out) { return __builtin_addcb (a, b, carry_in, carry_out); }
 
+static inline u64 CarrySub64(u64 a, u64 b, u64 carry_in, u64* carry_out) { return __builtin_subcll(a, b, carry_in, carry_out); }
+static inline u32 CarrySub32(u32 a, u32 b, u32 carry_in, u32* carry_out) { return __builtin_subc  (a, b, carry_in, carry_out); }
+static inline u16 CarrySub16(u16 a, u16 b, u16 carry_in, u16* carry_out) { return __builtin_subcs (a, b, carry_in, carry_out); }
+static inline u8  CarrySub8 (u8  a, u8  b, u8  carry_in, u8*  carry_out) { return __builtin_subcb (a, b, carry_in, carry_out); }
+
 #endif // MATH_H

@@ -15,11 +15,13 @@ typedef signed char      s8;
 typedef signed short     s16;
 typedef signed int       s32;
 typedef signed long long s64;
+typedef signed __int128  s128;
 
-static_assert(sizeof(s8 ) == 1);
-static_assert(sizeof(s16) == 2);
-static_assert(sizeof(s32) == 4);
-static_assert(sizeof(s64) == 8);
+static_assert(sizeof(s8 )  == 1);
+static_assert(sizeof(s16)  == 2);
+static_assert(sizeof(s32)  == 4);
+static_assert(sizeof(s64)  == 8);
+static_assert(sizeof(s128) == 16);
 
 static const s64 INT8_MAX  = 0x7F;               // 127
 static const s64 INT16_MAX = 0x7FFF;             // 32767
@@ -42,11 +44,13 @@ typedef unsigned char      u8;
 typedef unsigned short     u16;
 typedef unsigned int       u32;
 typedef unsigned long long u64;
+typedef unsigned __int128  u128;
 
-static_assert(sizeof(u8 ) == 1);
-static_assert(sizeof(u16) == 2);
-static_assert(sizeof(u32) == 4);
-static_assert(sizeof(u64) == 8);
+static_assert(sizeof(u8 )  ==  1);
+static_assert(sizeof(u16)  ==  2);
+static_assert(sizeof(u32)  ==  4);
+static_assert(sizeof(u64)  ==  8);
+static_assert(sizeof(u128) == 16);
 
 static const u64 UINT8_MIN  = 0;
 static const u64 UINT16_MIN = 0;
@@ -65,14 +69,14 @@ static const s64 UINT64_MAX_DIGITS = 20;
 
 // -------------------------------------------- //
 
-// typedef __fp16 float16;
+typedef __fp16 float16;
 typedef float  float32;
 typedef double float64;
-// static_assert(sizeof(float16) == 2);
+static_assert(sizeof(float16) == 2);
 static_assert(sizeof(float32) == 4);
 static_assert(sizeof(float64) == 8);
 
-// @Todo: float32 and float64 min, max and epsilon.
+// @todo: float32 and float64 min, max and epsilon.
 
 // -------------------------------------------- //
 

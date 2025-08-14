@@ -1,6 +1,8 @@
 #pragma once
 
 #include "int.h"
+#include "general.h"
+#include "assert.h"
 
 enum TypeKind : u32 {
 	TYPE_PRIMITIVE   = 0,
@@ -286,29 +288,13 @@ static bool IsFloat(TypeID type) {
 	}
 }
 
-static bool IsPointer(TypeID type) {
-	return GetTypeKind(type) == TYPE_POINTER;
-}
+static bool IsPointer(TypeID type)         { return GetTypeKind(type) == TYPE_POINTER; }
+static bool IsFunctionPointer(TypeID type) { return GetTypeKind(type) == TYPE_POINTER && GetTypeKind(GetSubType(type)) == TYPE_FUNCTION; }
+static bool IsArray(TypeID type)           { return GetTypeKind(type) == TYPE_ARRAY; }
+static bool IsFixedArray(TypeID type)      { return GetTypeKind(type) == TYPE_FIXED_ARRAY; }
 
-static bool IsFunctionPointer(TypeID type) {
-	return GetTypeKind(type) == TYPE_POINTER && GetTypeKind(GetSubType(type)) == TYPE_FUNCTION;
-}
-
-static inline bool IsArray(TypeID type) {
-	return GetTypeKind(type) == TYPE_ARRAY;
-}
-
-static inline bool IsFixedArray(TypeID type) {
-	return GetTypeKind(type) == TYPE_FIXED_ARRAY;
-}
-
-static TypeID GetFunctionInputType(TypeID type) {
-	return GetTypeInfo(type)->function_info.input;
-}
-
-static TypeID GetFunctionOutputType(TypeID type) {
-	return GetTypeInfo(type)->function_info.output;
-}
+static TypeID GetFunctionInputType(TypeID  type) { return GetTypeInfo(type)->function_info.input; }
+static TypeID GetFunctionOutputType(TypeID type) { return GetTypeInfo(type)->function_info.output; }
 
 // static bool IsXXX(TypeID type)
 // {

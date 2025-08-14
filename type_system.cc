@@ -415,7 +415,7 @@ static TypeID GetTuple(TypeID* elements, u64 count) {
 		size += GetTypeSize(elements[i]);
 
 	TypeID* new_elements = (TypeID*)AllocateMemory(sizeof(TypeID) * count);
-	CopyMemory(new_elements, elements, count);
+	Copy(new_elements, elements, count);
 
 	TypeID result = CreateType(TYPE_TUPLE, {
 		.size = size,
@@ -471,7 +471,7 @@ static TypeID MergeTypeRight(TypeID a, TypeID b) {
 
 	TypeID elements[count];
 	elements[0] = a;
-	CopyMemory(elements+1, b_info->tuple_info.elements, count-1);
+	Copy(elements+1, b_info->tuple_info.elements, count-1);
 
 	return GetTuple(elements, count);
 }

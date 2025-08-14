@@ -48,10 +48,13 @@ static inline Array<T> AllocateArray(u64 count) {
 
 // ------------------------------------------- //
 
-// @cleanme Change to Copy
+static void CopyMemory(byte* dest, const byte* src, u64 count) {
+	__builtin_memcpy(dest, src, count);
+}
+
 template<typename T>
-static void CopyMemory(T* dest, const T* src, u64 count = 1) {
-	__builtin_memcpy(dest, src, sizeof(T) * count);
+static void Copy(T* dest, const T* src, u64 count) {
+	CopyMemory(dest, src, count * sizeof(T));
 }
 
 // @cleanme Change to Fill

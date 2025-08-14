@@ -21,7 +21,7 @@ endif
 FLAGS := $(DEBUG)
 FLAGS += -std=c++23
 FLAGS += -nostdinc++ -fno-rtti -fno-exceptions -Wno-vla-cxx-extension
-FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wno-all
+FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wno-all -Wshift-op-parentheses
 FLAGS += -MJ compile_commands.json
 
 qualia_xxx: *.cc *.h $(OS_FILE).o

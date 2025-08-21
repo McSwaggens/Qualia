@@ -95,7 +95,7 @@ static inline u32 Boi8(u8 n)   { return 8-Clz8(n); }
 static inline bool IsPow2(u64 n) { return PopCount64(n) == 1; }
 
 // @Note: 2^n -> 2^(n+1)
-static inline u64 NextPow2(u64 n) { return 1 << Boi64(n); }
+static inline u64 NextPow2(u64 n) { return 1llu << Boi64(n); }
 
 // @Note: NextPow2(2^n) = 2^n
 static u64 RaisePow2(u64 n) {

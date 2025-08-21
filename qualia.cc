@@ -1,3 +1,4 @@
+#include "file_system.h"
 #include "int.h"
 #include "list.h"
 
@@ -50,26 +51,66 @@ static void CompileFile(String file_path) {
 	SemanticParse(module);
 }
 
+static inline u64 GoldenHash(u64 n) { return n * 11400714819323198485llu; } // Golden/Fibinacci hash: (2^64)/((1+sqrt(5))/2)
+
+#include "sort.h"
+
+static void GenerateRandomNumbers(u64* numbers, u64 n) {
+	static u64 state = 2293724;
+
+	for (u64 i = 0; i < n; i++)
+	{
+		state ^= state << 13;
+		state ^= state >>  7;
+		state ^= state << 17;
+
+		numbers[i] = state;
+	}
+}
+
 int main(int argc, char** args) {
 	InitGlobalArena();
 	InitTypeSystem();
 	InitIntrinsics();
 	IR::Init();
 
-	// @Todo: Process user args.
-	// @Todo: Find files in current directory or the directory that the user specified.
+	u64 max_numbers = (1llu<<37) / sizeof(u64);
+	u64* numbers = Allocate<u64>(max_numbers);
+	for (u64 n = 0; n <= max_numbers; n++) {
+		Print("Generating % random numbers...", n);
+		output_buffer.Flush();
+		GenerateRandomNumbers(numbers, n);
+		// Print("\nrandom = %\n", Array<u64>(numbers, n));
 
-	const String files[] = {
-		"test.q",
-		// "test_literals.q"
-	};
+		Print(" Sorting...");
+		output_buffer.Flush();
+		QuickSort(numbers, numbers + n);
 
-	for (u32 i = 0; i < COUNT(files); i++) {
-		Print("Compiling: %\n", files[i]);
-		CompileFile(files[i]);
+		Print(" Verifying...");
+		output_buffer.Flush();
+		bool is_sorted = IsSorted(numbers, numbers + n);
+		if (!is_sorted) {
+			Print(" FAILURE!\n");
+			output_buffer.Flush();
+			break;
+		}
+
+		Print(" SUCCESS!\n");
+		output_buffer.Flush();
+
 	}
 
-	Print("Compiler finished.\n");
+	// const String files[] = {
+	// 	"test.q",
+	// 	// "test_literals.q"
+	// };
+
+	// for (u32 i = 0; i < COUNT(files); i++) {
+	// 	Print("Compiling: %\n", files[i]);
+	// 	CompileFile(files[i]);
+	// }
+
+	// Print("Compiler finished.\n");
 
 	output_buffer.Flush();
 	error_buffer.Flush();

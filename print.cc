@@ -6,14 +6,6 @@
 
 static void Write(OutputBuffer* buffer, char c) { buffer->Write(c); }
 
-static void Write(OutputBuffer* buffer, s8  n)  { Write(buffer, (s64)n); }
-static void Write(OutputBuffer* buffer, s16 n)  { Write(buffer, (s64)n); }
-static void Write(OutputBuffer* buffer, s32 n)  { Write(buffer, (s64)n); }
-static void Write(OutputBuffer* buffer, u8  n) { Write(buffer, (u64)n); }
-static void Write(OutputBuffer* buffer, u16 n) { Write(buffer, (u64)n); }
-static void Write(OutputBuffer* buffer, u32 n) { Write(buffer, (u64)n); }
-static void Write(OutputBuffer* buffer, unsigned long int n) { Write(buffer, (u64)n); }
-
 // 3 5 10 20
 // Lut for n < 256?
 static void Write(OutputBuffer* buffer, u64 n) {
@@ -21,13 +13,20 @@ static void Write(OutputBuffer* buffer, u64 n) {
 	char digits[max];
 	int count = 0;
 
-	do
-	{
+	do {
 		digits[max - count - 1] = '0' + n % 10;
 	} while (++count < max && (n /= 10));
 
 	buffer->Write(digits + (max - count), count);
 }
+
+static void Write(OutputBuffer* buffer, s8  n) { Write(buffer, (s64)n); }
+static void Write(OutputBuffer* buffer, s16 n) { Write(buffer, (s64)n); }
+static void Write(OutputBuffer* buffer, s32 n) { Write(buffer, (s64)n); }
+static void Write(OutputBuffer* buffer, u8  n) { Write(buffer, (u64)n); }
+static void Write(OutputBuffer* buffer, u16 n) { Write(buffer, (u64)n); }
+static void Write(OutputBuffer* buffer, u32 n) { Write(buffer, (u64)n); }
+static void Write(OutputBuffer* buffer, unsigned long int n) { Write(buffer, (u64)n); }
 
 static void Write(OutputBuffer* buffer, s64 n) {
 	if (n < 0) { buffer->Write('-'); n = -n; }
@@ -58,7 +57,7 @@ static void GenericWriteHex(OutputBuffer* buffer, u64 n) {
 
 	char character_buffer[17];
 
-	u64 digits = length_table[CountLeadingZeroes64(n)];
+	u64 digits = length_table[Ctz64(n)];
 	u64 k = digits << 2;
 
 	for (u64 i = 0; i < digits; i++) {
@@ -96,7 +95,7 @@ static void GenericWriteBin(OutputBuffer* buffer, u64 n) {
 	};
 
 	char character_buffer[65];
-	s64 lz = CountLeadingZeroes64(n);
+	s64 lz = Ctz64(n);
 
 	for (s64 i = 0; i < 16; i++) {
 		((u32*)character_buffer)[i] = table[(n >> (60-(i*4))) & 0x0f];

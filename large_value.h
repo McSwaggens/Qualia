@@ -6,9 +6,31 @@
 #include "memory.h"
 #include "math.h"
 #include "stack.h"
+#include "assert.h"
+
+namespace Bitwise {
+	static u64 SafeLeftShift64(u64 a, u64 b) {
+		if (b >= 64) COLD return 0;
+		return a << b;
+	}
+
+	static u64 Apply64(u64 a, u64 b, u32 index, u32 length) {
+		Assert(index + length <= 64);
+		u64 mask = SafeLeftShift64(-1llu, index) ^ SafeLeftShift64(-1llu, (index + length));
+		return (a & ~mask) | (b & mask);
+	}
+
+	static u32 Apply32(u32 a, u32 b, u32 index, u32 length) {
+		u64 mask = (-1llu << index) ^ (-1llu << (index + length));
+		return (a & ~mask) | (b & mask);
+	}
+
+	static u16 Apply16(u16 a, u16 b, u32 index, u32 length) { return Apply32(a, b, index, length); }
+	static u8  Apply8 (u8  a, u8  b, u32 index, u32 length) { return Apply32(a, b, index, length); }
+}
 
 namespace Integer {
-	u32 Add64(u64* a, u64* b, u64* r, u64 count) {
+	static u32 Add64(u64* a, u64* b, u64* r, u64 count) {
 		u64 carry = 0;
 
 		for (u64 i = 0; i < count; i++) r[i] = CarryAdd64(a[i], b[i], carry, &carry);
@@ -16,7 +38,7 @@ namespace Integer {
 		return carry;
 	}
 
-	u32 Add32(u32* a, u32* b, u32* r, u64 count) {
+	static u32 Add32(u32* a, u32* b, u32* r, u64 count) {
 		u64 carry = 0;
 
 		if (count & 1) {
@@ -31,7 +53,7 @@ namespace Integer {
 		return carry;
 	}
 
-	u32 Add16(u16* a, u16* b, u16* r, u64 count) {
+	static u32 Add16(u16* a, u16* b, u16* r, u64 count) {
 		u64 carry = 0;
 
 		if (count & 1) *(u16*)r = CarryAdd16(*(u16*)(a + (count & 0)), *(u16*)(b + (count & 0)), carry, (u16*)&carry);
@@ -45,7 +67,7 @@ namespace Integer {
 		return carry;
 	}
 
-	u32 Add8(byte* a, byte* b, byte* r, u64 size) {
+	static u32 Add8(byte* a, byte* b, byte* r, u64 size) {
 		u64 carry = 0;
 
 		if (size & 1) *(u8 *)r = CarryAdd8 (*(u8 *)(a + (size & 0)), *(u8 *)(b + (size & 0)), carry, (u8 *)&carry);
@@ -59,83 +81,96 @@ namespace Integer {
 
 		return carry;
 	}
-	void And64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = a[i] & b[i]; }
-	void And32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = *a++ & *b++; And64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
-	void And16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = *a++ & *b++; And32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
-	void And8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = *a++ & *b++; And16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
+	static void And64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = a[i] & b[i]; }
+	static void And32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = *a++ & *b++; And64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
+	static void And16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = *a++ & *b++; And32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
+	static void And8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = *a++ & *b++; And16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
 
-	void Nand64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = ~(a[i] & b[i]); }
-	void Nand32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = ~(*a++ & *b++); Nand64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
-	void Nand16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = ~(*a++ & *b++); Nand32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
-	void Nand8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = ~(*a++ & *b++); Nand16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
+	static void Nand64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = ~(a[i] & b[i]); }
+	static void Nand32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = ~(*a++ & *b++); Nand64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
+	static void Nand16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = ~(*a++ & *b++); Nand32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
+	static void Nand8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = ~(*a++ & *b++); Nand16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
 
-	void Or64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = a[i] | b[i]; }
-	void Or32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = *a++ | *b++; Or64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
-	void Or16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = *a++ | *b++; Or32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
-	void Or8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = *a++ | *b++; Or16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
+	static void Or64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = a[i] | b[i]; }
+	static void Or32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = *a++ | *b++; Or64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
+	static void Or16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = *a++ | *b++; Or32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
+	static void Or8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = *a++ | *b++; Or16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
 
-	void Xor64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = a[i] ^ b[i]; }
-	void Xor32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = *a++ ^ *b++; Xor64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
-	void Xor16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = *a++ ^ *b++; Xor32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
-	void Xor8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = *a++ ^ *b++; Xor16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
+	static void Xor64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = a[i] ^ b[i]; }
+	static void Xor32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = *a++ ^ *b++; Xor64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
+	static void Xor16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = *a++ ^ *b++; Xor32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
+	static void Xor8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = *a++ ^ *b++; Xor16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
 
-	void Nor64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = ~(a[i] | b[i]); }
-	void Nor32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = ~(*a++ | *b++); Nor64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
-	void Nor16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = ~(*a++ | *b++); Nor32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
-	void Nor8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = ~(*a++ | *b++); Nor16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
+	static void Nor64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = ~(a[i] | b[i]); }
+	static void Nor32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = ~(*a++ | *b++); Nor64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
+	static void Nor16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = ~(*a++ | *b++); Nor32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
+	static void Nor8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = ~(*a++ | *b++); Nor16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
 
-	void Xnor64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = ~(a[i] ^ b[i]); }
-	void Xnor32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = ~(*a++ ^ *b++); Xnor64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
-	void Xnor16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = ~(*a++ ^ *b++); Xnor32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
-	void Xnor8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = ~(*a++ ^ *b++); Xnor16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
+	static void Xnor64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = ~(a[i] ^ b[i]); }
+	static void Xnor32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = ~(*a++ ^ *b++); Xnor64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
+	static void Xnor16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = ~(*a++ ^ *b++); Xnor32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
+	static void Xnor8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = ~(*a++ ^ *b++); Xnor16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
+	static void Xnor1 (u8*  a, u8*  b, u8*  r, u64 count) {
+		Xnor8((u8*)a, b, (u8*)r, count >> 3);
+		if (count & 7)
+			r[count>>3] = a[count>>3] ^ a[count>>3] & ((1<<(count^7))-1);
+	}
 
-	void Not64(u64* a, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = ~a[i]; }
-	void Not32(u32* a, u32* r, u64 count) { if (count & 1) *r++ = ~*a++; Not64((u64*)a, (u64*)r, count >> 1); }
-	void Not16(u16* a, u16* r, u64 count) { if (count & 1) *r++ = ~*a++; Not32((u32*)a, (u32*)r, count >> 1); }
-	void Not8 (u8*  a, u8*  r, u64 count) { if (count & 1) *r++ = ~*a++; Not16((u16*)a, (u16*)r, count >> 1); }
+	static void Not64(u64* a, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = ~a[i]; }
+	static void Not32(u32* a, u32* r, u64 count) { if (count & 1) *r++ = ~*a++; Not64((u64*)a, (u64*)r, count >> 1); }
+	static void Not16(u16* a, u16* r, u64 count) { if (count & 1) *r++ = ~*a++; Not32((u32*)a, (u32*)r, count >> 1); }
+	static void Not8 (u8*  a, u8*  r, u64 count) { if (count & 1) *r++ = ~*a++; Not16((u16*)a, (u16*)r, count >> 1); }
+	static void Not1 (u8*  a, u8*  r, u64 index, u64 count) {
+		a += index >> 3;
+		r += index >> 3;
+
+		if (index & 7) *r++ =  *a++ ^ (-1 << (index & 7));
+		Not8(a, r, count >> 3);
+		if (count & 7) r[index>>3] ^= 255 >> (count & 7);
+	}
 }
 
 struct Binary {
 	u64 bitcount;
 	union {
-		u128 inlined_value;
+		u64  inlined64;
+		u128 inlined128;
 		byte* data;
 	};
 
-	Binary(u8   n) : inlined_value(n), bitcount(8)  { }
-	Binary(u16  n) : inlined_value(n), bitcount(16) { }
-	Binary(u32  n) : inlined_value(n), bitcount(32) { }
-	Binary(u64  n) : inlined_value(n), bitcount(64) { }
-	Binary(u128 n) : inlined_value(n), bitcount(128) { }
+	Binary(u8   n) : inlined64(n),  bitcount(8)  { }
+	Binary(u16  n) : inlined64(n),  bitcount(16) { }
+	Binary(u32  n) : inlined64(n),  bitcount(32) { }
+	Binary(u64  n) : inlined64(n),  bitcount(64) { }
+	Binary(u128 n) : inlined128(n), bitcount(128) { }
 
-	Binary(s8   n, u64 bitcount = 8)   : inlined_value(n), bitcount(bitcount) { }
-	Binary(s16  n, u64 bitcount = 16)  : inlined_value(n), bitcount(bitcount) { }
-	Binary(s32  n, u64 bitcount = 32)  : inlined_value(n), bitcount(bitcount) { }
-	Binary(s64  n, u64 bitcount = 64)  : inlined_value(n), bitcount(bitcount) { }
-	Binary(s128 n, u64 bitcount = 128) : inlined_value(n), bitcount(bitcount) { }
+	Binary(s8   n, u64 bitcount = 8)   : inlined128(n), bitcount(bitcount) { }
+	Binary(s16  n, u64 bitcount = 16)  : inlined128(n), bitcount(bitcount) { }
+	Binary(s32  n, u64 bitcount = 32)  : inlined128(n), bitcount(bitcount) { }
+	Binary(s64  n, u64 bitcount = 64)  : inlined128(n), bitcount(bitcount) { }
+	Binary(s128 n, u64 bitcount = 128) : inlined128(n), bitcount(bitcount) { }
 
-	Binary(byte* data, u64 bitcount) : data(data), bitcount(bitcount) {
-		if (bitcount <= 128) {
-			inlined_value = 0;
-			CopyMemory((byte*)&inlined_value, data, (bitcount+7)>>3);
-		}
-	}
+	// Binary(byte* data, u64 bitcount) : data(data), bitcount(bitcount) {
+	// 	if (bitcount <= 128) {
+	// 		inlined_value = 0;
+	// 		CopyMemory((byte*)&inlined_value, data, (bitcount+7)>>3);
+	// 		return;
+	// 	}
 
-	bool IsInlined() { return bitcount <= 64; }
 
-	byte* GetData() {
-		if (IsInlined())
-			return (byte*)&inlined_value;
+	// }
 
-		return data;
-	}
+	// bool IsInlined() { return bitcount <= 64; }
 
-	Binary IntegerAdd(Binary o) {
-		u64 max_out_bitcount = (Max(bitcount, o->bitcount) + 1);
-		if (!out) out = Binary(AllocateMemory(max_out_bitcount << 3));
+	// byte* GetData() {
+	// 	if (IsInlined())
+	// 		return (byte*)&inlined_value;
 
-		return out;
-	}
+	// 	return data;
+	// }
+
+	// Binary IntegerAdd(Binary o) {
+	// }
 };
 
 #endif // LARGE_VALUE_H

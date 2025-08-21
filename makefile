@@ -18,10 +18,10 @@ ifeq ($(OS_NAME), Linux)
 	RELEASE+=-march=x86-64-v3
 endif
 
-FLAGS := $(DEBUG)
+FLAGS := $(RELEASE)
 FLAGS += -std=c++23
 FLAGS += -nostdinc++ -fno-rtti -fno-exceptions -Wno-vla-cxx-extension
-FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wno-all -Wshift-op-parentheses
+FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wshift-op-parentheses
 FLAGS += -MJ compile_commands.json
 
 qualia_xxx: *.cc *.h $(OS_FILE).o
@@ -36,7 +36,7 @@ general.o: general.asm
 run: qualia_xxx
 	./qualia
 
-time: qualia
+time: qualia_xxx
 	fish -c "time ./qualia"
 
 clean:

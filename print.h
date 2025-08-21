@@ -36,20 +36,20 @@ static void Write(OutputBuffer* buffer, void* p);
 static void Write(OutputBuffer* buffer, String str);
 
 template<typename T>
-static void Write(OutputBuffer* buffer, List<T> list) {
-	Write(buffer, list.ToSpan());
-}
-
-template<typename T>
 static void Write(OutputBuffer* buffer, Array<T> array) {
 	buffer->Write("{ ");
 
-	for (u64 i = 0; i < array.count; i++) {
+	for (u64 i = 0; i < array.length; i++) {
 		if (i != 0) buffer->Write(", ");
 		Write(buffer, array[i]);
 	}
 
 	buffer->Write(" }");
+}
+
+template<typename T>
+static void Write(OutputBuffer* buffer, List<T> list) {
+	Write(buffer, list.ToArray());
 }
 
 template<typename ...Args>
@@ -76,6 +76,9 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args) {
 
 	if (p < end)
 		buffer->Write(p, end - p);
+
+	if (IsDebug())
+		buffer->Flush();
 }
 
 template<typename ...Args>

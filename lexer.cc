@@ -253,7 +253,7 @@ void Lexer::ParseLiteral() {
 			qualifier && (fractional.qualifier & QUALIFIER_H) && !IsAlpha(fractional.end[0])) {
 			qualifier = fractional.qualifier;
 			base = (Base)Max(base, fractional.base);
-			whole.count += CountBits64(whole.qualifier);
+			whole.count += PopCount64(whole.qualifier);
 			has_fractional = true;
 		}
 	}
@@ -334,7 +334,7 @@ void Lexer::ParseLiteral() {
 			value = scaled_value;
 		}
 
-		if (BitsOfInformation64(value) > effective_size)
+		if (Boi64(value) > effective_size)
 			LexerError(module, location, "Integer literal exceeds %-bits.\n", effective_size);
 
 		current_token->literal_int = value;

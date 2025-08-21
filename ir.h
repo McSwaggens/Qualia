@@ -17,7 +17,7 @@ namespace IR {
 		bool IsInline() { return handle < UINT32_MAX; }
 		u32 GetInlinedValue() { Assert(IsInline()); return ((s32)handle << 1) >> 1; }
 
-		LargeValue* GetLargeValue() { }
+		// LargeValue* GetLargeValue() { }
 	};
 
 	static void Init() {

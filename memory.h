@@ -54,7 +54,7 @@ static void CopyMemory(byte* dest, const byte* src, u64 count) {
 
 template<typename T>
 static void Copy(T* dest, const T* src, u64 count) {
-	CopyMemory(dest, src, count * sizeof(T));
+	CopyMemory((byte*)dest, (byte*)src, count * sizeof(T));
 }
 
 // @cleanme Change to Fill

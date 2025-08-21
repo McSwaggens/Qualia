@@ -49,7 +49,7 @@ static byte* AllocateMemory(u64 size) {
 	Assert(size);
 
 	size = GetArenaEffectiveSize(size);
-	u32 pow = CountTrailingZeroes64(size);
+	u32 pow = Ctz64(size);
 	u32 index = pow - ARENA_MIN_POW;
 
 	if (index >= ARENA_POOL_COUNT)
@@ -86,7 +86,7 @@ static void DeAllocateMemory(void* px, u64 size) {
 	Assert(size);
 
 	size = GetArenaEffectiveSize(size);
-	u32 pow = CountTrailingZeroes64(size);
+	u32 pow = Ctz64(size);
 	u32 index = pow - ARENA_MIN_POW;
 
 	if (index >= ARENA_POOL_COUNT) {

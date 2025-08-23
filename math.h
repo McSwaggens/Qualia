@@ -2,6 +2,7 @@
 #define MATH_H
 
 #include "int.h"
+#include "concepts.h"
 
 struct Float32 {
 	union {
@@ -34,31 +35,8 @@ struct Float64 {
 static_assert(sizeof(Float32) == 4);
 static_assert(sizeof(Float64) == 8);
 
-static inline s8  Min(s8 a,  s8 b)  { return a <= b ? a : b; }
-static inline s16 Min(s16 a, s16 b) { return a <= b ? a : b; }
-static inline s32 Min(s32 a, s32 b) { return a <= b ? a : b; }
-static inline s64 Min(s64 a, s64 b) { return a <= b ? a : b; }
-
-static inline u8  Min(u8 a,  u8 b)  { return a <= b ? a : b; }
-static inline u16 Min(u16 a, u16 b) { return a <= b ? a : b; }
-static inline u32 Min(u32 a, u32 b) { return a <= b ? a : b; }
-static inline u64 Min(u64 a, u64 b) { return a <= b ? a : b; }
-
-static inline float32 Min(float32 a, float32 b) { return a <= b ? a : b; }
-static inline float64 Min(float64 a, float64 b) { return a <= b ? a : b; }
-
-static inline s8  Max(s8 a,  s8 b)  { return a <= b ? a : b; }
-static inline s16 Max(s16 a, s16 b) { return a <= b ? a : b; }
-static inline s32 Max(s32 a, s32 b) { return a <= b ? a : b; }
-static inline s64 Max(s64 a, s64 b) { return a <= b ? a : b; }
-
-static inline u8  Max(u8 a,  u8 b)  { return a <= b ? a : b; }
-static inline u16 Max(u16 a, u16 b) { return a <= b ? a : b; }
-static inline u32 Max(u32 a, u32 b) { return a <= b ? a : b; }
-static inline u64 Max(u64 a, u64 b) { return a <= b ? a : b; }
-
-static inline float32 Max(float32 a, float32 b) { return a <= b ? a : b; }
-static inline float64 Max(float64 a, float64 b) { return a <= b ? a : b; }
+template<Concepts::Numeric T> static inline T Min(T a, T b) { return a <= b ? a : b; }
+template<Concepts::Numeric T> static inline T Max(T a, T b) { return a <= b ? a : b; }
 
 template<typename T>
 static inline T Clamp(T v, T min, T max) { return v < min ? min : v > max ? max : v; }
@@ -72,7 +50,10 @@ static u32 Pow(u32 base, u32 exponent) { return __builtin_powl(base, exponent); 
 static s32 Pow(s32 base, s32 exponent) { return __builtin_powl(base, exponent); }
 
 template<typename T>
-static inline T Abs(T n) { return n >= 0 ? n : -n; }
+requires Concepts::SignedInteger<T> || Concepts::Float<T> 
+static inline T Abs(T n) {
+	return n >= 0 ? n : -n;
+}
 
 static inline u64 CarryAdd64(u64 a, u64 b, u64 carry_in, u64* carry_out) { return __builtin_addcll(a, b, carry_in, carry_out); }
 static inline u32 CarryAdd32(u32 a, u32 b, u32 carry_in, u32* carry_out) { return __builtin_addc  (a, b, carry_in, carry_out); }

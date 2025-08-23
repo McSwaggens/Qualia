@@ -3,6 +3,7 @@
 #include "assert.h"
 #include "parser.h"
 #include "ir.h"
+#include "math.h"
 
 static void Write(OutputBuffer* buffer, char c) { buffer->Write(c); }
 
@@ -115,9 +116,7 @@ static void Write(OutputBuffer* buffer, IntFormat format) {
 
 static void Write(OutputBuffer* buffer, String str) {
 	if (!str.data) COLD
-	{
 		buffer->Write("<null-string>");
-	}
 
 	buffer->Write(str.data, str.length);
 }
@@ -150,13 +149,11 @@ static void Write(OutputBuffer* buffer, Token token) {
 	switch (token.kind) {
 		case TOKEN_IDENTIFIER_CONSTANT:
 		case TOKEN_IDENTIFIER_CASUAL:
-		case TOKEN_IDENTIFIER_FORMAL:
-		{
+		case TOKEN_IDENTIFIER_FORMAL: {
 			Write(buffer, token.identifier_string);
 		} break;
 
-		case TOKEN_LITERAL_STRING:
-		{
+		case TOKEN_LITERAL_STRING: {
 			buffer->Write('"');
 			Write(buffer, token.literal_string);
 			buffer->Write('"');
@@ -171,20 +168,17 @@ static void Write(OutputBuffer* buffer, Token token) {
 		case TOKEN_LITERAL_UINT8:
 		case TOKEN_LITERAL_UINT16:
 		case TOKEN_LITERAL_UINT32:
-		case TOKEN_LITERAL_UINT64:
-		{
+		case TOKEN_LITERAL_UINT64: {
 			Write(buffer, token.literal_int);
 		} break;
 
 		case TOKEN_LITERAL_FLOAT:
 		case TOKEN_LITERAL_FLOAT32:
-		case TOKEN_LITERAL_FLOAT64:
-		{
+		case TOKEN_LITERAL_FLOAT64: {
 			Write(buffer, token.literal_float);
 		} break;
 
-		default:
-		{
+		default: {
 			Write(buffer, token.kind);
 		} break;
 	}
@@ -199,8 +193,7 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 	}
 
 	switch (GetTypeKind(type)) {
-		case TYPE_PRIMITIVE:
-		{
+		case TYPE_PRIMITIVE: {
 			switch (type) {
 				case TYPE_BYTE:    buffer->Write("byte");    break;
 				case TYPE_BOOL:    buffer->Write("bool");    break;
@@ -218,8 +211,7 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 			}
 		} return;
 
-		case TYPE_TUPLE:
-		{
+		case TYPE_TUPLE: {
 			TupleTypeInfo tuple_info = info->tuple_info;
 			buffer->Write('(');
 
@@ -231,8 +223,7 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 			buffer->Write(')');
 		} return;
 
-		case TYPE_FUNCTION:
-		{
+		case TYPE_FUNCTION: {
 			FunctionTypeInfo function_info = info->function_info;
 
 			bool is_input_type_tuple = GetTypeKind(function_info.input) == TYPE_TUPLE;
@@ -250,41 +241,35 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 			Write(buffer, function_info.output);
 		} return;
 
-		case TYPE_STRUCT:
-		{
+		case TYPE_STRUCT: {
 			StructTypeInfo struct_info = info->struct_info;
 			Ast_Struct* ast = struct_info.ast;
 			buffer->Write(ast->name);
 		} return;
 
-		case TYPE_ENUM:
-		{
+		case TYPE_ENUM: {
 			EnumTypeInfo enum_info = info->enum_info;
 			Ast_Enum* ast = enum_info.ast;
 			buffer->Write(ast->name);
 		} return;
 
-		case TYPE_POINTER:
-		{
+		case TYPE_POINTER: {
 			PointerTypeInfo* ptr_info = &info->pointer_info;
 			buffer->Write('*');
 			Write(buffer, ptr_info->subtype);
 		} return;
 
-		case TYPE_OPTIONAL:
-		{
+		case TYPE_OPTIONAL: {
 			buffer->Write('?');
 			Write(buffer, info->optional_info.subtype);
 		} return;
 
-		case TYPE_ARRAY:
-		{
+		case TYPE_ARRAY: {
 			buffer->Write("[]");
 			Write(buffer, info->array_info.subtype);
 		} return;
 
-		case TYPE_FIXED_ARRAY:
-		{
+		case TYPE_FIXED_ARRAY: {
 			buffer->Write('[');
 			Write(buffer, info->fixed_info.length);
 			buffer->Write(']');
@@ -321,8 +306,7 @@ static void Write(OutputBuffer* buffer, Ast_Type* type) {
 		case AST_BASETYPE_PRIMITIVE: Write(buffer, type->basetype.token); break;
 		case AST_BASETYPE_USERTYPE:  Write(buffer, type->basetype.token); break;
 
-		case AST_BASETYPE_TUPLE:
-		{
+		case AST_BASETYPE_TUPLE: {
 			buffer->Write("(");
 
 			for (Ast_Type* t = type->basetype.tuple; t < type->basetype.tuple.End(); t++) {
@@ -333,8 +317,7 @@ static void Write(OutputBuffer* buffer, Ast_Type* type) {
 			buffer->Write(")");
 		} break;
 
-		case AST_BASETYPE_FUNCTION:
-		{
+		case AST_BASETYPE_FUNCTION: {
 			buffer->Write("(");
 			Write(buffer, type->basetype.function.input);
 			buffer->Write(") -> (");
@@ -351,64 +334,56 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 	}
 
 	switch (expression->kind) {
-		case AST_EXPRESSION_TERMINAL_VARIABLE:
-		{
+		case AST_EXPRESSION_TERMINAL_VARIABLE: {
 			Ast_Expression_Variable* variable = (Ast_Expression_Variable*)expression;
 			buffer->Write("(Variable: ");
 			Write(buffer, variable->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_FUNCTION:
-		{
+		case AST_EXPRESSION_TERMINAL_FUNCTION: {
 			Ast_Expression_Function* function = (Ast_Expression_Function*)expression;
 			buffer->Write("(Function: ");
 			Write(buffer, function->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_INTRINSIC:
-		{
+		case AST_EXPRESSION_TERMINAL_INTRINSIC: {
 			Ast_Expression_Intrinsic* intrinsic = (Ast_Expression_Intrinsic*)expression;
 			buffer->Write("(Intrinsic: ");
 			Write(buffer, intrinsic->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_STRUCT:
-		{
+		case AST_EXPRESSION_TERMINAL_STRUCT: {
 			Ast_Expression_Struct* structure = (Ast_Expression_Struct*)expression;
 			buffer->Write("(Struct: ");
 			Write(buffer, structure->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_ENUM:
-		{
+		case AST_EXPRESSION_TERMINAL_ENUM: {
 			Ast_Expression_Enum* enumeration = (Ast_Expression_Enum*)expression;
 			buffer->Write("(Enum: ");
 			Write(buffer, enumeration->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER:
-		{
+		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER: {
 			Ast_Expression_Struct_Member* member = (Ast_Expression_Struct_Member*)expression;
 			buffer->Write("(Struct_Member: ");
 			Write(buffer, member->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER:
-		{
+		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER: {
 			Ast_Expression_Enum_Member* member = (Ast_Expression_Enum_Member*)expression;
 			buffer->Write("(Enum_Member: ");
 			Write(buffer, member->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_ARRAY:
-		{
+		case AST_EXPRESSION_ARRAY: {
 			Ast_Expression_Array* array = (Ast_Expression_Array*)expression;
 			buffer->Write("[ ");
 			Write(buffer, array->left);
@@ -416,8 +391,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			Write(buffer, array->right);
 			buffer->Write(" ]");
 		}
-		case AST_EXPRESSION_FIXED_ARRAY:
-		{
+		case AST_EXPRESSION_FIXED_ARRAY: {
 			Ast_Expression_Fixed_Array* fixed_array = (Ast_Expression_Fixed_Array*)expression;
 
 			buffer->Write("{ ");
@@ -436,8 +410,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
 		case AST_EXPRESSION_TERMINAL_ARRAY_BEGIN:
 		case AST_EXPRESSION_TERMINAL_ARRAY_END:
-		case AST_EXPRESSION_TERMINAL_ARRAY_LENGTH:
-		{
+		case AST_EXPRESSION_TERMINAL_ARRAY_LENGTH: {
 			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
 			Write(buffer, literal->token);
 		} break;
@@ -460,8 +433,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
 		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
 		case AST_EXPRESSION_BINARY_AND:
-		case AST_EXPRESSION_BINARY_OR:
-		{
+		case AST_EXPRESSION_BINARY_OR: {
 			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
 			buffer->Write("(");
 			Write(buffer, binary->left);
@@ -477,8 +449,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 		case AST_EXPRESSION_UNARY_MINUS:
 		case AST_EXPRESSION_UNARY_PLUS:
 		case AST_EXPRESSION_UNARY_BITWISE_NOT:
-		case AST_EXPRESSION_UNARY_NOT:
-		{
+		case AST_EXPRESSION_UNARY_NOT: {
 			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
 			buffer->Write("(");
 			Write(buffer, unary->op);
@@ -487,8 +458,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_SUBSCRIPT:
-		{
+		case AST_EXPRESSION_SUBSCRIPT: {
 			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
 			Write(buffer, subscript->array);
 			buffer->Write("[");
@@ -497,8 +467,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 		} break;
 
 		case AST_EXPRESSION_DOT_CALL:
-		case AST_EXPRESSION_CALL:
-		{
+		case AST_EXPRESSION_CALL: {
 			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
 			Write(buffer, call->function);
 			if (call->parameters->kind != AST_EXPRESSION_TUPLE) {
@@ -512,8 +481,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			}
 		} break;
 
-		case AST_EXPRESSION_TUPLE:
-		{
+		case AST_EXPRESSION_TUPLE: {
 			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
 			buffer->Write("(");
 			for (u32 i = 0; i < tuple->elements.length; i++) {
@@ -523,8 +491,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_IF_ELSE:
-		{
+		case AST_EXPRESSION_IF_ELSE: {
 			Ast_Expression_Ternary* ternary = (Ast_Expression_Ternary*)expression;
 			buffer->Write("(");
 			Write(buffer, ternary->left);
@@ -535,8 +502,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_AS:
-		{
+		case AST_EXPRESSION_AS: {
 			Ast_Expression_As* as = (Ast_Expression_As*)expression;
 
 			buffer->Write("(");
@@ -546,8 +512,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_IMPLICIT_CAST:
-		{
+		case AST_EXPRESSION_IMPLICIT_CAST: {
 			Ast_Expression_Implicit_Cast* cast = (Ast_Expression_Implicit_Cast*)expression;
 			buffer->Write("(Implicit_Cast: ");
 			Write(buffer, cast->type);
@@ -556,8 +521,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_LAMBDA:
-		{
+		case AST_EXPRESSION_LAMBDA: {
 			buffer->Write("(LAMBDA)");
 		} break;
 	}

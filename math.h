@@ -48,15 +48,15 @@ static inline u64 Min(u64 a, u64 b) { return a <= b ? a : b; }
 static inline float32 Min(float32 a, float32 b) { return a <= b ? a : b; }
 static inline float64 Min(float64 a, float64 b) { return a <= b ? a : b; }
 
-static inline s8  Max(s8 a,  s8 b)  { return a <= b ? a : b; }
-static inline s16 Max(s16 a, s16 b) { return a <= b ? a : b; }
-static inline s32 Max(s32 a, s32 b) { return a <= b ? a : b; }
-static inline s64 Max(s64 a, s64 b) { return a <= b ? a : b; }
+static inline s8  Max(s8 a,  s8 b)  { return a > b ? a : b; }
+static inline s16 Max(s16 a, s16 b) { return a > b ? a : b; }
+static inline s32 Max(s32 a, s32 b) { return a > b ? a : b; }
+static inline s64 Max(s64 a, s64 b) { return a > b ? a : b; }
 
-static inline u8  Max(u8 a,  u8 b)  { return a <= b ? a : b; }
-static inline u16 Max(u16 a, u16 b) { return a <= b ? a : b; }
-static inline u32 Max(u32 a, u32 b) { return a <= b ? a : b; }
-static inline u64 Max(u64 a, u64 b) { return a <= b ? a : b; }
+static inline u8  Max(u8 a,  u8 b)  { return a > b ? a : b; }
+static inline u16 Max(u16 a, u16 b) { return a > b ? a : b; }
+static inline u32 Max(u32 a, u32 b) { return a > b ? a : b; }
+static inline u64 Max(u64 a, u64 b) { return a > b ? a : b; }
 
 static inline float32 Max(float32 a, float32 b) { return a <= b ? a : b; }
 static inline float64 Max(float64 a, float64 b) { return a <= b ? a : b; }

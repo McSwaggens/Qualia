@@ -65,7 +65,7 @@ Array<byte> File::Load(String path, u64 left_pad, u64 right_pad) {
 		return null;
 	}
 
-	byte* data = AllocateMemory(left_pad + size + right_pad);
+	byte* data = (byte*)AllocMemory(left_pad + size + right_pad);
 
 	file.Read(data + left_pad, size);
 

@@ -64,30 +64,27 @@ static void GenerateRandomNumbers(u64* numbers, u64 n) {
 		state ^= state >>  7;
 		state ^= state << 17;
 
-		numbers[i] = state;
+		numbers[i] = state & 0xffff;
 	}
 }
 
 int main(int argc, char** args) {
-	InitGlobalArena();
+	InitGlobalAllocator();
 	InitTypeSystem();
 	InitIntrinsics();
 	IR::Init();
 
 	u64 max_numbers = (1llu<<37) / sizeof(u64);
-	u64* numbers = Allocate<u64>(max_numbers);
-	for (u64 n = 0; n <= max_numbers; n++) {
+	u64* numbers = Alloc<u64>(max_numbers);
+	for (u64 n = max_numbers; n <= max_numbers; n++) {
 		Print("Generating % random numbers...", n);
-		output_buffer.Flush();
 		GenerateRandomNumbers(numbers, n);
 		// Print("\nrandom = %\n", Array<u64>(numbers, n));
 
 		Print(" Sorting...");
-		output_buffer.Flush();
-		QuickSort(numbers, numbers + n);
+		RadixSort(Array<u64>(numbers, numbers + n));
 
 		Print(" Verifying...");
-		output_buffer.Flush();
 		bool is_sorted = IsSorted(numbers, numbers + n);
 		if (!is_sorted) {
 			Print(" FAILURE!\n");
@@ -100,17 +97,17 @@ int main(int argc, char** args) {
 
 	}
 
-	// const String files[] = {
-	// 	"test.q",
-	// 	// "test_literals.q"
-	// };
+	const String files[] = {
+		"test.q",
+		// "test_literals.q"
+	};
 
-	// for (u32 i = 0; i < COUNT(files); i++) {
-	// 	Print("Compiling: %\n", files[i]);
-	// 	CompileFile(files[i]);
-	// }
+	for (u32 i = 0; i < COUNT(files); i++) {
+		Print("Compiling: %\n", files[i]);
+		CompileFile(files[i]);
+	}
 
-	// Print("Compiler finished.\n");
+	Print("Compiler finished.\n");
 
 	output_buffer.Flush();
 	error_buffer.Flush();

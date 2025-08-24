@@ -38,7 +38,7 @@ static TypeID GetDominantType(TypeID a, TypeID b) {
 		return a;
 
 	if (a < b)
-		Swap(&a, &b);
+		Swap(a, b);
 
 	if (IsInteger(a) && IsInteger(b)) {
 		bool sign = IsSignedInteger(a) && IsSignedInteger(b);
@@ -183,7 +183,7 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to) {
 
 static void AddExtensionEntry(ExtensionTable* table, ExtensionEntry entry) {
 	if (!table->count || IsPow2(table->count & -16)) {
-		table->entries = (ExtensionEntry*)ReAllocateMemory(
+		table->entries = (ExtensionEntry*)ReAllocMemory(
 			table->entries,
 			sizeof(ExtensionEntry) * table->count,
 			sizeof(ExtensionEntry) * RaisePow2(table->count|16)
@@ -197,7 +197,7 @@ static void InitTypeSystem(void) {
 	ZeroMemory(&type_system);
 	type_system.info_count = CORE_TYPES_COUNT;
 	type_system.info_capacity = 1<<20;
-	type_system.infos = (TypeInfo*)AllocateMemory(type_system.info_capacity*sizeof(TypeInfo));
+	type_system.infos = (TypeInfo*)AllocMemory(type_system.info_capacity*sizeof(TypeInfo));
 
 	for (s32 prim = PRIMITIVE_BEGIN; prim < PRIMITIVE_END; prim++) {
 		TypeInfo* info = &type_system.infos[prim];
@@ -256,7 +256,7 @@ static TypeID CreateType(TypeKind kind, TypeInfo info) {
 	if (type_system.info_count == type_system.info_capacity) COLD
 	{
 		type_system.info_capacity <<= 4;
-		type_system.infos = (TypeInfo*)ReAllocateMemory(
+		type_system.infos = (TypeInfo*)ReAllocMemory(
 			type_system.infos,
 			sizeof(TypeInfo) * type_system.info_count,
 			sizeof(TypeInfo) * (type_system.info_capacity)
@@ -414,8 +414,7 @@ static TypeID GetTuple(TypeID* elements, u64 count) {
 	for (s32 i = 0; i < count; i++)
 		size += GetTypeSize(elements[i]);
 
-	TypeID* new_elements = (TypeID*)AllocateMemory(sizeof(TypeID) * count);
-	Copy(new_elements, elements, count);
+	TypeID* new_elements = CopyAlloc(elements, count);
 
 	TypeID result = CreateType(TYPE_TUPLE, {
 		.size = size,

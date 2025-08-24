@@ -33,10 +33,10 @@ static inline void Assume(bool b) { __builtin_assume(b); }
 #define GetInternalColumnNumber() __builtin_COLUMN()
 
 template<typename T>
-static inline void Swap(T* a, T* b) {
-	T tmp = *a;
-	*a = *b;
-	*b = tmp;
+static inline void Swap(T& a, T& b) {
+	T tmp = a;
+	a = b;
+	b = tmp;
 }
 
 static u64 MaskLowerBits64(u64 n, u64 bits)   { return n & (-1 >> (sizeof(n) * 8 - bits)); }
@@ -73,6 +73,7 @@ static inline u64 PopCount64(u64 n) { return __builtin_popcountll(n); }
 static inline u32 PopCount32(u32 n) { return __builtin_popcount(n); }
 static inline u16 PopCount16(u16 n) { return __builtin_popcount((u32)n); }
 static inline u8  PopCount8(u8 n)   { return __builtin_popcount((u32)n); }
+static inline u64 PopCount(u64 n) { return __builtin_popcountll(n); }
 
 // lzcnt
 // `n == 0` check is here to prevent clang from braking the program. Branch is removed.
@@ -91,6 +92,7 @@ static inline u64 Boi64(u64 n) { return 64llu-Clz64(n); }
 static inline u32 Boi32(u32 n) { return 32-Clz32(n); }
 static inline u32 Boi16(u16 n) { return 16-Clz16(n); }
 static inline u32 Boi8(u8 n)   { return 8-Clz8(n); }
+static inline u64 Boi(u64 n) { return 64llu-Clz64(n); }
 
 static inline bool IsPow2(u64 n) { return PopCount64(n) == 1; }
 

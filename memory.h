@@ -9,41 +9,49 @@
 
 // ------------------------------------------- //
 
-static void InitGlobalArena();
+static void InitGlobalAllocator();
 
 // ------------------------------------------- //
 
-static byte* AllocateMemory(u64 size);
-static byte* ReAllocateMemory(void* p, u64 old_size, u64 new_size);
-static void  DeAllocateMemory(void* p, u64 size);
-
-// ------------------------------------------- //
-
-template<typename T>
-static inline T* Allocate(u64 count = 1) {
-	return (T*)AllocateMemory(count * sizeof(T));
-}
-
-template<typename T>
-static inline T* ReAllocate(T* p, u64 old_count, u64 new_count) {
-	return (T*)ReAllocateMemory((byte*)p, old_count * sizeof(T), new_count * sizeof(T));
-}
-
-template<typename T>
-static inline void DeAllocate(T* p, u64 count = 1) {
-	DeAllocateMemory((byte*)p, count * sizeof(T));
-}
+static void* AllocMemory(u64 size);
+static void* ReAllocMemory(void* p, u64 old_size, u64 new_size);
+static void  FreeMemory(void* p, u64 size);
+static void* CopyAllocMemory(void* p, u64 size);
 
 // ------------------------------------------- //
 
 template<typename T>
-static inline void DeAllocateArray(Array<T> array) {
-	DeAllocateMemory(array.data, sizeof(T) * array.count);
+static inline T* Alloc(u64 count = 1) {
+	return (T*)AllocMemory(count * sizeof(T));
 }
 
 template<typename T>
-static inline Array<T> AllocateArray(u64 count) {
-	return Array<T>((T*)AllocateMemory(count * sizeof(T)), count);
+static inline T* ReAlloc(T* p, u64 old_count, u64 new_count) {
+	return (T*)ReAllocMemory((byte*)p, old_count * sizeof(T), new_count * sizeof(T));
+}
+
+template<typename T>
+static inline void Free(T* p, u64 count = 1) {
+	FreeMemory((byte*)p, count * sizeof(T));
+}
+
+template<typename T>
+static inline T* CopyAlloc(T* p, u64 count) {
+	T* result = Alloc<T>(count);
+	Copy(result, p, count);
+	return result;
+}
+
+// ------------------------------------------- //
+
+template<typename T>
+static inline void FreeArray(Array<T> array) {
+	FreeMemory(array.data, sizeof(T) * array.count);
+}
+
+template<typename T>
+static inline Array<T> AllocArray(u64 count) {
+	return Array<T>((T*)AllocMemory(count * sizeof(T)), count);
 }
 
 // ------------------------------------------- //
@@ -57,6 +65,19 @@ static void Copy(T* dest, const T* src, u64 count) {
 	CopyMemory((byte*)dest, (byte*)src, count * sizeof(T));
 }
 
+// ------------------------------------------- //
+
+static void MoveMemory(byte* dest, const byte* src, u64 count) {
+	__builtin_memmove(dest, src, count);
+}
+
+template<typename T>
+static void Move(T* dest, const T* src, u64 count) {
+	MoveMemory((byte*)dest, (byte*)src, count * sizeof(T));
+}
+
+// ------------------------------------------- //
+
 // @cleanme Change to Fill
 template<typename T>
 static void FillMemory(T* dest, u64 count, T value) {
@@ -68,6 +89,8 @@ template<typename T>
 static void FillMemory(T* begin, T* end, T value) {
 	for (; begin < end; begin++) *begin = value;
 }
+
+// ------------------------------------------- //
 
 // @cleanme Change to Compare
 // @cleanme return int? Or maybe use <=> operator now?
@@ -88,6 +111,11 @@ static inline bool Compare(const T* a, const T* b, u64 count = 1) {
 template<typename T>
 static inline void ZeroMemory(T* begin, T* end) {
 	__builtin_memset((char*)begin, 0, (char*)end - (char*)begin);
+}
+
+template<typename T>
+static inline void Zero(T* p, u64 count = 1) {
+	ZeroMemory(p, p + count);
 }
 
 template<typename T>

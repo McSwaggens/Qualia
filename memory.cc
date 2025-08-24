@@ -1,126 +1,201 @@
 #include "memory.h"
 #include "general.h"
 #include "assert.h"
+#include "math.h"
+#include "print.h"
 
 #include "os.h"
 
-struct ArenaPool {
-	// @cleanme Put functions inside here
-	void* head;
-	void* data;
-	u32 count;
-};
+static const u64 GA_MIN_POW  = 4;
+static const u64 GA_MIN_SIZE = 1llu << GA_MIN_POW;
+static const u64 GA_LOWER_MASK =  (OS::PAGE_SIZE-1) & -GA_MIN_SIZE;
+static const u64 GA_UPPER_MASK = -OS::PAGE_SIZE;
 
-static const u64 ARENA_MIN_POW    = 5;
-static const u64 ARENA_MIN_SIZE   = (1 << ARENA_MIN_POW);
-static const u64 ARENA_POOL_COUNT = (16 - ARENA_MIN_POW);
+struct GlobalAllocatorPool {
+	byte* stack_head = null;
+	byte* stack_tail = null;
+	byte* linked_list_head = null;
 
-struct Arena {
-	// @cleanme Put functions inside here
-	ArenaPool pools[ARENA_POOL_COUNT];
-};
+	bool IsStackEmpty()      { return stack_head >= stack_tail; }
+	bool IsLinkedListEmpty() { return !linked_list_head; }
+	bool IsEmpty() { return IsLinkedListEmpty() && IsStackEmpty(); }
 
-static Arena arena;
-
-static void InitGlobalArena() {
-	ZeroMemory(&arena);
-	byte* pages = OS::AllocateVirtualMemory((1<<21) * ARENA_POOL_COUNT);
-
-	for (u32 index = 0; index < ARENA_POOL_COUNT; index++) {
-		ArenaPool* pool = &arena.pools[index];
-
-		u32 pow = index + ARENA_MIN_POW;
-
-		pool->head = null;
-		pool->data = pages;
-		pool->count = 1<<(21-pow);
-
-		*(char*)pool->data = 42;
-
-		pages += (1<<21);
+	void InsertLinkedList(byte* p) {
+		*(byte**)p = linked_list_head;
+		linked_list_head = p;
 	}
-}
 
-static u64 GetArenaEffectiveSize(u64 size) {
-	return RaisePow2(size-1 | ARENA_MIN_SIZE-1);
-}
+	void SetStack(byte* p, u64 size) {
+		Assert(stack_head == stack_tail);
+		Assert(size);
+		Assert(p);
 
-static byte* AllocateMemory(u64 size) {
-	Assert(size);
+		stack_head = p;
+		stack_tail = p + size;
+	}
 
-	size = GetArenaEffectiveSize(size);
-	u32 pow = Ctz64(size);
-	u32 index = pow - ARENA_MIN_POW;
+	byte* TakeLinkedList() {
+		Assert(!IsLinkedListEmpty());
 
-	if (index >= ARENA_POOL_COUNT)
-		return OS::AllocateVirtualMemory(size);
+		byte* result = linked_list_head;
+		linked_list_head = *(byte**)linked_list_head;
 
-
-	ArenaPool* pool = &arena.pools[index];
-
-	if (pool->head) {
-		byte* result = (byte*)pool->head;
-		pool->head = *(byte**)result;
 		return result;
 	}
 
-	if (!pool->count) {
-		pool->data = OS::AllocateVirtualMemory(1<<21);
-		pool->count = 1<<(21-pow);
+	byte* TakeStack(u64 size) {
+		Assert(!IsStackEmpty());
+
+		byte* result = stack_head;
+		stack_head += size;
+
+		return result;
+	}
+};
+
+struct GlobalAllocator {
+	u64 map = 0;
+	GlobalAllocatorPool pools[64] = { };
+
+	void Init() {
+		map = GA_LOWER_MASK;
+
+		u64   block_size = PopCount(map) * OS::PAGE_SIZE;
+		byte* block = OS::AllocateVirtualMemory(block_size);
+
+		byte* p = block;
+		for (u32 i = 0; i < PopCount(map); i++) {
+			pools[GA_MIN_POW + i].SetStack(p, OS::PAGE_SIZE);
+			p += OS::PAGE_SIZE;
+		}
+
+		Assert(p == block + block_size);
 	}
 
-	byte* result = (byte*)pool->data;
-	pool->data = (byte*)pool->data + size;
-	pool->count--;
+	u64 NormalizeSize(u64 size) {
+		return RaisePow2((size + (GA_MIN_SIZE-1)) & -GA_MIN_SIZE);
+	}
 
-	result = (byte*)AssumeAligned(result, 1ll << ARENA_MIN_POW);
-	return result;
-}
+	void InsertSingle(u64 bit, u64 pool_index, byte* block) {
+		GlobalAllocatorPool* pool = &pools[pool_index];
 
-static void DeAllocateMemory(void* px, u64 size) {
-	byte* p = (byte*)px; // Sepples
+		if (pool->IsStackEmpty()) pool->SetStack(block, bit);
+		else                      pool->InsertLinkedList(block);
 
-	if (!p) return;
+		map |= bit;
+	}
 
-	// Check if p is not null? Or leave that up to the caller?
-	Assert(size);
+	byte* Take(u64 pool_index) {
+		GlobalAllocatorPool* pool = &pools[pool_index];
+		u64 bit = 1llu << pool_index;
 
-	size = GetArenaEffectiveSize(size);
-	u32 pow = Ctz64(size);
-	u32 index = pow - ARENA_MIN_POW;
+		Assert(map & bit);
+		Assert(!pool->IsEmpty());
 
-	if (index >= ARENA_POOL_COUNT) {
-		OS::FreeVirtualMemory(p, size);
+		byte* result;
+		if (!pool->IsLinkedListEmpty()) result = pool->TakeLinkedList();
+		else                            result = pool->TakeStack(bit);
+
+		if (pool->IsEmpty())
+			map ^= bit;
+
+		Assert(result);
+		return result;
+	}
+
+	void Fill(u64 bit, u64 index) {
+		Assert(pools[index].IsEmpty());
+		Assert(~map & bit);
+		Assert(PopCount(bit) == 1);
+
+		u64 upper_map = map & GA_UPPER_MASK & -bit;
+
+		if (!upper_map) {
+			u64 block_size = Max(bit << 4llu, OS::PAGE_SIZE); // This is not great.. :(
+			byte* block = (byte*)OS::AllocateVirtualMemory(block_size);
+			Assert(block_size > bit * 2);
+			Assert(block);
+
+			pools[index].SetStack(block, block_size);
+			map |= bit;
+
+			Assert(!pools[index].IsEmpty());
+
+			return;
+		}
+
+		// Spill.
+		u64 take_index = Ctz64(upper_map);
+		u64 block_size = 1llu << take_index;
+		byte* block = Take(take_index);
+		Assert(block_size > bit * 2);
+
+		pools[index].SetStack(block, block_size);
+		Assert(!pools[index].IsEmpty());
+		map |= bit;
+
 		return;
 	}
 
-	ArenaPool* pool = &arena.pools[index];
-	*(void**)p = pool->head;
-	pool->head = p;
+	byte* Allocate(u64 size) {
+		u64 bit   = NormalizeSize(size);
+		u64 index = Ctz64(bit);
+
+		if (!(map & bit))
+			Fill(bit, index);
+
+		return Take(index);
+	}
+
+	void Free(byte* p, u64 size) {
+		u64 bit   = NormalizeSize(size);
+		u64 index = Ctz64(bit);
+
+		InsertSingle(bit, index, p);
+	}
+} static global_allocator;
+
+static void* AllocMemory(u64 size) {
+	// Print("AllocMemory(size = %)\n", size);
+	return global_allocator.Allocate(size);
 }
 
-static byte* ReAllocateMemory(void* px, u64 old_size, u64 new_size) {
-	byte* p = (byte*)px; // Sepples
-	// @Todo: Deal with shrinking
-	Assert(new_size > old_size); // @RemoveMe @FixMe
-	Assert(new_size);
-	Assert(new_size != old_size, "Redundant ReAllocation\n");
+static void FreeMemory(void* p, u64 size) {
+	// Print("FreeMemory(p = %, size = %)\n", p, size);
+	if (!p) return;
+	global_allocator.Free((byte*)p, size);
+}
 
+static void* ReAllocMemory(void* p, u64 old_size, u64 new_size) {
+	// Print("ReAllocMemory(p = %, old_size = %, new_size = %)\n", p, old_size, new_size);
+	u64 old_real_size = old_size;
 
-	if (new_size <= GetArenaEffectiveSize(old_size)) {
-		// Print("[SAME]   ReAllocate(%, %)\n", GetArenaEffectiveSize(old_size), GetArenaEffectiveSize(new_size));
+	old_size = global_allocator.NormalizeSize(old_size);
+	new_size = global_allocator.NormalizeSize(new_size);
+
+	if (old_size == new_size)
 		return p;
+
+	void* result = global_allocator.Allocate(new_size);
+
+	if (old_size)
+	{
+		CopyMemory((byte*)result, (byte*)p, old_real_size);
+		FreeMemory(p, old_size);
 	}
-
-	byte* result = (byte*)AllocateMemory(new_size);
-
-	if (old_size) {
-		CopyMemory(result, p, old_size);
-		DeAllocateMemory(p, old_size);
-	}
-
-	Assert(result);
+	else Assert(!p);
 
 	return result;
 }
 
+static void* CopyAllocMemory(void* p, u64 size) {
+	// Print("CopyAllocMemory(p = %, size = %)\n", p, size);
+	void* result = global_allocator.Allocate(size);
+	CopyMemory((byte*)result, (byte*)p, size);
+
+	return result;
+}
+
+static void InitGlobalAllocator() {
+	global_allocator.Init();
+}

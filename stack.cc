@@ -1,5 +1,4 @@
 #include "stack.h"
-
 #include "assert.h"
 #include "os.h"
 

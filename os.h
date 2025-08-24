@@ -12,6 +12,8 @@ namespace OS {
 		PAGE_FLAG_STACK   = 0x04,
 	};
 
+	static constexpr u64 PAGE_SIZE = 4096;
+
 	[[noreturn]]
 	void Terminate(bool success = true);
 

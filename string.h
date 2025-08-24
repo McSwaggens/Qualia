@@ -75,7 +75,7 @@ struct String {
 		if (length + other.length >= capacity) {
 			u32 old_capacity = capacity;
 			capacity = capacity * 2 + other.length;
-			data = ReAllocate(data, old_capacity, capacity);
+			data = ReAlloc(data, old_capacity, capacity);
 		}
 
 		CopyMemory(data + length, other.data, other.length);
@@ -86,7 +86,7 @@ struct String {
 		if (length + 1 >= capacity) {
 			u32 old_capacity = capacity;
 			capacity += length + 1;
-			data = ReAllocate(data, old_capacity, capacity);
+			data = ReAlloc(data, old_capacity, capacity);
 		}
 
 		data[length++] = c;
@@ -113,7 +113,7 @@ struct String {
 	}
 
 	String Copy() {
-		String copy = String(Allocate<char>(length), length, capacity);
+		String copy = String(Alloc<char>(length), length, capacity);
 		CopyMemory(copy.data, data, length);
 		return copy;
 	}
@@ -123,7 +123,7 @@ struct String {
 	}
 
 	void Free() {
-		DeAllocate(data, capacity);
+		::Free(data, capacity);
 
 		data = null;
 		length = 0;
@@ -132,7 +132,7 @@ struct String {
 };
 
 static inline String AllocateString(u64 length, u64 extra_capacity) {
-	return String(Allocate<char>(length+extra_capacity), length, length+extra_capacity);
+	return String(Alloc<char>(length+extra_capacity), length, length+extra_capacity);
 }
 
 template<u64 N>

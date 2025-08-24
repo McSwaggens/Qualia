@@ -6,29 +6,29 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "print.cc"
-
 [[noreturn]]
 void OS::Terminate(bool success) {
 	_exit(!success);
 	Unreachable();
 }
 
-#include "print.h"
-
 byte* OS::AllocateVirtualMemory(u64 size, PageFlags flags) {
-	Print("OS::AllocateVirtualMemory(%)\n", size);
 	u64 protection = PROT_READ; // Pages are always readable on x86.
 	if (flags & PAGE_FLAG_WRITE)   protection |= PROT_WRITE;
 	// if (flags & PAGE_FLAG_STACK)   protection |= PROT_GROWSDOWN;
 	if (flags & PAGE_FLAG_EXECUTE) protection |= PROT_EXEC;
 
 	u64 mflags = MAP_ANONYMOUS | MAP_PRIVATE;
-	// if (flags & PAGE_FLAG_STACK) protection |= PROT_GROWSDOWN;
+
+	if (size >= 8llu << 30)
+		mflags |= MAP_NORESERVE;
 
 	byte* page = (byte*)mmap(0, size, protection, mflags, -1, 0);
 
 	page = (byte*)AssumeAligned(page, 4096);
+
+	if (page == (void*)-1)
+		return 0;
 
 	return page;
 }

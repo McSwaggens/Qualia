@@ -1,27 +1,30 @@
 #pragma once
 
 #include "memory.h"
+#include "assert.h"
+#include "math.h"
 
 template<typename T>
 struct List {
-	T*  data = null;
-	u32 count = 0;
+	T*  data     = null;
+	u32 count    = 0;
 	u32 capacity = 0;
 
-	List() = default;
-	List(Null) : data(null), count(0), capacity(0) { }
-	T& operator[](u32 n) { return data[n]; }
-	T  operator[](u32 n) const { return data[n]; }
+	constexpr List() = default;
+	constexpr List(Null) : data(null), count(0), capacity(0) { }
 
-	constexpr T* Begin() { return data; }
-	constexpr T* End()   { return data + count; }
+	constexpr T& operator[](u32 n) { return data[n]; }
+	constexpr T  operator[](u32 n) const { return data[n]; }
+
+	constexpr       T* Begin()       { return data; }
 	constexpr const T* Begin() const { return data; }
-	constexpr const T* End()   const { return data + count; }
-
-	constexpr T* begin() { return data; }
-	constexpr T* end()   { return data + count; }
+	constexpr       T* begin()       { return data; }
 	constexpr const T* begin() const { return data; }
-	constexpr const T* end()   const { return data + count; }
+
+	constexpr       T* End()       { return data + count; }
+	constexpr const T* End() const { return data + count; }
+	constexpr       T* end()       { return data + count; }
+	constexpr const T* end() const { return data + count; }
 
 	constexpr bool operator ==(List<T> o) {
 		if (count != o.count)
@@ -39,117 +42,102 @@ struct List {
 
 	constexpr bool operator !=(List<T> o) { return !(*this == o); }
 
-	constexpr T& Last() { return data[count-1]; }
+	constexpr operator bool() { return count != 0; }
+	constexpr bool IsEmpty()  { return count == 0; }
 
-	T& Force(u32 n) {
-		if (capacity <= n) {
-			u32 new_capacity = NextPow2(n);
-			data = ReAllocate(data, capacity, new_capacity);
-			ZeroMemory(data+count, new_capacity - capacity);
-			capacity = new_capacity;
-			count = n;
-		}
-		else if (count < n) {
-			count = n;
-		}
+	constexpr T& Last()  { Assert(!IsEmpty()); return data[count-1]; }
+	constexpr T& First() { Assert(!IsEmpty()); return data[0]; }
 
-		return data[n];
+	u32 NextCapacity(u32 n) {
+		if (n == 0) return 0;
+		if (n <= 8) return 8;
+		return NextPow2(n);
 	}
 
-	T* LinearFind(T value) {
-		for (u32 i = 0; i < count; i++) {
-			if (Compare(data+i, value)) return data + i;
-		}
+	void ChangeCapacity(u32 new_capacity) {
+		new_capacity = NextCapacity(new_capacity);
+		data = ReAlloc(data, capacity, new_capacity);
+		capacity = new_capacity;
+	}
 
-		return null;
+	void AssureCapacity(u32 new_capacity) {
+		if (capacity >= new_capacity)
+			return;
+
+		ChangeCapacity(new_capacity);
 	}
 
 	void Add(T item) {
-		if (count == capacity) {
-			capacity = NextPow2(count+8);
-			data = ReAllocate(data, count, capacity);
-		}
-
+		AssureCapacity(count + 1);
 		data[count++] = item;
 	}
 
 	bool AddIfUnique(T item) {
-		for (u32 i = 0; i < count; i++) {
-			if (data[i] == item) {
-				return false;
-			}
-		}
+		if (Contains(item))
+			return false;
 
 		Add(item);
 		return true;
 	}
 
 	void Add(T item, u32 amount) {
-		if (count + amount >= capacity) {
-			u32 old_capacity = capacity;
-			capacity = (count + amount) * 2;
-			data = ReAllocate(data, old_capacity, capacity);
-		}
-
-		FillMemory(data + count, amount, item);
+		AssureCapacity(count + amount);
+		FillMemory(End(), amount, item);
 		count += amount;
 	}
 
-	void Replace(T old_item, T new_item) {
-		for (T* p = Begin(); p < End(); p++) {
-			if (*p == old_item) {
-				*p = new_item;
-				return;
-			}
-		}
+	void Add(List<T> items) {
+		AssureCapacity(count + items.count);
+		Copy(End(), items.Begin(), items.count);
+		count += items.count;
 	}
 
-	void ReplaceAll(T old_item, T new_item) {
-		for (T* p = Begin(); p < End(); p++) {
-			if (*p == old_item) {
-				*p = new_item;
-			}
-		}
+	void RemoveIndex(u32 index, u32 n = 1) {
+		Assert(index + n <= count);
+
+		if (index + n != count)
+			Move(data + index, data + index + n, End() - (data + index + n));
+
+		count -= n;
+	}
+
+	void Insert(T item, u32 index) {
+		AssureCapacity(count + 1);
+		index = Min(index, count);
+		Move(data + index + 1, data + index, count - index);
+		data[index] = item;
+		count++;
+	}
+
+	void Insert(Array<T> items, u32 index) {
+		AssureCapacity(count + items.length);
+		index = Min(index, count);
+		Move(data + index + items.length, data + index, count - index);
+		Copy(data + index, items, items.length);
+		count += items.length;
+	}
+
+	void Insert(List<T> items, u32 index) {
+		Insert(items.ToArray());
 	}
 
 	void Remove(T item) {
 		T* p = Begin();
 		while (p < End() && *p != item) p++;
 		if (p != End()) {
-			while (p+1 != End()) {
+			while (p+1 != End())
 				*p = *++p;
-			}
 
 			count--;
 		}
 	}
 
 	bool Contains(T value) {
-		for (u32 i = 0; i < count; i++) {
-			if (data[i] == value) {
+		for (u32 i = 0; i < count; i++)
+			if (data[i] == value)
 				return true;
-			}
-		}
 
 		return false;
-	}
-
-	void Pad(u32 amount) {
-		if (count + amount >= capacity) {
-			u32 old_capacity = capacity;
-			capacity = count + amount;
-			data = ReAllocate(data, old_capacity, capacity);
-		}
-	}
-
-	void Pad(u32 amount, T value) {
-		if (count + amount >= capacity) {
-			u32 old_capacity = capacity;
-			capacity = count + amount;
-			data = ReAllocate(data, old_capacity, capacity);
-		}
-
-		FillMemory(data + count, amount, value);
 	}
 
 	void Clear() {
@@ -160,41 +148,24 @@ struct List {
 		return Array<T>(data, count);
 	}
 
+	void Copy() {
+		return List<T>{
+			.capacity = capacity,
+			.count = count,
+			.data = CopyAllocate<T>(data, capacity)
+		};
+	}
+
 	void Free() {
-		DeAllocate(data, count);
+		DeAllocate(data, capacity);
 	}
 };
 
 template<typename T>
 static inline List<T> AllocateList(u32 capacity = 16) {
 	List<T> list;
-	list.data = Allocate<T>(capacity);
-	list.count = 0;
-	list.capacity = capacity;
+	list.AssureCapacity(capacity);
 	return list;
-}
-
-// ------------------------------------------- //
-
-template<typename T>
-static inline List<T> CopyList(List<T> src, u32 padding = 0) {
-	List<T> list;
-	list.count = src.count;
-	list.capacity = src.count + padding;
-	list.data = (T*)AllocateMemory(list.capacity * sizeof(T));
-	CopyMemory(list.data, src.data, list.count);
-	return list;
-}
-
-template<typename T>
-static inline void AppendListToList(List<T>* list, const List<T> other) {
-	if (list->count + other.count >= list->capacity) {
-		list->capacity += other.count;
-		list->data = ReAllocate(list->data, list->capacity);
-	}
-
-	CopyMemory(list->data + list->count, other.data, other.count);
-	list->count += other.count;
 }
 
 template<typename T>

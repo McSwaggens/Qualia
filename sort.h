@@ -77,6 +77,27 @@ static void RadixSort(Array<T> array) {
 
 // -------------------------------------------------- //
 
+template<typename T> requires(sizeof(T) == 1)
+static void CountSort(Array<T> array) {
+	u64 counters[256] = { };
+
+	for (u8* p = array; p < array.End(); p++)
+		counters[*p]++;
+
+	u8 offset = 0;
+	if constexpr (Concepts::IsSignedInteger<T>())
+		offset = 128;
+
+	T* p = array;
+	for (u64 i = 0; i < 256; i++) {
+		u64 counter = counters[i+offset & 255];
+		FillMemory<u8>(p, p + counter, i);
+		p += counter;
+	}
+}
+
+// -------------------------------------------------- //
+
 template<typename T>
 static bool IsSorted(T* begin, T* end) {
 	for (T* p = begin; p < end-1; p++)

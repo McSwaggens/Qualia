@@ -64,7 +64,7 @@ static TypeID GetBaseType(Ast_BaseType basetype, Ast_Scope* scope, Ast_Module* m
 				types[i] = GetType(&basetype.tuple[i], scope, module);
 			}
 
-			result = GetTuple(types, tuple_count);
+			result = GetTuple({types, tuple_count});
 		} break;
 
 		case AST_BASETYPE_FUNCTION: {
@@ -958,7 +958,7 @@ static void GenerateClosure(Ast_Struct* target, Array<TypeID> tuple) {
 			}
 		}
 		else if (GetTypeKind(type) == TYPE_TUPLE) {
-			GenerateClosure(target, Array<TypeID>(type_info->tuple_info.elements, type_info->tuple_info.count));
+			GenerateClosure(target, type_info->tuple_info.elements);
 		}
 	}
 }
@@ -974,7 +974,7 @@ static void GenerateClosure(Ast_Struct* target, Ast_Struct* ast_struct) {
 			}
 		}
 		else if (GetTypeKind(type) == TYPE_TUPLE) {
-			GenerateClosure(target, Array<TypeID>(type_info->tuple_info.elements, type_info->tuple_info.count));
+			GenerateClosure(target, type_info->tuple_info.elements);
 		}
 	}
 }
@@ -996,9 +996,8 @@ static void CalculateTupleSize(TypeID tuple) {
 
 	u64 size = 0;
 
-	Assert(info->tuple_info.count);
-	for (u32 i = 0; i < info->tuple_info.count; i++) {
-		TypeID element_type = info->tuple_info.elements[i];
+	Assert(info->tuple_info.elements.length);
+	for (TypeID element_type : info->tuple_info.elements) {
 
 		if (GetTypeKind(element_type) == TYPE_STRUCT) {
 			CalculateStructSize(GetTypeInfo(element_type)->struct_info.ast);

@@ -391,7 +391,7 @@ bool Lexer::TestKeyword(TokenKind keyword) {
 	String keyword_string = ToString(keyword);
 	char post = cursor[keyword_string.length];
 
-	if (!CompareMemory(cursor, ToString(keyword).data, ToString(keyword).length))
+	if (CompareMemory(cursor, ToString(keyword).data, ToString(keyword).length) != 0)
 		return false;
 
 	if (IsAlpha(post))
@@ -486,7 +486,6 @@ void Lexer::Parse() {
 
 			case 'a':
 				if (TestKeyword(TOKEN_ALIAS))   break;
-				if (TestKeyword(TOKEN_AND))     break;
 				if (TestKeyword(TOKEN_AS))      break;
 				if (TestKeyword(TOKEN_ASM))     break;
 				goto PARSE_IDENTIFIER;

@@ -18,10 +18,10 @@ static void InitArrayBufferPool();
 
 template<typename T>
 struct ArrayBuffer {
-	T* data;
-	u64 count;
-	u64 capacity;
-	u64 size;
+	T*  data     = null;
+	u64 count    = 0;
+	u64 capacity = 0;
+	u64 size     = 0;
 
 	void Add(T value) {
 		if (count+1 >= capacity) COLD {

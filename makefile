@@ -18,11 +18,11 @@ ifeq ($(OS_NAME), Linux)
 	RELEASE+=-march=x86-64-v3
 endif
 
-FLAGS := $(RELEASE)
-FLAGS += -std=c++23
+FLAGS := $(DEBUG)
+FLAGS += -std=c++20
 FLAGS += -nostdinc++ -fno-rtti -fno-exceptions -Wno-vla-cxx-extension
 FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wshift-op-parentheses
-FLAGS += -MJ compile_commands.json
+# FLAGS += -MJ compile_commands.json
 
 qualia_xxx: *.cc *.h $(OS_FILE).o
 	clang -lm $(FLAGS) qualia.cc $(OS_FILE).o -o qualia

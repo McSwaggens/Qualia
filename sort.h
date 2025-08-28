@@ -1,8 +1,6 @@
 #include "general.h"
 #include "array.h"
 #include "memory.h"
-#include "concepts.h"
-#include "print.h"
 
 // -------------------------------------------------- //
 
@@ -77,21 +75,37 @@ static void RadixSort(Array<T> array) {
 
 // -------------------------------------------------- //
 
-template<typename T> requires(sizeof(T) == 1)
+template<typename T>
 static void CountSort(Array<T> array) {
+	byte* begin = (byte*)array.Begin();
+	byte* end   = (byte*)array.End();
+
+	static_assert(sizeof(T) == 1);
+
 	u64 counters[256] = { };
-
-	for (u8* p = array; p < array.End(); p++)
-		counters[*p]++;
-
-	u8 offset = 0;
-	if constexpr (Concepts::IsSignedInteger<T>())
-		offset = 128;
+	for (byte* p = begin; p < end; p++)
+		counters[*(u8*)p]++;
 
 	T* p = array;
 	for (u64 i = 0; i < 256; i++) {
-		u64 counter = counters[i+offset & 255];
-		FillMemory<u8>(p, p + counter, i);
+		u64 counter = counters[i];
+		Fill<u8>(p, p + counter, i);
+		p += counter;
+	}
+}
+
+static void CountSort(Array<s8> array) {
+	byte* begin = (byte*)array.Begin();
+	byte* end   = (byte*)array.End();
+
+	u64 counters[256] = { };
+	for (byte* p = begin; p < end; p++)
+		counters[*(u8*)p]++;
+
+	s8* p = array;
+	for (u64 i = 0; i < 256; i++) {
+		u64 counter = counters[i+128 & 255];
+		Fill<s8>(p, p + counter, i);
 		p += counter;
 	}
 }

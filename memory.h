@@ -78,34 +78,29 @@ static void Move(T* dest, const T* src, u64 count) {
 
 // ------------------------------------------- //
 
-// @cleanme Change to Fill
 template<typename T>
-static void FillMemory(T* dest, u64 count, T value) {
+static void Fill(T* dest, u64 count, T value) {
 	for (u64 i = 0; i < count; i++) dest[i] = value;
 }
 
-// @cleanme Change to Fill
 template<typename T>
-static void FillMemory(T* begin, T* end, T value) {
+static void Fill(T* begin, T* end, T value) {
 	for (; begin < end; begin++) *begin = value;
 }
 
 // ------------------------------------------- //
 
-// @cleanme Change to Compare
-// @cleanme return int? Or maybe use <=> operator now?
-template<typename T>
-static inline bool CompareMemory(const T* a, const T* b, u64 count = 1) {
-	return __builtin_memcmp(a, b, sizeof(T) * count) == 0;
+static int CompareMemory(const byte* a, const byte* b, u64 count) {
+	return __builtin_memcmp(a, b, count);
 }
 
 template<typename T>
-static inline bool Compare(const T* a, const T* b, u64 count = 1) {
-	for (u64 i = 0; i < count; i++) {
-		if (!Compare(a[i], b[i])) return false;
-	}
+static inline int Compare(const T* a, const T* b, u64 count) {
+	for (u64 i = 0; i < count; i++)
+		if (int cmp = Compare(a[i], b[i]); cmp != 0)
+			return cmp;
 
-	return true;
+	return 0;
 }
 
 template<typename T>

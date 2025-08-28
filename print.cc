@@ -215,7 +215,7 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 			TupleTypeInfo tuple_info = info->tuple_info;
 			buffer->Write('(');
 
-			for (s32 i = 0; i < tuple_info.count; i++) {
+			for (s32 i = 0; i < tuple_info.elements.length; i++) {
 				if (i) buffer->Write(", ");
 				Write(buffer, tuple_info.elements[i]);
 			}

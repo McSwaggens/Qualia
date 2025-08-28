@@ -32,8 +32,17 @@ static inline void Assume(bool b) { __builtin_assume(b); }
 #define GetInternalLineNumber()   __builtin_LINE()
 #define GetInternalColumnNumber() __builtin_COLUMN()
 
+static inline u64 GoldenHash(u64 n) { return n * 11400714819323198485llu; } // Golden/Fibinacci hash: (2^64)/((1+sqrt(5))/2)
+
+template<typename U, typename V>
+static constexpr int Compare(U u, V v) {
+	if (u <  v) return -1;
+	if (u  > v) return  1;
+	return 0;
+}
+
 template<typename T>
-static inline void Swap(T& a, T& b) {
+static constexpr inline void Swap(T& a, T& b) {
 	T tmp = a;
 	a = b;
 	b = tmp;
@@ -101,7 +110,10 @@ static inline u64 NextPow2(u64 n) { return 1llu << Boi64(n); }
 
 // @Note: NextPow2(2^n) = 2^n
 static u64 RaisePow2(u64 n) {
-	return IsPow2(n) ? n : NextPow2(n);
+	if (IsPow2(n))
+		return n;
+
+	return NextPow2(n);
 }
 
 CFUNC s64 SystemCall(s64 rax, s64 rdi = 0, s64 rsi = 0, s64 rdx = 0, s64 r10 = 0, s64 r8 = 0, s64 r9 = 0);

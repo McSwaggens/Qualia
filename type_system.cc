@@ -82,8 +82,8 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to) {
 
 		case TYPE_TUPLE:
 		{
-			if (to_kind == TYPE_TUPLE && cast >= CAST_COERCIVE && from_info->tuple_info.count == to_info->tuple_info.count) {
-				for (u64 i = 0; i < from_info->tuple_info.count; i++) {
+			if (to_kind == TYPE_TUPLE && cast >= CAST_COERCIVE && from_info->tuple_info.elements.length == to_info->tuple_info.elements.length) {
+				for (u64 i = 0; i < from_info->tuple_info.elements.length; i++) {
 					if (!CanCast(cast, from_info->tuple_info.elements[i], to_info->tuple_info.elements[i]))
 						return false;
 				}
@@ -238,8 +238,7 @@ static void InitTypeSystem(void) {
 	*empty = {
 		.size = 0,
 		.tuple_info = {
-			.elements = null,
-			.count = 0,
+			.elements = { }
 		}
 	};
 
@@ -385,11 +384,11 @@ static TypeID GetFunctionType(TypeID input, TypeID output) {
 	return result;
 }
 
-static TypeID GetTuple(TypeID* elements, u64 count) {
-	if (!count)
+static TypeID GetTuple(Array<TypeID> elements) {
+	if (!elements.length)
 		return TYPE_EMPTY_TUPLE;
 
-	if (count == 1)
+	if (elements.length == 1)
 		return elements[0];
 
 	TypeInfo* header_info = GetTypeInfo(elements[0]);
@@ -398,36 +397,38 @@ static TypeID GetTuple(TypeID* elements, u64 count) {
 	for (s32 i = 0; i < table->count; i++) {
 		ExtensionEntry* entry = &table->entries[i];
 
-		if (entry->length != count)
+		if (entry->length != elements.length)
 			continue;
 
 		if (GetTypeKind(entry->type) != TYPE_TUPLE)
 			continue;
 
 		TypeInfo* ext_info = GetTypeInfo(entry->type);
-
-		if (CompareMemory(elements, ext_info->tuple_info.elements))
+		if (elements == ext_info->tuple_info.elements)
 			return entry->type;
 	}
 
 	u64 size = 0;
-	for (s32 i = 0; i < count; i++)
+	for (s32 i = 0; i < elements.length; i++)
 		size += GetTypeSize(elements[i]);
 
-	TypeID* new_elements = CopyAlloc(elements, count);
+	TypeID* new_elements = CopyAlloc(elements.data, elements.length);
 
 	TypeID result = CreateType(TYPE_TUPLE, {
 		.size = size,
-		.tuple_info.elements = new_elements,
-		.tuple_info.count = count,
+		.tuple_info.elements = { new_elements, elements.length }
 	});
 
 	AddExtensionEntry(table, {
 		.type = result,
-		.length = count,
+		.length = elements.length,
 	});
 
 	return result;
+}
+
+static TypeID GetTuple(TypeID* elements, u64 count) {
+	return GetTuple({ elements, count });
 }
 
 static TypeID CreateStructType(Ast_Struct* ast, u64 size) {
@@ -462,16 +463,18 @@ static TypeID MergeTypeRight(TypeID a, TypeID b) {
 	if (b == TYPE_EMPTY_TUPLE)
 		return a;
 
-	if (GetTypeKind(b) != TYPE_TUPLE)
-		return GetTuple((TypeID[]){ a, b }, 2);
+	if (GetTypeKind(b) != TYPE_TUPLE) {
+		TypeID types[2] = { a, b };
+		return GetTuple(Array<TypeID>(types, 2));
+	}
 
 	TypeInfo* b_info = GetTypeInfo(b);
-	u64 count = b_info->tuple_info.count+1;
+	u64 count = b_info->tuple_info.elements.length+1;
 
 	TypeID elements[count];
 	elements[0] = a;
-	Copy(elements+1, b_info->tuple_info.elements, count-1);
+	Copy(elements+1, b_info->tuple_info.elements.Begin(), count-1);
 
-	return GetTuple(elements, count);
+	return GetTuple(Array<TypeID>(elements, count));
 }
 

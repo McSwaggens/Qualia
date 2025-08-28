@@ -82,7 +82,7 @@ struct List {
 
 	void Add(T item, u32 amount) {
 		AssureCapacity(count + amount);
-		FillMemory(End(), amount, item);
+		Fill(End(), amount, item);
 		count += amount;
 	}
 

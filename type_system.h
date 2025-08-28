@@ -3,6 +3,7 @@
 #include "int.h"
 #include "general.h"
 #include "assert.h"
+#include "array.h"
 
 enum TypeKind : u32 {
 	TYPE_PRIMITIVE   = 0,
@@ -91,7 +92,7 @@ enum TypeID : u32 {
 	TYPE_EMPTY_TUPLE      = (TYPE_TUPLE    << TYPE_INDEX_BITCOUNT) | TYPE_EXTRA_OFFSET + 1,
 };
 
-static TypeID type_int = TYPE_INT64;
+static TypeID type_int  = TYPE_INT64;
 static TypeID type_uint = TYPE_INT64;
 
 struct PrimitiveTypeInfo {
@@ -120,8 +121,7 @@ struct FunctionTypeInfo {
 };
 
 struct TupleTypeInfo {
-	TypeID* elements;
-	u64  count;
+	Array<TypeID> elements;
 };
 
 struct EnumTypeInfo {
@@ -330,7 +330,7 @@ static TypeID GetSubType(TypeID type);
 static TypeID GetPointer(TypeID subtype);
 static TypeID GetOptional(TypeID subtype);
 static TypeID GetArray(TypeID subtype);
-static TypeID GetTuple(TypeID* types, u64 count);
+static TypeID GetTuple(Array<TypeID> types);
 static TypeID GetFixedArray(TypeID subtype, u64 length);
 static TypeID GetFunctionType(TypeID input, TypeID output);
 static TypeID GetDominantType(TypeID a, TypeID b);

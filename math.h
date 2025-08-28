@@ -2,7 +2,6 @@
 #define MATH_H
 
 #include "int.h"
-#include "concepts.h"
 
 struct Float32 {
 	union {
@@ -73,7 +72,6 @@ static u32 Pow(u32 base, u32 exponent) { return __builtin_powl(base, exponent); 
 static s32 Pow(s32 base, s32 exponent) { return __builtin_powl(base, exponent); }
 
 template<typename T>
-requires Concepts::SignedInteger<T> || Concepts::Float<T> 
 static inline T Abs(T n) {
 	return n >= 0 ? n : -n;
 }

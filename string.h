@@ -44,7 +44,7 @@ struct String {
 		if (length != N-1)
 			return false;
 
-		if (!CompareMemory(data, s, N-1))
+		if (Compare(data, s, N-1) != 0)
 			return false;
 
 		return true;
@@ -57,7 +57,7 @@ struct String {
 		if (data == o.data)
 			return true;
 
-		if (!CompareMemory(data, o.data, length))
+		if (Compare(data, o.data, length) != 0)
 			return false;
 
 		return true;
@@ -96,7 +96,7 @@ struct String {
 		if (length < s.length)
 			return false;
 
-		if (!CompareMemory(data, s.data, s.length))
+		if (Compare(data, s.data, s.length) != 0)
 			return false;
 
 		return true;
@@ -106,7 +106,7 @@ struct String {
 		if (length < s.length)
 			return false;
 
-		if (!CompareMemory(End() - s.length, s.data, s.length))
+		if (Compare(End() - s.length, s.data, s.length) != 0)
 			return false;
 
 		return true;
@@ -137,7 +137,7 @@ static inline String AllocateString(u64 length, u64 extra_capacity) {
 
 template<u64 N>
 static inline bool CompareStringRaw(const char* a, const char (&b)[N]) {
-	return CompareMemory(a, b, N-1);
+	return CompareMemory(a, b, N-1) == 0;
 }
 
 static constexpr u64 CStringLength(const char* s) {

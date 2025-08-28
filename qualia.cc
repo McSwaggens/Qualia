@@ -1,6 +1,7 @@
 #include "file_system.h"
 #include "int.h"
 #include "list.h"
+#include "sort.h"
 
 struct Ast_Module;
 
@@ -51,51 +52,11 @@ static void CompileFile(String file_path) {
 	SemanticParse(module);
 }
 
-static inline u64 GoldenHash(u64 n) { return n * 11400714819323198485llu; } // Golden/Fibinacci hash: (2^64)/((1+sqrt(5))/2)
-
-#include "sort.h"
-
-static void GenerateRandomNumbers(u64* numbers, u64 n) {
-	static u64 state = 2293724;
-
-	for (u64 i = 0; i < n; i++)
-	{
-		state ^= state << 13;
-		state ^= state >>  7;
-		state ^= state << 17;
-
-		numbers[i] = state & 0xffff;
-	}
-}
-
 int main(int argc, char** args) {
 	InitGlobalAllocator();
 	InitTypeSystem();
 	InitIntrinsics();
 	IR::Init();
-
-	u64 max_numbers = (1llu<<37) / sizeof(u64);
-	u64* numbers = Alloc<u64>(max_numbers);
-	for (u64 n = max_numbers; n <= max_numbers; n++) {
-		Print("Generating % random numbers...", n);
-		GenerateRandomNumbers(numbers, n);
-		// Print("\nrandom = %\n", Array<u64>(numbers, n));
-
-		Print(" Sorting...");
-		RadixSort(Array<u64>(numbers, numbers + n));
-
-		Print(" Verifying...");
-		bool is_sorted = IsSorted(numbers, numbers + n);
-		if (!is_sorted) {
-			Print(" FAILURE!\n");
-			output_buffer.Flush();
-			break;
-		}
-
-		Print(" SUCCESS!\n");
-		output_buffer.Flush();
-
-	}
 
 	const String files[] = {
 		"test.q",

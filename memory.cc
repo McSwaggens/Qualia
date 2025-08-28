@@ -120,7 +120,6 @@ struct GlobalAllocator {
 			map |= bit;
 
 			Assert(!pools[index].IsEmpty());
-
 			return;
 		}
 
@@ -128,7 +127,7 @@ struct GlobalAllocator {
 		u64 take_index = Ctz64(upper_map);
 		u64 block_size = 1llu << take_index;
 		byte* block = Take(take_index);
-		Assert(block_size > bit * 2);
+		Assert(block_size > bit);
 
 		pools[index].SetStack(block, block_size);
 		Assert(!pools[index].IsEmpty());
@@ -138,6 +137,8 @@ struct GlobalAllocator {
 	}
 
 	byte* Allocate(u64 size) {
+		Print("Allocate(%)\n", size);
+
 		u64 bit   = NormalizeSize(size);
 		u64 index = Ctz64(bit);
 

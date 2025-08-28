@@ -137,8 +137,6 @@ struct GlobalAllocator {
 	}
 
 	byte* Allocate(u64 size) {
-		Print("Allocate(%)\n", size);
-
 		u64 bit   = NormalizeSize(size);
 		u64 index = Ctz64(bit);
 

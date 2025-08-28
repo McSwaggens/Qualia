@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "error.h"
+#include "general.h"
 #include "token.h"
 #include "print.h"
 #include "memory.h"
@@ -456,6 +457,38 @@ static bool CanTakeNextOp(Token* token, bool assignment_break, u32 parent_preced
 	return true;
 }
 
+static IR::Value CreateValueFromLiteralToken(Token* token) {
+	switch (token->kind) {
+		case TOKEN_LITERAL_INT:
+		case TOKEN_LITERAL_INT8:
+		case TOKEN_LITERAL_INT16:
+		case TOKEN_LITERAL_INT32:
+		case TOKEN_LITERAL_INT64:
+		case TOKEN_LITERAL_UINT:
+		case TOKEN_LITERAL_UINT8:
+		case TOKEN_LITERAL_UINT16:
+		case TOKEN_LITERAL_UINT32:
+		case TOKEN_LITERAL_UINT64:
+		case TOKEN_LITERAL_FLOAT:
+		case TOKEN_LITERAL_FLOAT32:
+		case TOKEN_LITERAL_FLOAT64:
+		case TOKEN_TRUE:
+		case TOKEN_FALSE:
+			return IR::Constant(token->literal_int);
+
+		case TOKEN_NULL:
+			return IR::Constant(0);
+
+		case TOKEN_LITERAL_STRING:
+			Assert();
+
+		default:
+			Assert();
+	}
+
+	Unreachable();
+}
+
 static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* module, bool assignment_break, u32 parent_precedence) {
 	Ast_Expression* left = null;
 
@@ -488,6 +521,7 @@ static Ast_Expression* ParseExpression(Token*& token, u32 indent, Ast_Module* mo
 		literal->kind  = AST_EXPRESSION_TERMINAL_LITERAL;
 		literal->flags |= AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | AST_EXPRESSION_FLAG_PURE;
 		literal->token = token;
+		literal->value = CreateValueFromLiteralToken(token);
 		token += 1;
 		left = literal;
 	}

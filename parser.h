@@ -193,11 +193,11 @@ struct Ast_Expression_As : Ast_Expression {
 
 struct Ast_Expression_Literal : Ast_Expression {
 	Token* token;
+	IR::Value value = 0;
 
 	union
 	{
-		bool    value_bool;
-		s64   value_int;
+		s64     value_int;
 		float32 value_f32;
 		float64 value_f64;
 	};

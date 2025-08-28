@@ -416,7 +416,7 @@ static void ScanExpressionTuple(Ast_Expression_Tuple* tuple, Ast_Scope* scope, A
 		tuple->flags |= (tuple_flags & AST_EXPRESSION_FLAG_INTERNALLY_REFERENTIAL);
 	}
 
-	tuple->type = GetTuple(types, tuple->elements.length);
+	tuple->type = GetTuple({ types, tuple->elements.length });
 }
 
 static void ScanExpressionCall(Ast_Expression_Call* call, Ast_Scope* scope, Ast_Module* module) {

@@ -7,11 +7,29 @@
 #include "assert.h"
 #include "memory.h"
 #include "fixed_buffer.h"
+#include "set.h"
 
 #include "large_value.h"
+#include "map.h"
 
 namespace IR {
 	static Stack stack;
+
+	struct Handle;
+	struct Context;
+	struct Relation;
+	struct Key;
+	struct ValueData;
+
+	enum class RelationKind {
+		Equal,
+		NotEqual,
+		Less,
+		LessOrEqual,
+		Greater,
+		GreaterOrEqual,
+		Distance,
+	};
 
 	struct ValueData {
 	};
@@ -19,17 +37,29 @@ namespace IR {
 	static FixedBuffer<ValueData, 1l << 32> value_buffer;
 
 	struct Value {
-		u32 handle;
+		u32 handle = 0;
 
+		constexpr Value() = default;
 		constexpr Value(u32 index) : handle(index) { }
 
-		bool IsInline() { return handle < UINT32_MAX; }
-		u32 GetInlinedValue() { Assert(IsInline()); return ((s32)handle << 1) >> 1; }
-
+		bool IsValid() { return handle != 0; }
 		constexpr operator bool() { return handle != 0; }
-
 		ValueData* operator ->() { return &value_buffer[handle]; }
 	};
+
+	struct Key {
+	};
+
+	struct Context {
+	};
+
+	struct Relation {
+		Key key;
+		Value value;
+		Value to;
+	};
+
+	static Map<u64, Value> small_constants;
 
 	static void Init();
 
@@ -38,10 +68,13 @@ namespace IR {
 		if (n < 256)
 			return 1 + n;
 
-		// Check if constant already exists..
+		auto[inserted, value] = small_constants.GetOrAdd(n);
 
-		Value value = NewValue();
-		return value;
+		if (!inserted) {
+			*value = NewValue();
+		}
+
+		return *value;
 	}
 };
 

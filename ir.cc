@@ -7,7 +7,7 @@ static void IR::Init() {
 	value_buffer.AllocIndex(); // Don't use index 0.
 
 	for (int i = 0; i < 256; i++) {
-		value_buffer.AllocIndex();
+		Value value = value_buffer.AllocIndex();
 	}
 }
 

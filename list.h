@@ -86,10 +86,14 @@ struct List {
 		count += amount;
 	}
 
+	void Add(Array<T> items) {
+		AssureCapacity(count + items.length);
+		Copy(End(), items.Begin(), items.length);
+		count += items.length;
+	}
+
 	void Add(List<T> items) {
-		AssureCapacity(count + items.count);
-		Copy(End(), items.Begin(), items.count);
-		count += items.count;
+		Add(items.ToArray());
 	}
 
 	void RemoveIndex(u32 index, u32 n = 1) {

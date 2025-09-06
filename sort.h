@@ -1,3 +1,6 @@
+#ifndef SORT_H
+#define SORT_H
+
 #include "general.h"
 #include "array.h"
 #include "memory.h"
@@ -125,11 +128,12 @@ static T* BinarySearch(Array<T> array, T value) {
 	if (array.length < 2)
 		return array.Begin();
 
-	T* middle = array + (array.length / 2);
+	T* middle = array.Begin() + (array.length / 2);
 
-	if (value < middle) return BinarySearch(Array<T>(array.Begin(), (array.length / 2)), value);
-	if (value > middle) return BinarySearch(Array<T>(middle, array.End() - middle), value);
+	if (value < *middle) return BinarySearch(Array<T>(array.Begin(), (array.length / 2)), value);
+	if (value > *middle) return BinarySearch(Array<T>(middle, array.End() - middle), value);
 
 	return middle;
 }
 
+#endif // SORT_H

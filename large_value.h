@@ -130,44 +130,45 @@ namespace Integer {
 	}
 }
 
+static u64 BitToByteCount(u64 bitcount) { return (bitcount + 7) >> 3; }
+
 struct Binary {
 	u64 bitcount;
 	union {
-		u64  inlined64;
-		u128 inlined128;
+		u64   inlined64;
 		byte* data;
 	};
 
-	Binary(u8   n) : inlined64(n),  bitcount(8)  { }
-	Binary(u16  n) : inlined64(n),  bitcount(16) { }
-	Binary(u32  n) : inlined64(n),  bitcount(32) { }
-	Binary(u64  n) : inlined64(n),  bitcount(64) { }
-	Binary(u128 n) : inlined128(n), bitcount(128) { }
+	Binary() = default;
 
-	Binary(s8   n, u64 bitcount = 8)   : inlined128(n), bitcount(bitcount) { }
-	Binary(s16  n, u64 bitcount = 16)  : inlined128(n), bitcount(bitcount) { }
-	Binary(s32  n, u64 bitcount = 32)  : inlined128(n), bitcount(bitcount) { }
-	Binary(s64  n, u64 bitcount = 64)  : inlined128(n), bitcount(bitcount) { }
-	Binary(s128 n, u64 bitcount = 128) : inlined128(n), bitcount(bitcount) { }
+	Binary(u8  n) : inlined64(n),  bitcount( 8) { }
+	Binary(u16 n) : inlined64(n),  bitcount(16) { }
+	Binary(u32 n) : inlined64(n),  bitcount(32) { }
+	Binary(u64 n) : inlined64(n),  bitcount(64) { }
 
-	// Binary(byte* data, u64 bitcount) : data(data), bitcount(bitcount) {
-	// 	if (bitcount <= 128) {
-	// 		inlined_value = 0;
-	// 		CopyMemory((byte*)&inlined_value, data, (bitcount+7)>>3);
-	// 		return;
-	// 	}
+	Binary(s8  n)  : inlined64(n), bitcount( 8) { }
+	Binary(s16 n)  : inlined64(n), bitcount(16) { }
+	Binary(s32 n)  : inlined64(n), bitcount(32) { }
+	Binary(s64 n)  : inlined64(n), bitcount(64) { }
 
+	Binary(byte* data, u64 bitcount) : data(data), bitcount(bitcount) { }
 
-	// }
+	bool IsInlined() { return bitcount <= 128; }
+	u64  ByteCount() { return BitToByteCount(bitcount); }
 
-	// bool IsInlined() { return bitcount <= 64; }
+	byte* GetData() {
+		if (IsInlined())
+			return (byte*)&inlined64;
 
-	// byte* GetData() {
-	// 	if (IsInlined())
-	// 		return (byte*)&inlined_value;
+		return data;
+	}
 
-	// 	return data;
-	// }
+	Binary Copy() {
+		if (IsInlined())
+			return *this;
+
+		return Binary((byte*)CopyAllocMemory(data, ByteCount()), bitcount);
+	}
 
 	// Binary IntegerAdd(Binary o) {
 	// }

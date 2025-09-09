@@ -24,14 +24,31 @@ namespace IR {
 	enum class RelationKind {
 		Equal,
 		NotEqual,
-		Less,
-		LessOrEqual,
-		Greater,
-		GreaterOrEqual,
+
+		UnsignedLess,
+		UnsignedLessOrEqual,
+		UnsignedGreater,
+		UnsignedGreaterOrEqual,
+
+		SignedLess,
+		SignedLessOrEqual,
+		SignedGreater,
+		SignedGreaterOrEqual,
+
 		Distance,
 	};
 
+	enum ValueFlag : u16 {
+		VALUE_CONSTANT      = 0x01,
+		VALUE_LONG_CONSTANT = 0x02,
+	};
+
 	struct ValueData {
+		u16 flags = 0;
+		Set<Relation> relations;
+		Binary constant;
+
+		bool IsConstant() { return flags & VALUE_CONSTANT; }
 	};
 
 	static FixedBuffer<ValueData, 1l << 32> value_buffer;
@@ -48,15 +65,20 @@ namespace IR {
 	};
 
 	struct Key {
+		RelationKind kind;
+		Value pivot;
+		Value to;
 	};
 
 	struct Context {
+		Set<Key> keys;
 	};
 
 	struct Relation {
-		Key key;
+		RelationKind kind;
 		Value value;
 		Value to;
+		Context context;
 	};
 
 	static Map<u64, Value> small_constants;
@@ -71,7 +93,9 @@ namespace IR {
 		auto[inserted, value] = small_constants.GetOrAdd(n);
 
 		if (!inserted) {
-			*value = NewValue();
+			Value new_value = NewValue();
+			new_value->constant = n;
+			*value = new_value;
 		}
 
 		return *value;

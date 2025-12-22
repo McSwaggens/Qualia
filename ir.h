@@ -86,6 +86,7 @@ namespace IR {
 	static void Init();
 
 	static Value NewValue() { return value_buffer.AllocIndex(); }
+
 	static Value Constant(u64 n) {
 		if (n < 256)
 			return 1 + n;
@@ -99,6 +100,22 @@ namespace IR {
 		}
 
 		return *value;
+	}
+
+	static Value Constant(Array<byte> data) {
+		Assert(data.length);
+
+		if (data.length <= 8) {
+			union { u64 n; byte bytes[8]; } u = { 0 };
+			CopyMemory(u.bytes, data, data.length);
+			return small_constants.TryGet(u.n).Or(Constant(u.n));
+		}
+
+		Value new_value = NewValue();
+		new_value->flags = VALUE_CONSTANT | VALUE_LONG_CONSTANT;
+		new_value->constant = Binary(data);
+
+		return new_value;
 	}
 };
 

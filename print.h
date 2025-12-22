@@ -53,7 +53,7 @@ static void Write(OutputBuffer* buffer, List<T> list) {
 	Write(buffer, list.ToArray());
 }
 
-template<typename ...Args>
+template<typename... Args>
 static void Print(OutputBuffer* buffer, String format, Args&&... args) {
 	char* end = format.data + format.length;
 	char* p = format.data;
@@ -82,7 +82,7 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args) {
 		buffer->Flush();
 }
 
-template<typename ...Args>
+template<typename... Args>
 static void Print(String format, Args&&... args) {
 	Print(&output_buffer, format, args...);
 }

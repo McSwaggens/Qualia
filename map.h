@@ -5,6 +5,7 @@
 #include "list.h"
 #include "memory.h"
 #include "sort.h"
+#include "optional.h"
 
 template<typename Key, typename Value>
 struct Map {
@@ -49,13 +50,25 @@ struct Map {
 		count += 1;
 	}
 
-	u32 GetKeyIndex(Key key) {
-		return BinarySearch(Array<Key>(keys, count), key) - keys;
+	Optional<u32> GetKeyIndex(Key key) {
+		u32 index = BinarySearch(Array<Key>(keys, count), key) - keys;
+
+		if (index == count)
+			return OptNone;
+
+		if (keys[index] != key)
+			return OptNone;
+
+		return index;
+	}
+
+	bool DoesKeyExist(Key key) {
+		return GetKeyIndex(key) != count;
 	}
 
 	void Add(Key key, Value value) {
 		u32 index = GetKeyIndex(key);
-		if (keys[index] == key)
+		if (index != count && keys[index] == key)
 			return;
 
 		Insert(index, key, value);
@@ -72,10 +85,28 @@ struct Map {
 		count -= 1;
 	}
 
+	Key GetKey(u32 index) {
+		Assert(index < count);
+		return keys[index];
+	}
+
+	Value GetValue(u32 index) {
+		Assert(index < count);
+		return values[index];
+	}
+
+	Optional<Value&> TryGet(Key key) {
+		u32 index = GetKeyIndex(key);
+		if (keys[index] != key)
+			return values[index];
+
+		return OptNone;
+	}
+
 	struct GetOrAddResult { bool was_inserted; Value* value; };
 	GetOrAddResult GetOrAdd(Key key, Value value = { }) {
 		u32 index = GetKeyIndex(key);
-		if (keys[index] == key)
+		if (GetKey(index) == key)
 			return { false, &values[index] };
 
 		InsertIndex(index, key, value);

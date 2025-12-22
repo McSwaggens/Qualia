@@ -133,25 +133,39 @@ namespace Integer {
 static u64 BitToByteCount(u64 bitcount) { return (bitcount + 7) >> 3; }
 
 struct Binary {
-	u64 bitcount;
+	u64 bitcount = 0;
 	union {
-		u64   inlined64;
+		u64   inlined64 = 0;
 		byte* data;
 	};
 
-	Binary() = default;
+	constexpr Binary() = default;
 
-	Binary(u8  n) : inlined64(n),  bitcount( 8) { }
-	Binary(u16 n) : inlined64(n),  bitcount(16) { }
-	Binary(u32 n) : inlined64(n),  bitcount(32) { }
-	Binary(u64 n) : inlined64(n),  bitcount(64) { }
+	constexpr Binary(u64 n, u64 bitcount) : inlined64(n),  bitcount(bitcount) { Assert(bitcount <= 64); }
 
-	Binary(s8  n)  : inlined64(n), bitcount( 8) { }
-	Binary(s16 n)  : inlined64(n), bitcount(16) { }
-	Binary(s32 n)  : inlined64(n), bitcount(32) { }
-	Binary(s64 n)  : inlined64(n), bitcount(64) { }
+	constexpr Binary(u8  n) : inlined64(n),  bitcount( 8) { }
+	constexpr Binary(u16 n) : inlined64(n),  bitcount(16) { }
+	constexpr Binary(u32 n) : inlined64(n),  bitcount(32) { }
+	constexpr Binary(u64 n) : inlined64(n),  bitcount(64) { }
 
-	Binary(byte* data, u64 bitcount) : data(data), bitcount(bitcount) { }
+	constexpr Binary(s8  n)  : inlined64(n), bitcount( 8) { }
+	constexpr Binary(s16 n)  : inlined64(n), bitcount(16) { }
+	constexpr Binary(s32 n)  : inlined64(n), bitcount(32) { }
+	constexpr Binary(s64 n)  : inlined64(n), bitcount(64) { }
+
+	constexpr Binary(byte* data, u64 bitcount) : data(data), bitcount(bitcount) { }
+
+	static Binary Create(u64 bitcount) {
+		bitcount = RaisePow2(bitcount);
+		u64 byte_count = bitcount * 8;
+
+		if (bitcount <= 64)
+			return Binary(0ull, bitcount);
+
+		byte* memory = (byte*)AllocMemory(byte_count);
+		ZeroMemory(memory, byte_count);
+		return Binary(memory, bitcount);
+	}
 
 	bool IsInlined() { return bitcount <= 128; }
 	u64  ByteCount() { return BitToByteCount(bitcount); }
@@ -169,9 +183,31 @@ struct Binary {
 
 		return Binary((byte*)CopyAllocMemory(data, ByteCount()), bitcount);
 	}
-
-	// Binary IntegerAdd(Binary o) {
-	// }
 };
+
+struct IntegerOperationResult {
+	Binary value;
+	bool overflow;
+	bool underflow;
+};
+
+static Stack binstack;
+
+static void InitEvalSystem() {
+	binstack = CreateStack(1llu<<32);
+}
+
+namespace Integer {
+	static void Add(Binary a, Binary b, u64 bitcount) {
+		Binary result = Binary::Create(result_bitcount);
+	}
+
+	static Binary AddBinClamp(Binary a, Binary b) {
+		u64 result_bitcount = Max(a.bitcount, b.bitcount);
+		Integer::Add
+		return result;
+	}
+
+}
 
 #endif // LARGE_VALUE_H

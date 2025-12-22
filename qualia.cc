@@ -54,6 +54,7 @@ static void CompileFile(String file_path) {
 
 int main(int argc, char** args) {
 	InitGlobalAllocator();
+	InitEvalSystem();
 	InitTypeSystem();
 	InitIntrinsics();
 	IR::Init();

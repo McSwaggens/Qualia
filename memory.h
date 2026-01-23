@@ -7,9 +7,6 @@
 // @cleanme Move Allocators into separate file(s)
 // @cleanme Move other functions into general.h?
 
-// ------------------------------------------- //
-
-static void InitGlobalAllocator();
 
 // ------------------------------------------- //
 

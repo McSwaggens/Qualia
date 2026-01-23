@@ -10,8 +10,8 @@ struct Optional {
 	T value;
 	bool present;
 
-	constexpr Optional() : present(true) { }
-	constexpr Optional(OptNoneType) : present(false) { }
+	constexpr Optional() : value(T()), present(true) { }
+	constexpr Optional(OptNoneType) : value(T()), present(false) { }
 	constexpr Optional(T value) : value(value), present(true) { }
 
 	constexpr operator bool() { return present; }
@@ -23,7 +23,6 @@ struct Optional {
 		Assert(present);
 		return value;
 	}
-
 };
 
 #endif // OPTIONAL_H

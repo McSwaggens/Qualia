@@ -155,14 +155,14 @@ struct Binary {
 
 	constexpr Binary(byte* data, u64 bitcount) : data(data), bitcount(bitcount) { }
 
-	static Binary Create(u64 bitcount) {
+	static Binary Create(u64 bitcount, Stack& stack) {
 		bitcount = RaisePow2(bitcount);
 		u64 byte_count = bitcount * 8;
 
 		if (bitcount <= 64)
 			return Binary(0ull, bitcount);
 
-		byte* memory = (byte*)AllocMemory(byte_count);
+		byte* memory = (byte*)stack.AllocateMemory(byte_count);
 		ZeroMemory(memory, byte_count);
 		return Binary(memory, bitcount);
 	}
@@ -177,11 +177,11 @@ struct Binary {
 		return data;
 	}
 
-	Binary Copy() {
+	Binary Copy(Stack* stack) {
 		if (IsInlined())
 			return *this;
 
-		return Binary((byte*)CopyAllocMemory(data, ByteCount()), bitcount);
+		return Binary((byte*)stack->CopyAllocMemory(data, ByteCount()), bitcount);
 	}
 };
 
@@ -198,16 +198,14 @@ static void InitEvalSystem() {
 }
 
 namespace Integer {
-	static void Add(Binary a, Binary b, u64 bitcount) {
-		Binary result = Binary::Create(result_bitcount);
+	static Binary Add(Binary a, Binary b) {
+		return Binary();
 	}
 
 	static Binary AddBinClamp(Binary a, Binary b) {
 		u64 result_bitcount = Max(a.bitcount, b.bitcount);
-		Integer::Add
-		return result;
+		return Binary();
 	}
-
 }
 
 #endif // LARGE_VALUE_H

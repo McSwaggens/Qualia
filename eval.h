@@ -81,6 +81,60 @@ namespace Integer {
 
 		return carry;
 	}
+
+	static u32 Sub64(u64* a, u64* b, u64* r, u64 count) {
+		u64 carry = 0;
+
+		for (u64 i = 0; i < count; i++)
+			r[i] = CarrySub64(a[i], b[i], carry, &carry);
+
+		return carry;
+	}
+
+	static u32 Sub32(u32* a, u32* b, u32* r, u64 count) {
+		u64 carry = 0;
+
+		if (count & 1) {
+			*(u32*)r = CarrySub32(*(u32*)a, *(u32*)b, carry, (u32*)&carry);
+			a += 1;
+			b += 1;
+		}
+
+		for (u32 words = count >> 2, i = 0; i < words; i++)
+			((u64*)r)[i] = CarrySub64(((u64*)a)[i], ((u64*)b)[i], carry, &carry);
+
+		return carry;
+	}
+
+	static u32 Sub16(u16* a, u16* b, u16* r, u64 count) {
+		u64 carry = 0;
+
+		if (count & 1) *(u16*)r = CarrySub16(*(u16*)(a + (count & 0)), *(u16*)(b + (count & 0)), carry, (u16*)&carry);
+		if (count & 2) *(u32*)r = CarrySub32(*(u32*)(a + (count & 1)), *(u32*)(b + (count & 1)), carry, (u32*)&carry);
+
+		a += (count & 3);
+		b += (count & 3);
+		for (u32 words = count >> 2, i = 0; i < words; i++)
+			((u64*)r)[i] = CarrySub64(((u64*)a)[i], ((u64*)b)[i], carry, &carry);
+
+		return carry;
+	}
+
+	static u32 Sub8(byte* a, byte* b, byte* r, u64 size) {
+		u64 carry = 0;
+
+		if (size & 1) *(u8 *)r = CarrySub8 (*(u8 *)(a + (size & 0)), *(u8 *)(b + (size & 0)), carry, (u8 *)&carry);
+		if (size & 2) *(u16*)r = CarrySub16(*(u16*)(a + (size & 1)), *(u16*)(b + (size & 1)), carry, (u16*)&carry);
+		if (size & 4) *(u32*)r = CarrySub32(*(u32*)(a + (size & 3)), *(u32*)(b + (size & 3)), carry, (u32*)&carry);
+
+		a += (size & 7);
+		b += (size & 7);
+		for (u32 words = size >> 3, i = 0; i < words; i++)
+			((u64*)r)[i] = CarrySub64(((u64*)a)[i], ((u64*)b)[i], carry, &carry);
+
+		return carry;
+	}
+
 	static void And64(u64* a, u64* b, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = a[i] & b[i]; }
 	static void And32(u32* a, u32* b, u32* r, u64 count) { if (count & 1) *r++ = *a++ & *b++; And64((u64*)a, (u64*)b, (u64*)r, count >> 1); }
 	static void And16(u16* a, u16* b, u16* r, u64 count) { if (count & 1) *r++ = *a++ & *b++; And32((u32*)a, (u32*)b, (u32*)r, count >> 1); }
@@ -199,12 +253,39 @@ static void InitEvalSystem() {
 
 namespace Integer {
 	static Binary Add(Binary a, Binary b) {
-		return Binary();
+		u64 result_bitcount = Max(a.bitcount, b.bitcount);
+		Binary result = Binary::Create(result_bitcount, binstack);
+
+		// Perform addition based on the element size
+		if      (result_bitcount <=  8) Integer::Add8(a.GetData(), b.GetData(), result.GetData(), 1);
+		else if (result_bitcount <= 16) Integer::Add16((u16*)a.GetData(), (u16*)b.GetData(), (u16*)result.GetData(), 1);
+		else if (result_bitcount <= 32) Integer::Add32((u32*)a.GetData(), (u32*)b.GetData(), (u32*)result.GetData(), 1);
+		else if (result_bitcount <= 64) Integer::Add64((u64*)a.GetData(), (u64*)b.GetData(), (u64*)result.GetData(), 1);
+		else {
+			// For larger sizes, work with 64-bit chunks
+			u64 word_count = (result_bitcount + 63) / 64;
+			Integer::Add64((u64*)a.GetData(), (u64*)b.GetData(), (u64*)result.GetData(), word_count);
+		}
+
+		return result;
 	}
 
-	static Binary AddBinClamp(Binary a, Binary b) {
+	static Binary Sub(Binary a, Binary b) {
 		u64 result_bitcount = Max(a.bitcount, b.bitcount);
-		return Binary();
+		Binary result = Binary::Create(result_bitcount, binstack);
+
+		// Perform subtraction based on the element size
+		if      (result_bitcount <=  8) Integer::Sub8(a.GetData(), b.GetData(), result.GetData(), 1);
+		else if (result_bitcount <= 16) Integer::Sub16((u16*)a.GetData(), (u16*)b.GetData(), (u16*)result.GetData(), 1);
+		else if (result_bitcount <= 32) Integer::Sub32((u32*)a.GetData(), (u32*)b.GetData(), (u32*)result.GetData(), 1);
+		else if (result_bitcount <= 64) Integer::Sub64((u64*)a.GetData(), (u64*)b.GetData(), (u64*)result.GetData(), 1);
+		else {
+			// For larger sizes, work with 64-bit chunks
+			u64 word_count = (result_bitcount + 63) / 64;
+			Integer::Sub64((u64*)a.GetData(), (u64*)b.GetData(), (u64*)result.GetData(), word_count);
+		}
+
+		return result;
 	}
 }
 

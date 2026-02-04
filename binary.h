@@ -1,5 +1,5 @@
-#ifndef LARGE_VALUE_H
-#define LARGE_VALUE_H
+#ifndef BINARY_H
+#define BINARY_H
 
 #include "int.h"
 #include "general.h"
@@ -289,4 +289,4 @@ namespace Integer {
 	}
 }
 
-#endif // LARGE_VALUE_H
+#endif // BINARY_H

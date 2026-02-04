@@ -9,7 +9,7 @@
 #include "fixed_buffer.h"
 #include "set.h"
 
-#include "eval.h"
+#include "binary.h"
 #include "map.h"
 
 namespace IR {

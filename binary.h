@@ -166,8 +166,10 @@ namespace Integer {
 	static void Xnor8 (u8*  a, u8*  b, u8*  r, u64 count) { if (count & 1) *r++ = ~(*a++ ^ *b++); Xnor16((u16*)a, (u16*)b, (u16*)r, count >> 1); }
 	static void Xnor1 (u8*  a, u8*  b, u8*  r, u64 count) {
 		Xnor8((u8*)a, b, (u8*)r, count >> 3);
-		if (count & 7)
-			r[count>>3] = a[count>>3] ^ a[count>>3] & ((1<<(count^7))-1);
+		if (count & 7) {
+			u8 mask = (1 << (count & 7)) - 1;
+			r[count>>3] = ~(a[count>>3] ^ b[count>>3]) & mask;
+		}
 	}
 
 	static void Not64(u64* a, u64* r, u64 count) { for (u64 i = 0; i < count; i++) r[i] = ~a[i]; }
@@ -211,7 +213,7 @@ struct Binary {
 
 	static Binary Create(u64 bitcount, Stack& stack) {
 		bitcount = RaisePow2(bitcount);
-		u64 byte_count = bitcount * 8;
+		u64 byte_count = BitToByteCount(bitcount);
 
 		if (bitcount <= 64)
 			return Binary(0ull, bitcount);
@@ -221,7 +223,7 @@ struct Binary {
 		return Binary(memory, bitcount);
 	}
 
-	bool IsInlined() { return bitcount <= 128; }
+	bool IsInlined() { return bitcount <= 64; }
 	u64  ByteCount() { return BitToByteCount(bitcount); }
 
 	byte* GetData() {

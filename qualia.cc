@@ -22,6 +22,7 @@ static List<Ast_Module*> modules = null;
 #include "parser.cc"
 #include "interpreter.cc"
 #include "ir.cc"
+#include "binary.cc"
 
 static void CompileFile(String file_path) {
 	if (!File::DoesExist(file_path)) {

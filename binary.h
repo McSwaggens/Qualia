@@ -189,11 +189,20 @@ namespace Integer {
 static u64 BitToByteCount(u64 bitcount) { return (bitcount + 7) >> 3; }
 
 struct Binary {
+	static constexpr u64 INLINE_BITS = 64;
+
 	u64 bitcount = 0;
 	union {
 		u64   inlined64 = 0;
 		byte* data;
 	};
+
+	static Binary FindBinary(Array<byte> data);
+
+	template<typename T>
+	static Binary FindBinary(T value) {
+		return FindBinary(Array<byte>(&value, sizeof(T)));
+	}
 
 	constexpr Binary() = default;
 
@@ -209,17 +218,19 @@ struct Binary {
 	constexpr Binary(s32 n)  : inlined64(n), bitcount(32) { }
 	constexpr Binary(s64 n)  : inlined64(n), bitcount(64) { }
 
-	constexpr Binary(byte* data, u64 bitcount) : data(data), bitcount(bitcount) { }
+	// Okay all this code is fucked. Please redo x'|
+	// @todo
+	constexpr Binary(byte* data, u64 bitcount) : bitcount(bitcount) {
+		data = FindBinary(Array<byte>(data, BitToByteCount(bitcount))).GetData();
+	}
 
-	static Binary Create(u64 bitcount, Stack& stack) {
+	static Binary Create(u64 bitcount) {
 		bitcount = RaisePow2(bitcount);
 		u64 byte_count = BitToByteCount(bitcount);
 
 		if (bitcount <= 64)
 			return Binary(0ull, bitcount);
 
-		byte* memory = (byte*)stack.AllocateMemory(byte_count);
-		ZeroMemory(memory, byte_count);
 		return Binary(memory, bitcount);
 	}
 

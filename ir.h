@@ -108,7 +108,8 @@ namespace IR {
 		if (data.length <= 8) {
 			union { u64 n; byte bytes[8]; } u = { 0 };
 			CopyMemory(u.bytes, data, data.length);
-			return small_constants.TryGet(u.n).Or(Constant(u.n));
+			// @fixme
+			// return small_constants.TryGet(u.n).Or(Constant(u.n));
 		}
 
 		Value new_value = NewValue();

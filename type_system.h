@@ -95,7 +95,7 @@ enum TypeID : u32 {
 };
 
 static TypeID type_int  = TYPE_INT64;
-static TypeID type_uint = TYPE_INT64;
+static TypeID type_uint = TYPE_UINT64;
 
 struct PrimitiveTypeInfo {
 };
@@ -177,7 +177,7 @@ static inline TypeID CreateTypeID(TypeKind kind, u32 index) {
 }
 
 static inline TypeKind GetTypeKind(TypeID id) {
-	return (TypeKind)((s32)id >> TYPE_INDEX_BITCOUNT);
+	return (TypeKind)((u32)id >> TYPE_INDEX_BITCOUNT);
 }
 
 static inline s32 GetTypeIndex(TypeID id) {
@@ -226,6 +226,7 @@ static inline u64 GetTypeSize(TypeID type) {
 		case TYPE_OPTIONAL:    return GetTypeInfo(type)->size;
 		case TYPE_ARRAY:       return 16;
 		case TYPE_FIXED_ARRAY: return GetTypeInfo(type)->size;
+		default: AssertUnreachable();
 	}
 }
 

@@ -25,7 +25,7 @@ FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wshift-op-parentheses
 # FLAGS += -MJ compile_commands.json
 
 qualia_xxx: *.cc *.h $(OS_FILE).o
-	clang -lm $(FLAGS) qualia.cc $(OS_FILE).o -o qualia
+	clang -lm -no-pie $(FLAGS) qualia.cc $(OS_FILE).o -o qualia
 
 $(OS_FILE).o: $(OS_FILE).cc
 	clang $(FLAGS) -c $^ -o $@

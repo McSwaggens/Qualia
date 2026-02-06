@@ -9,6 +9,7 @@ static List<Ast_Module*> modules = null;
 
 #include "general.cc"
 #include "thread.cc"
+#include "stacktrace.cc"
 #include "assert.cc"
 #include "file_system.cc"
 #include "stack.cc"
@@ -54,6 +55,7 @@ static void CompileFile(String file_path) {
 }
 
 int main(int argc, char** args) {
+	InitCrashHandler();
 	InitGlobalAllocator();
 	InitEvalSystem();
 	InitTypeSystem();
@@ -61,7 +63,7 @@ int main(int argc, char** args) {
 	IR::Init();
 
 	const String files[] = {
-		"test.q",
+		"tests/types.q",
 		// "test_literals.q"
 	};
 

@@ -13,6 +13,7 @@ static void Assert(bool b, const char* desc, InternalLocation loc) {
 	if (desc)
 		Print("%:%: error: %\n", ToString(loc.file), loc.line, ToString(desc));
 
+	PrintStackTrace();
 	DebugBreak();
 
 	output_buffer.Flush();

@@ -309,13 +309,13 @@ static bool IsCorrectScope(Token* token, u32 indent) {
 	return !token->IsNewLine() || token->indent == indent;
 }
 
-static void CheckScope(Token* token, u32 indent, Ast_Module* module) {
+static void CheckScope(Token* token, u32 indent, Ast::Module* module) {
 	if (!IsCorrectScope(token, indent))
 		Error(module, token->location, "Invalid indentation.\n");
 }
 
-Ast_Struct Parser::ParseStruct(u32 indent) {
-	Ast_Struct structure = {};
+Ast::Struct Parser::ParseStruct(u32 indent) {
+	Ast::Struct structure = {};
 	token += 1;
 
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL) {
@@ -336,11 +336,11 @@ Ast_Struct Parser::ParseStruct(u32 indent) {
 	CheckScope(token, indent, module);
 	token += 1;
 
-	ArrayBuffer<Ast_Struct_Member> members = CreateArrayBuffer<Ast_Struct_Member>();
+	ArrayBuffer<Ast::Struct_Member> members = CreateArrayBuffer<Ast::Struct_Member>();
 
  	while (IsCorrectScope(token, indent+1)) {
 		if (token->kind == TOKEN_IDENTIFIER_CASUAL) {
-			Ast_Struct_Member member;
+			Ast::Struct_Member member;
 			member.name = token->identifier_string;
 			member.name_token = token;
 			member.index = members.count;
@@ -378,8 +378,8 @@ Ast_Struct Parser::ParseStruct(u32 indent) {
 	return structure;
 }
 
-Ast_Enum Parser::ParseEnum(u32 indent) {
-	Ast_Enum enumeration;
+Ast::Enum Parser::ParseEnum(u32 indent) {
+	Ast::Enum enumeration;
 	token += 1;
 
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL) {
@@ -400,11 +400,11 @@ Ast_Enum Parser::ParseEnum(u32 indent) {
 	CheckScope(token, indent, module);
 	token += 1;
 
-	ArrayBuffer<Ast_Enum_Member> members = CreateArrayBuffer<Ast_Enum_Member>();
+	ArrayBuffer<Ast::Enum_Member> members = CreateArrayBuffer<Ast::Enum_Member>();
 
 	while (IsCorrectScope(token, indent+1)) {
 		if (token->kind == TOKEN_IDENTIFIER_FORMAL) {
-			Ast_Enum_Member member;
+			Ast::Enum_Member member;
 			member.name_token = token;
 			member.name = token->identifier_string;
 			member.index = members.count;
@@ -488,26 +488,26 @@ static IR::Value CreateValueFromLiteralToken(Token* token) {
 	Unreachable();
 }
 
-Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 parent_precedence) {
-	Ast_Expression* left = null;
+Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 parent_precedence) {
+	Ast::Expression* left = null;
 
 	Token* begin = token;
 
 	if (IsUnaryOperator(token->kind)) {
-		Ast_Expression_Unary* unary = module->stack.Allocate<Ast_Expression_Unary>();
+		Ast::Expression_Unary* unary = module->stack.Allocate<Ast::Expression_Unary>();
 		*unary = {
 			{},
 			.op = token,
 		};
 
 		switch (token->kind) {
-			case TOKEN_ASTERISK:         unary->kind = AST_EXPRESSION_UNARY_REFERENCE_OF; break;
-			case TOKEN_AMPERSAND:        unary->kind = AST_EXPRESSION_UNARY_ADDRESS_OF;   break;
-			case TOKEN_TILDE:            unary->kind = AST_EXPRESSION_UNARY_BITWISE_NOT;  break;
-			case TOKEN_NOT:              unary->kind = AST_EXPRESSION_UNARY_NOT;          break;
-			case TOKEN_MINUS:            unary->kind = AST_EXPRESSION_UNARY_MINUS;        break;
-			case TOKEN_PLUS:             unary->kind = AST_EXPRESSION_UNARY_PLUS;         break;
-			case TOKEN_EXCLAMATION_MARK: unary->kind = AST_EXPRESSION_UNARY_NOT;          break;
+			case TOKEN_ASTERISK:         unary->kind = Ast::EXPRESSION_UNARY_REFERENCE_OF; break;
+			case TOKEN_AMPERSAND:        unary->kind = Ast::EXPRESSION_UNARY_ADDRESS_OF;   break;
+			case TOKEN_TILDE:            unary->kind = Ast::EXPRESSION_UNARY_BITWISE_NOT;  break;
+			case TOKEN_NOT:              unary->kind = Ast::EXPRESSION_UNARY_NOT;          break;
+			case TOKEN_MINUS:            unary->kind = Ast::EXPRESSION_UNARY_MINUS;        break;
+			case TOKEN_PLUS:             unary->kind = Ast::EXPRESSION_UNARY_PLUS;         break;
+			case TOKEN_EXCLAMATION_MARK: unary->kind = Ast::EXPRESSION_UNARY_NOT;          break;
 			default: Assert();
 		}
 
@@ -517,9 +517,9 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		left = unary;
 	}
 	else if (IsLiteral(token->kind)) {
-		Ast_Expression_Literal* literal = module->stack.Allocate<Ast_Expression_Literal>();
+		Ast::Expression_Literal* literal = module->stack.Allocate<Ast::Expression_Literal>();
 		*literal = {
-			{ .kind = AST_EXPRESSION_TERMINAL_LITERAL, .flags = AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | AST_EXPRESSION_FLAG_PURE },
+			{ .kind = Ast::EXPRESSION_TERMINAL_LITERAL, .flags = Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE },
 			.token = token,
 			.value = CreateValueFromLiteralToken(token),
 		};
@@ -527,9 +527,9 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		left = literal;
 	}
 	else if (IsIdentifier(token->kind)) {
-		Ast_Expression_Terminal* term = module->stack.Allocate<Ast_Expression_Terminal>();
+		Ast::Expression_Terminal* term = module->stack.Allocate<Ast::Expression_Terminal>();
 		*term = {
-			{ .kind = AST_EXPRESSION_TERMINAL_NAME },
+			{ .kind = Ast::EXPRESSION_TERMINAL_NAME },
 			.token = token,
 		};
 		token += 1;
@@ -538,9 +538,9 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 	else if (token->kind == TOKEN_OPEN_BRACKET) {
 		Token* closure = token->closure;
 
-		Ast_Expression_Array* array = module->stack.Allocate<Ast_Expression_Array>();
+		Ast::Expression_Array* array = module->stack.Allocate<Ast::Expression_Array>();
 		*array = {
-			{ .kind = AST_EXPRESSION_ARRAY },
+			{ .kind = Ast::EXPRESSION_ARRAY },
 		};
 		token += 1;
 
@@ -571,16 +571,16 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		left = array;
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN) {
-		Ast_Expression_Tuple* tuple = module->stack.Allocate<Ast_Expression_Tuple>();
+		Ast::Expression_Tuple* tuple = module->stack.Allocate<Ast::Expression_Tuple>();
 		*tuple = {
-			{ .kind = AST_EXPRESSION_TUPLE },
+			{ .kind = Ast::EXPRESSION_TUPLE },
 		};
 
 		Token* closure = token->closure;
 
 		token += 1;
 
-		ArrayBuffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
+		ArrayBuffer<Ast::Expression*> elements = CreateArrayBuffer<Ast::Expression*>();
 
 		if (closure[-1].kind == TOKEN_COMMA)
 			Error("Expected expression after ','\n");
@@ -604,13 +604,13 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		left = tuple;
 	}
 	else if (token->kind == TOKEN_OPEN_BRACE) {
-		Ast_Expression_Fixed_Array* fixed_array = module->stack.Allocate<Ast_Expression_Fixed_Array>();
+		Ast::Expression_Fixed_Array* fixed_array = module->stack.Allocate<Ast::Expression_Fixed_Array>();
 		*fixed_array = {
-			{ .kind = AST_EXPRESSION_FIXED_ARRAY },
+			{ .kind = Ast::EXPRESSION_FIXED_ARRAY },
 		};
 
 		Token* closure = token->closure;
-		ArrayBuffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
+		ArrayBuffer<Ast::Expression*> elements = CreateArrayBuffer<Ast::Expression*>();
 
 		CheckScope(closure, indent, module);
 
@@ -621,7 +621,7 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 
 		while (token < closure) {
 			CheckScope(token, indent+1, module);
-			Ast_Expression* expression = ParseExpression(indent+1, false);
+			Ast::Expression* expression = ParseExpression(indent+1, false);
 			elements.Add(expression);
 			CheckScope(token, indent, module);
 
@@ -650,9 +650,9 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 	while (CanTakeNextOp(token, assignment_break, parent_precedence) && IsCorrectScope(token, indent)) {
 		// @Indent does unary operators need to be treated differently? (Error check)
 		if (token->kind == TOKEN_IF) {
-			Ast_Expression_Ternary* if_else = module->stack.Allocate<Ast_Expression_Ternary>();
+			Ast::Expression_Ternary* if_else = module->stack.Allocate<Ast::Expression_Ternary>();
 			*if_else = {
-				{ .kind = AST_EXPRESSION_IF_ELSE },
+				{ .kind = Ast::EXPRESSION_IF_ELSE },
 				.left = left,
 				.ops = {token},
 			};
@@ -672,9 +672,9 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 			left = if_else;
 		}
 		else if (token->kind == TOKEN_AS) {
-			Ast_Expression_As* as = module->stack.Allocate<Ast_Expression_As>();
+			Ast::Expression_As* as = module->stack.Allocate<Ast::Expression_As>();
 			*as = {
-				{ .kind = AST_EXPRESSION_AS },
+				{ .kind = Ast::EXPRESSION_AS },
 				.expression = left,
 				.op = token,
 			};
@@ -687,9 +687,9 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 			left = as;
 		}
 		else if (token->kind == TOKEN_OPEN_PAREN) {
-			Ast_Expression_Call* call = module->stack.Allocate<Ast_Expression_Call>();
+			Ast::Expression_Call* call = module->stack.Allocate<Ast::Expression_Call>();
 			*call = {
-				{ .kind = AST_EXPRESSION_CALL },
+				{ .kind = Ast::EXPRESSION_CALL },
 				.function = left,
 			};
 
@@ -697,7 +697,7 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 			Token* closure = open->closure;
 
 			CheckScope(token, indent, module);
-			call->parameters = (Ast_Expression_Tuple*)ParseExpression(indent, false, GetOperatorPrecedence(token->kind));
+			call->parameters = (Ast::Expression_Tuple*)ParseExpression(indent, false, GetOperatorPrecedence(token->kind));
 
 			token = closure + 1;
 			left = call;
@@ -706,9 +706,9 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 			Token* open = token++;
 			Token* closure = open->closure;
 
-			Ast_Expression_Subscript* subscript = module->stack.Allocate<Ast_Expression_Subscript>();
+			Ast::Expression_Subscript* subscript = module->stack.Allocate<Ast::Expression_Subscript>();
 			*subscript = {
-				{ .kind = AST_EXPRESSION_SUBSCRIPT },
+				{ .kind = Ast::EXPRESSION_SUBSCRIPT },
 				.array = left,
 			};
 
@@ -729,33 +729,33 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		else
 		{
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
-			Ast_Expression_Binary* binary = module->stack.Allocate<Ast_Expression_Binary>();
+			Ast::Expression_Binary* binary = module->stack.Allocate<Ast::Expression_Binary>();
 			*binary = {
 				{},
 				.left = left,
 			};
 
 			switch (token->kind) {
-				case TOKEN_EQUAL:            binary->kind = AST_EXPRESSION_BINARY_COMPARE_EQUAL;            break;
-				case TOKEN_NOT_EQUAL:        binary->kind = AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL;        break;
-				case TOKEN_LESS:             binary->kind = AST_EXPRESSION_BINARY_COMPARE_LESS;             break;
-				case TOKEN_LESS_OR_EQUAL:    binary->kind = AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL;    break;
-				case TOKEN_GREATER:          binary->kind = AST_EXPRESSION_BINARY_COMPARE_GREATER;          break;
-				case TOKEN_GREATER_OR_EQUAL: binary->kind = AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL; break;
-				case TOKEN_AND:              binary->kind = AST_EXPRESSION_BINARY_AND;                      break;
-				case TOKEN_OR:               binary->kind = AST_EXPRESSION_BINARY_OR;                       break;
-				case TOKEN_DOT:              binary->kind = AST_EXPRESSION_BINARY_DOT;                      break;
-				// case TOKEN_DOT_DOT:          binary->kind = AST_EXPRESSION_BINARY_RANGE;                    break;
-				case TOKEN_PLUS:             binary->kind = AST_EXPRESSION_BINARY_ADD;                      break;
-				case TOKEN_MINUS:            binary->kind = AST_EXPRESSION_BINARY_SUBTRACT;                 break;
-				case TOKEN_ASTERISK:         binary->kind = AST_EXPRESSION_BINARY_MULTIPLY;                 break;
-				case TOKEN_DIVIDE:           binary->kind = AST_EXPRESSION_BINARY_DIVIDE;                   break;
-				case TOKEN_MOD:              binary->kind = AST_EXPRESSION_BINARY_MODULO;                   break;
-				case TOKEN_CARET:            binary->kind = AST_EXPRESSION_BINARY_BITWISE_XOR;              break;
-				case TOKEN_BAR:              binary->kind = AST_EXPRESSION_BINARY_BITWISE_OR;               break;
-				case TOKEN_AMPERSAND:        binary->kind = AST_EXPRESSION_BINARY_BITWISE_AND;              break;
-				case TOKEN_LEFT_SHIFT:       binary->kind = AST_EXPRESSION_BINARY_LEFT_SHIFT;               break;
-				case TOKEN_RIGHT_SHIFT:      binary->kind = AST_EXPRESSION_BINARY_RIGHT_SHIFT;              break;
+				case TOKEN_EQUAL:            binary->kind = Ast::EXPRESSION_BINARY_COMPARE_EQUAL;            break;
+				case TOKEN_NOT_EQUAL:        binary->kind = Ast::EXPRESSION_BINARY_COMPARE_NOT_EQUAL;        break;
+				case TOKEN_LESS:             binary->kind = Ast::EXPRESSION_BINARY_COMPARE_LESS;             break;
+				case TOKEN_LESS_OR_EQUAL:    binary->kind = Ast::EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL;    break;
+				case TOKEN_GREATER:          binary->kind = Ast::EXPRESSION_BINARY_COMPARE_GREATER;          break;
+				case TOKEN_GREATER_OR_EQUAL: binary->kind = Ast::EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL; break;
+				case TOKEN_AND:              binary->kind = Ast::EXPRESSION_BINARY_AND;                      break;
+				case TOKEN_OR:               binary->kind = Ast::EXPRESSION_BINARY_OR;                       break;
+				case TOKEN_DOT:              binary->kind = Ast::EXPRESSION_BINARY_DOT;                      break;
+				// case TOKEN_DOT_DOT:          binary->kind = Ast::EXPRESSION_BINARY_RANGE;                    break;
+				case TOKEN_PLUS:             binary->kind = Ast::EXPRESSION_BINARY_ADD;                      break;
+				case TOKEN_MINUS:            binary->kind = Ast::EXPRESSION_BINARY_SUBTRACT;                 break;
+				case TOKEN_ASTERISK:         binary->kind = Ast::EXPRESSION_BINARY_MULTIPLY;                 break;
+				case TOKEN_DIVIDE:           binary->kind = Ast::EXPRESSION_BINARY_DIVIDE;                   break;
+				case TOKEN_MOD:              binary->kind = Ast::EXPRESSION_BINARY_MODULO;                   break;
+				case TOKEN_CARET:            binary->kind = Ast::EXPRESSION_BINARY_BITWISE_XOR;              break;
+				case TOKEN_BAR:              binary->kind = Ast::EXPRESSION_BINARY_BITWISE_OR;               break;
+				case TOKEN_AMPERSAND:        binary->kind = Ast::EXPRESSION_BINARY_BITWISE_AND;              break;
+				case TOKEN_LEFT_SHIFT:       binary->kind = Ast::EXPRESSION_BINARY_LEFT_SHIFT;               break;
+				case TOKEN_RIGHT_SHIFT:      binary->kind = Ast::EXPRESSION_BINARY_RIGHT_SHIFT;              break;
 				default: Assert(); Unreachable();
 			}
 
@@ -795,26 +795,26 @@ static Token* GetEndOfTypeIfValid(Token* token) {
 	return null;
 }
 
-Ast_Type Parser::ParseType(u32 indent) {
-	Ast_Type type = { };
+Ast::Type Parser::ParseType(u32 indent) {
+	Ast::Type type = { };
 
-	ArrayBuffer<Ast_Specifier> specifiers = CreateArrayBuffer<Ast_Specifier>();
+	ArrayBuffer<Ast::Specifier> specifiers = CreateArrayBuffer<Ast::Specifier>();
 
 	while (IsSpecifier(token->kind)) {
-		Ast_Specifier specifier;
+		Ast::Specifier specifier;
 		specifier.token = token;
 		specifier.size_expression = null;
 		CheckScope(token, indent, module);
 
 		if (token->kind == TOKEN_OPEN_BRACKET) {
-			specifier.kind = AST_SPECIFIER_ARRAY;
+			specifier.kind = Ast::SPECIFIER_ARRAY;
 
 			Token* closure = token->closure;
 			CheckScope(closure, indent, module);
 			token += 1;
 
 			if (token != closure) {
-				specifier.kind = AST_SPECIFIER_FIXED_ARRAY;
+				specifier.kind = Ast::SPECIFIER_FIXED_ARRAY;
 				specifier.size_expression = ParseExpression(indent+1);
 			}
 
@@ -824,11 +824,11 @@ Ast_Type Parser::ParseType(u32 indent) {
 			token = closure + 1;
 		}
 		else if (token->kind == TOKEN_ASTERISK) {
-			specifier.kind = AST_SPECIFIER_POINTER;
+			specifier.kind = Ast::SPECIFIER_POINTER;
 			token += 1;
 		}
 		else if (token->kind == TOKEN_QUESTION_MARK) {
-			specifier.kind = AST_SPECIFIER_OPTIONAL;
+			specifier.kind = Ast::SPECIFIER_OPTIONAL;
 			token += 1;
 		}
 
@@ -840,12 +840,12 @@ Ast_Type Parser::ParseType(u32 indent) {
 
 	if (IsPrimitive(token->kind)) {
 		CheckScope(token, indent, module);
-		type.basetype.kind = AST_BASETYPE_PRIMITIVE;
+		type.basetype.kind = Ast::BASETYPE_PRIMITIVE;
 		token += 1;
 	}
 	else if (token->kind == TOKEN_IDENTIFIER_FORMAL) {
 		CheckScope(token, indent, module);
-		type.basetype.kind = AST_BASETYPE_USERTYPE;
+		type.basetype.kind = Ast::BASETYPE_USERTYPE;
 		token += 1;
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN && token->closure[1].kind == TOKEN_ARROW) {
@@ -853,15 +853,15 @@ Ast_Type Parser::ParseType(u32 indent) {
 		CheckScope(token, indent, module);
 		CheckScope(closure, indent, module);
 		CheckScope(closure+1, indent, module);
-		type.basetype.kind = AST_BASETYPE_FUNCTION;
+		type.basetype.kind = Ast::BASETYPE_FUNCTION;
 		type.basetype.function.input = null;
 		type.basetype.function.output = null;
 		token += 1;
 
-		List<Ast_Type> params = null;
+		List<Ast::Type> params = null;
 
 		while (token != closure) {
-			Ast_Type param = ParseType(indent+1);
+			Ast::Type param = ParseType(indent+1);
 			params.Add(param);
 
 			if (token->kind == TOKEN_COMMA) {
@@ -880,9 +880,9 @@ Ast_Type Parser::ParseType(u32 indent) {
 		}
 		else
 		{
-			type.basetype.function.input = module->stack.Allocate<Ast_Type>();
+			type.basetype.function.input = module->stack.Allocate<Ast::Type>();
 			*type.basetype.function.input = {
-				.basetype = { .kind = AST_BASETYPE_TUPLE, .tuple = params.ToArray() },
+				.basetype = { .kind = Ast::BASETYPE_TUPLE, .tuple = params.ToArray() },
 			};
 		}
 
@@ -893,7 +893,7 @@ Ast_Type Parser::ParseType(u32 indent) {
 		}
 		else
 		{
-			type.basetype.function.output = module->stack.Allocate<Ast_Type>();
+			type.basetype.function.output = module->stack.Allocate<Ast::Type>();
 			*type.basetype.function.output = ParseType(indent);
 		}
 
@@ -902,11 +902,11 @@ Ast_Type Parser::ParseType(u32 indent) {
 		Token* closure = token->closure;
 		CheckScope(token, indent, module);
 		CheckScope(closure, indent, module);
-		type.basetype.kind = AST_BASETYPE_TUPLE;
+		type.basetype.kind = Ast::BASETYPE_TUPLE;
 		type.basetype.tuple = null;
 		token += 1;
 
-		List<Ast_Type> members = null;
+		List<Ast::Type> members = null;
 
 		while (token != closure) {
 			members.Add(ParseType(indent+1));
@@ -930,16 +930,16 @@ Ast_Type Parser::ParseType(u32 indent) {
 	return type;
 }
 
-void Parser::ParseParameters(Ast_Function* function, Token* open_paren, u32 indent) {
+void Parser::ParseParameters(Ast::Function* function, Token* open_paren, u32 indent) {
 	Token* closure = open_paren->closure;
 	Token* cursor = open_paren+1;
-	ArrayBuffer<Ast_Variable> params = CreateArrayBuffer<Ast_Variable>(); // @Todo: Get lexer to count commas in parens?
+	ArrayBuffer<Ast::Variable> params = CreateArrayBuffer<Ast::Variable>(); // @Todo: Get lexer to count commas in parens?
 
 	CheckScope(open_paren, indent, module);
 	CheckScope(closure, indent, module);
 
 	while (cursor < closure) {
-		Ast_Variable param = { .flags = AST_VARIABLE_FLAG_PARAMETER };
+		Ast::Variable param = { .flags = Ast::VARIABLE_FLAG_PARAMETER };
 
 		if (cursor->kind == TOKEN_COMMA)
 			::Error(module, cursor->location,"Empty parameters not allowed. (Remove redundant ',')\n");
@@ -962,7 +962,7 @@ void Parser::ParseParameters(Ast_Function* function, Token* open_paren, u32 inde
 		CheckScope(cursor, indent+1, module);
 		cursor += 1;
 
-		param.ast_type = module->stack.Allocate<Ast_Type>();
+		param.ast_type = module->stack.Allocate<Ast::Type>();
 		Token* saved = token;
 		token = cursor;
 		*param.ast_type = ParseType(indent+2);
@@ -983,39 +983,39 @@ void Parser::ParseParameters(Ast_Function* function, Token* open_paren, u32 inde
 	function->parameters = params.Lock();
 }
 
-Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
-	Ast_BranchBlock branch_block = {};
-	ArrayBuffer<Ast_Branch> branches = CreateArrayBuffer<Ast_Branch>();
+Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
+	Ast::BranchBlock branch_block = {};
+	ArrayBuffer<Ast::Branch> branches = CreateArrayBuffer<Ast::Branch>();
 
 	Token* branch_block_begin_token = token;
 
 	do {
-		Ast_Branch branch = {};
+		Ast::Branch branch = {};
 
 		Token* clause_token = token;
 
 		if (token->kind == TOKEN_ELSE) {
-			branch.clause = AST_BRANCH_CLAUSE_ELSE;
+			branch.clause = Ast::BRANCH_CLAUSE_ELSE;
 			token += 1;
 		}
 		else if (token->kind == TOKEN_THEN) {
-			branch.clause = AST_BRANCH_CLAUSE_THEN;
+			branch.clause = Ast::BRANCH_CLAUSE_THEN;
 			token += 1;
 		}
 		else {
-			branch.clause = AST_BRANCH_CLAUSE_INIT;
+			branch.clause = Ast::BRANCH_CLAUSE_INIT;
 		}
 
 		switch (token->kind) {
 			case TOKEN_IF: {
-				branch.kind = AST_BRANCH_IF;
+				branch.kind = Ast::BRANCH_IF;
 				CheckScope(token, indent, module);
 				token += 1;
 				branch.if_condition = ParseExpression(indent+1, false);
 			} break;
 
 			case TOKEN_WHILE: {
-				branch.kind = AST_BRANCH_WHILE;
+				branch.kind = Ast::BRANCH_WHILE;
 				CheckScope(token, indent, module);
 				token += 1;
 				branch.while_condition = ParseExpression(indent+1, false);
@@ -1035,13 +1035,13 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 				// for n : uint in signed_nums:
 
 				if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_IN) {
-					branch.kind = AST_BRANCH_FOR_RANGE;
+					branch.kind = Ast::BRANCH_FOR_RANGE;
 
-					Ast_Variable* iterator = module->stack.Allocate<Ast_Variable>();
+					Ast::Variable* iterator = module->stack.Allocate<Ast::Variable>();
 					*iterator = {
 						.name       = token->identifier_string,
 						.name_token = token,
-						.flags      = AST_VARIABLE_FLAG_ITERATOR,
+						.flags      = Ast::VARIABLE_FLAG_ITERATOR,
 					};
 					branch.for_range.iterator = iterator;
 
@@ -1063,9 +1063,9 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 					}
 				}
 				else if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON) {
-					branch.kind = AST_BRANCH_FOR_VERBOSE;
+					branch.kind = Ast::BRANCH_FOR_VERBOSE;
 
-					Ast_Variable* variable = module->stack.Allocate<Ast_Variable>();
+					Ast::Variable* variable = module->stack.Allocate<Ast::Variable>();
 					*variable = {
 						.name       = token->identifier_string,
 						.name_token = token,
@@ -1079,7 +1079,7 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 
 					if (token->kind != TOKEN_EQUAL) {
 						CheckScope(token, indent+1, module);
-						variable->ast_type = module->stack.Allocate<Ast_Type>();
+						variable->ast_type = module->stack.Allocate<Ast::Type>();
 						*variable->ast_type = ParseType(indent);
 					}
 
@@ -1118,7 +1118,7 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 				}
 			} break;
 
-			case TOKEN_COLON: branch.kind = AST_BRANCH_NAKED; break;
+			case TOKEN_COLON: branch.kind = Ast::BRANCH_NAKED; break;
 
 			default: Error("Expected 'if', 'while', 'for' or ':' after '%' clause, not: '%'\n", clause_token, token);
 		}
@@ -1136,22 +1136,22 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 
 	branch_block.branches = branches.Lock();
 
-	Ast_Branch* else_branch = null;
-	Ast_Branch* then_branch = null;
+	Ast::Branch* else_branch = null;
+	Ast::Branch* then_branch = null;
 
-	for (Ast_Branch* branch = branch_block.branches.End()-1; branch >= branch_block.branches.Begin(); branch--) {
+	for (Ast::Branch* branch = branch_block.branches.End()-1; branch >= branch_block.branches.Begin(); branch--) {
 		branch->else_branch = else_branch;
 		branch->then_branch = then_branch;
 
-		if (branch->clause == AST_BRANCH_CLAUSE_ELSE) else_branch = branch;
-		if (branch->clause == AST_BRANCH_CLAUSE_THEN) then_branch = branch;
+		if (branch->clause == Ast::BRANCH_CLAUSE_ELSE) else_branch = branch;
+		if (branch->clause == Ast::BRANCH_CLAUSE_THEN) then_branch = branch;
 	}
 
 	return branch_block;
 }
 
-Ast_Statement Parser::ParseStatement(u32 indent) {
-	Ast_Statement statement = Ast_Statement();
+Ast::Statement Parser::ParseStatement(u32 indent) {
+	Ast::Statement statement = Ast::Statement();
 
 	if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
 		Error("Variable names must start with a lowercase letter.\n");
@@ -1159,7 +1159,7 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 	if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON) {
 		CheckScope(token+1, indent, module);
 
-		statement.kind = AST_STATEMENT_VARIABLE_DECLARATION;
+		statement.kind = Ast::STATEMENT_VARIABLE_DECLARATION;
 		statement.variable_declaration.name_token = token;
 		statement.variable_declaration.name = token->identifier_string;
 
@@ -1167,7 +1167,7 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 
 		if (token->kind != TOKEN_EQUAL) {
 			CheckScope(token, indent+1, module);
-			statement.variable_declaration.ast_type = module->stack.Allocate<Ast_Type>();
+			statement.variable_declaration.ast_type = module->stack.Allocate<Ast::Type>();
 			*statement.variable_declaration.ast_type = ParseType(indent+1);
 		}
 
@@ -1181,15 +1181,15 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 		return statement;
 	}
 	else if (IsExpressionStarter(token->kind)) {
-		Ast_Expression* expression = ParseExpression(indent+1, true);
+		Ast::Expression* expression = ParseExpression(indent+1, true);
 
 		if (IsAssignment(token->kind)) {
-			if (token->kind == TOKEN_EQUAL)        statement.kind = AST_STATEMENT_ASSIGNMENT;
-			if (token->kind == TOKEN_PLUS_EQUAL)   statement.kind = AST_STATEMENT_ASSIGNMENT_ADD;
-			if (token->kind == TOKEN_MINUS_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_SUBTRACT;
-			if (token->kind == TOKEN_TIMES_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_MULTIPLY;
-			if (token->kind == TOKEN_DIVIDE_EQUAL) statement.kind = AST_STATEMENT_ASSIGNMENT_DIVIDE;
-			if (token->kind == TOKEN_CARET_EQUAL)  statement.kind = AST_STATEMENT_ASSIGNMENT_XOR;
+			if (token->kind == TOKEN_EQUAL)        statement.kind = Ast::STATEMENT_ASSIGNMENT;
+			if (token->kind == TOKEN_PLUS_EQUAL)   statement.kind = Ast::STATEMENT_ASSIGNMENT_ADD;
+			if (token->kind == TOKEN_MINUS_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_SUBTRACT;
+			if (token->kind == TOKEN_TIMES_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_MULTIPLY;
+			if (token->kind == TOKEN_DIVIDE_EQUAL) statement.kind = Ast::STATEMENT_ASSIGNMENT_DIVIDE;
+			if (token->kind == TOKEN_CARET_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_XOR;
 
 			CheckScope(token, indent+1, module);
 			token += 1;
@@ -1201,21 +1201,21 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 			statement.assignment.right = ParseExpression(indent+1, false);
 		}
 		else {
-			statement.kind = AST_STATEMENT_EXPRESSION;
+			statement.kind = Ast::STATEMENT_EXPRESSION;
 			statement.expression = expression;
 		}
 
 		return statement;
 	}
 	else if (token->kind == TOKEN_IF || token->kind == TOKEN_FOR || token->kind == TOKEN_WHILE) {
-		Ast_BranchBlock branch_block = ParseBranchBlock(indent);
-		statement.kind = AST_STATEMENT_BRANCH_BLOCK;
+		Ast::BranchBlock branch_block = ParseBranchBlock(indent);
+		statement.kind = Ast::STATEMENT_BRANCH_BLOCK;
 		statement.branch_block = branch_block;
 
 		return statement;
 	}
 	else if (token->kind == TOKEN_INC || token->kind == TOKEN_DEC) {
-		statement.kind = token->kind == TOKEN_INC ? AST_STATEMENT_INCREMENT : AST_STATEMENT_DECREMENT;
+		statement.kind = token->kind == TOKEN_INC ? Ast::STATEMENT_INCREMENT : Ast::STATEMENT_DECREMENT;
 		statement.increment.token = token;
 		token += 1;
 
@@ -1227,7 +1227,7 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 		return statement;
 	}
 	else if (token->kind == TOKEN_DEFER) {
-		statement.kind = AST_STATEMENT_DEFER;
+		statement.kind = Ast::STATEMENT_DEFER;
 		statement.defer.token = token;
 		token += 1;
 
@@ -1237,20 +1237,20 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 		CheckScope(token, indent, module);
 		token += 1;
 
-		Ast_Code code = ParseCode(indent+1);
+		Ast::Code code = ParseCode(indent+1);
 		statement.defer.code = code;
 
 		return statement;
 	}
 	else if (token->kind == TOKEN_BREAK) {
-		statement.kind = AST_STATEMENT_BREAK;
+		statement.kind = Ast::STATEMENT_BREAK;
 		statement.brk.token = token;
 		token += 1;
 
 		return statement;
 	}
 	else if (token->kind == TOKEN_RETURN) {
-		statement.kind = AST_STATEMENT_RETURN;
+		statement.kind = Ast::STATEMENT_RETURN;
 		statement.ret.token = token;
 		statement.ret.expression = null;
 		token += 1;
@@ -1261,7 +1261,7 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 		return statement;
 	}
 	else if (token->kind == TOKEN_CLAIM) {
-		statement.kind = AST_STATEMENT_CLAIM;
+		statement.kind = Ast::STATEMENT_CLAIM;
 		statement.claim.token = token;
 		token += 1;
 
@@ -1280,37 +1280,37 @@ static bool IsScopeTerminator(TokenKind kind) {
 	return kind == TOKEN_SEMICOLON || kind == TOKEN_ELSE || kind == TOKEN_THEN;
 }
 
-Ast_Code Parser::ParseCode(u32 indent) {
-	Ast_Code code = {};
+Ast::Code Parser::ParseCode(u32 indent) {
+	Ast::Code code = {};
 
-	ArrayBuffer<Ast_Statement> statements = CreateArrayBuffer<Ast_Statement>();
-	ArrayBuffer<Ast_Struct>    structs    = CreateArrayBuffer<Ast_Struct>();
-	ArrayBuffer<Ast_Enum>      enums      = CreateArrayBuffer<Ast_Enum>();
-	ArrayBuffer<Ast_Function>  functions  = CreateArrayBuffer<Ast_Function>();
+	ArrayBuffer<Ast::Statement> statements = CreateArrayBuffer<Ast::Statement>();
+	ArrayBuffer<Ast::Struct>    structs    = CreateArrayBuffer<Ast::Struct>();
+	ArrayBuffer<Ast::Enum>      enums      = CreateArrayBuffer<Ast::Enum>();
+	ArrayBuffer<Ast::Function>  functions  = CreateArrayBuffer<Ast::Function>();
 
 	if (token->IsNewLine() && token->indent > indent) {
 	}
 
 	while (IsCorrectScope(token, indent) && !IsScopeTerminator(token->kind)) {
 		if (token->kind == TOKEN_STRUCT) {
-			Ast_Struct structure = ParseStruct(indent);
+			Ast::Struct structure = ParseStruct(indent);
 			structs.Add(structure);
 		}
 		else if (token->kind == TOKEN_ENUM) {
-			Ast_Enum enumeration = ParseEnum(indent);
+			Ast::Enum enumeration = ParseEnum(indent);
 			enums.Add(enumeration);
 		}
 		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN && (token[1].closure[1].kind == TOKEN_COLON || token[1].closure[1].kind == TOKEN_ARROW)) {
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 				Error("Function names must start with an uppercase letter.\n", token);
 
-			Ast_Function function = ParseFunction(indent);
+			Ast::Function function = ParseFunction(indent);
 			function.is_global = false;
 			functions.Add(function);
 		}
 		else
 		{
-			Ast_Statement statement = ParseStatement(indent);
+			Ast::Statement statement = ParseStatement(indent);
 			statements.Add(statement);
 
 			if (!token->IsNewLine() && !IsScopeTerminator(token->kind))
@@ -1332,8 +1332,8 @@ Ast_Code Parser::ParseCode(u32 indent) {
 	return code;
 }
 
-Ast_Function Parser::ParseFunction(u32 indent) {
-	Ast_Function function = {
+Ast::Function Parser::ParseFunction(u32 indent) {
+	Ast::Function function = {
 		.name       = token->identifier_string,
 		.name_token = token,
 	};
@@ -1348,7 +1348,7 @@ Ast_Function Parser::ParseFunction(u32 indent) {
 	if (token->kind == TOKEN_ARROW) {
 		CheckScope(token, indent+1, module);
 		token += 1;
-		function.ast_return_type = module->stack.Allocate<Ast_Type>();
+		function.ast_return_type = module->stack.Allocate<Ast::Type>();
 		*function.ast_return_type = ParseType(indent);
 	}
 
@@ -1363,8 +1363,8 @@ Ast_Function Parser::ParseFunction(u32 indent) {
 	return function;
 }
 
-Ast_Import Parser::ParseImport(u32 indent) {
-	Ast_Import import;
+Ast::Import Parser::ParseImport(u32 indent) {
+	Ast::Import import;
 	import.token = token;
 	token += 1;
 
@@ -1388,29 +1388,29 @@ Ast_Import Parser::ParseImport(u32 indent) {
 }
 
 void Parser::ParseGlobalScope() {
-	ArrayBuffer<Ast_Import>   imports    = CreateArrayBuffer<Ast_Import>();
-	ArrayBuffer<Ast_Struct>   structs    = CreateArrayBuffer<Ast_Struct>();
-	ArrayBuffer<Ast_Enum>     enums      = CreateArrayBuffer<Ast_Enum>();
-	ArrayBuffer<Ast_Function> functions  = CreateArrayBuffer<Ast_Function>();
+	ArrayBuffer<Ast::Import>   imports    = CreateArrayBuffer<Ast::Import>();
+	ArrayBuffer<Ast::Struct>   structs    = CreateArrayBuffer<Ast::Struct>();
+	ArrayBuffer<Ast::Enum>     enums      = CreateArrayBuffer<Ast::Enum>();
+	ArrayBuffer<Ast::Function> functions  = CreateArrayBuffer<Ast::Function>();
 
 	while (token->kind != TOKEN_EOF) {
 		if (token->kind == TOKEN_IMPORT) {
-			Ast_Import import = ParseImport(0);
+			Ast::Import import = ParseImport(0);
 			imports.Add(import);
 		}
 		else if (token->kind == TOKEN_STRUCT) {
-			Ast_Struct structure = ParseStruct(0);
+			Ast::Struct structure = ParseStruct(0);
 			structs.Add(structure);
 		}
 		else if (token->kind == TOKEN_ENUM) {
-			Ast_Enum enumeration = ParseEnum(0);
+			Ast::Enum enumeration = ParseEnum(0);
 			enums.Add(enumeration);
 		}
 		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN) {
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 				Error("Function names must start with an uppercase letter.\n", token);
 
-			Ast_Function function = ParseFunction(0);
+			Ast::Function function = ParseFunction(0);
 			function.is_global = true;
 			functions.Add(function);
 		}

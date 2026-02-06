@@ -5,6 +5,8 @@
 #include "assert.h"
 #include "array.h"
 
+namespace Ast { struct Struct; struct Enum; }
+
 enum TypeKind : u32 {
 	TYPE_PRIMITIVE   = 0,
 
@@ -125,12 +127,12 @@ struct TupleTypeInfo {
 };
 
 struct EnumTypeInfo {
-	struct Ast_Enum* ast;
+	Ast::Enum* ast;
 	TypeID backing_type;
 };
 
 struct StructTypeInfo {
-	struct Ast_Struct* ast;
+	Ast::Struct* ast;
 };
 
 struct ExtensionEntry {
@@ -323,8 +325,8 @@ static TypeID GetFunctionOutputType(TypeID type) { return GetTypeInfo(type)->fun
 static bool CanCast(CastKind cast, TypeID from, TypeID to);
 static void InitTypeSystem(void);
 static TypeID MergeTypeRight(TypeID a, TypeID b);
-static TypeID CreateStructType(Ast_Struct* ast, u64 size);
-static TypeID CreateEnumType(Ast_Enum* ast, TypeID backing_type);
+static TypeID CreateStructType(Ast::Struct* ast, u64 size);
+static TypeID CreateEnumType(Ast::Enum* ast, TypeID backing_type);
 static TypeID GetArithmeticBackingType(TypeID id);
 static TypeID GetSubType(TypeID type);
 static TypeID GetPointer(TypeID subtype);
@@ -334,4 +336,3 @@ static TypeID GetTuple(Array<TypeID> types);
 static TypeID GetFixedArray(TypeID subtype, u64 length);
 static TypeID GetFunctionType(TypeID input, TypeID output);
 static TypeID GetDominantType(TypeID a, TypeID b);
-

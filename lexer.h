@@ -9,7 +9,7 @@
 #include "token.h"
 
 struct Lexer {
-	Ast_Module* module;
+	Ast::Module* module;
 	String file_path;
 	Array<Token> tokens;
 	Token* current_token;
@@ -29,7 +29,7 @@ struct Lexer {
 	void PushLine();
 };
 
-static Lexer CreateLexer(Ast_Module* module, String file_path) {
+static Lexer CreateLexer(Ast::Module* module, String file_path) {
 	Array<char>  code   = File::Load(file_path, 16, 64);
 	Array<Token> tokens = AllocArray<Token>(code.length + 1);
 	List<Line>   lines  = AllocateList<Line>(code.length/4);

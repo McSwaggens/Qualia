@@ -431,7 +431,7 @@ static TypeID GetTuple(TypeID* elements, u64 count) {
 	return GetTuple({ elements, count });
 }
 
-static TypeID CreateStructType(Ast_Struct* ast, u64 size) {
+static TypeID CreateStructType(Ast::Struct* ast, u64 size) {
 	TypeID result = CreateType(TYPE_STRUCT, {
 		.size = size,
 		.struct_info.ast = ast,
@@ -440,7 +440,7 @@ static TypeID CreateStructType(Ast_Struct* ast, u64 size) {
 	return result;
 }
 
-static TypeID CreateEnumType(Ast_Enum* ast, TypeID backing_type) {
+static TypeID CreateEnumType(Ast::Enum* ast, TypeID backing_type) {
 	TypeID result = CreateType(TYPE_ENUM, {
 		.size = GetTypeSize(backing_type),
 		.enum_info.ast = ast,

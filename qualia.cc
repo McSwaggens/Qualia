@@ -3,9 +3,9 @@
 #include "list.h"
 #include "sort.h"
 
-struct Ast_Module;
+namespace Ast { struct Module; }
 
-static List<Ast_Module*> modules = null;
+static List<Ast::Module*> modules = null;
 
 #include "general.cc"
 #include "thread.cc"
@@ -32,7 +32,7 @@ static void CompileFile(String file_path) {
 	}
 
 	Stack stack = CreateStack(1 << 21);
-	Ast_Module* module = stack.Allocate<Ast_Module>();
+	Ast::Module* module = stack.Allocate<Ast::Module>();
 	ZeroMemory(module);
 
 	modules.Add(module);
@@ -82,4 +82,3 @@ int main(int argc, char** args) {
 
 	OS::Terminate(true);
 }
-

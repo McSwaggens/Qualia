@@ -243,13 +243,13 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 
 		case TYPE_STRUCT: {
 			StructTypeInfo struct_info = info->struct_info;
-			Ast_Struct* ast = struct_info.ast;
+			Ast::Struct* ast = struct_info.ast;
 			buffer->Write(ast->name);
 		} return;
 
 		case TYPE_ENUM: {
 			EnumTypeInfo enum_info = info->enum_info;
-			Ast_Enum* ast = enum_info.ast;
+			Ast::Enum* ast = enum_info.ast;
 			buffer->Write(ast->name);
 		} return;
 
@@ -278,22 +278,22 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 	}
 }
 
-static void Write(OutputBuffer* buffer, Ast_Type& type) {
+static void Write(OutputBuffer* buffer, Ast::Type& type) {
 	Write(buffer, &type);
 }
 
-static void Write(OutputBuffer* buffer, Ast_Type* type) {
+static void Write(OutputBuffer* buffer, Ast::Type* type) {
 	if (!type) {
 		buffer->Write("null");
 		return;
 	}
 
-	for (Ast_Specifier* specifier = type->specifiers; specifier < type->specifiers.End(); specifier++) {
+	for (Ast::Specifier* specifier = type->specifiers; specifier < type->specifiers.End(); specifier++) {
 		switch (specifier->kind) {
-			case AST_SPECIFIER_POINTER:   buffer->Write("*"); break;
-			case AST_SPECIFIER_OPTIONAL:  buffer->Write("?"); break;
-			case AST_SPECIFIER_ARRAY:     buffer->Write("[]");
-			case AST_SPECIFIER_FIXED_ARRAY:
+			case Ast::SPECIFIER_POINTER:   buffer->Write("*"); break;
+			case Ast::SPECIFIER_OPTIONAL:  buffer->Write("?"); break;
+			case Ast::SPECIFIER_ARRAY:     buffer->Write("[]");
+			case Ast::SPECIFIER_FIXED_ARRAY:
 			{
 				buffer->Write("[");
 				Write(buffer, specifier->size_expression);
@@ -303,13 +303,13 @@ static void Write(OutputBuffer* buffer, Ast_Type* type) {
 	}
 
 	switch (type->basetype.kind) {
-		case AST_BASETYPE_PRIMITIVE: Write(buffer, type->basetype.token); break;
-		case AST_BASETYPE_USERTYPE:  Write(buffer, type->basetype.token); break;
+		case Ast::BASETYPE_PRIMITIVE: Write(buffer, type->basetype.token); break;
+		case Ast::BASETYPE_USERTYPE:  Write(buffer, type->basetype.token); break;
 
-		case AST_BASETYPE_TUPLE: {
+		case Ast::BASETYPE_TUPLE: {
 			buffer->Write("(");
 
-			for (Ast_Type* t = type->basetype.tuple; t < type->basetype.tuple.End(); t++) {
+			for (Ast::Type* t = type->basetype.tuple; t < type->basetype.tuple.End(); t++) {
 				if (t != type->basetype.tuple) buffer->Write(", ");
 				Write(buffer, t);
 			}
@@ -317,7 +317,7 @@ static void Write(OutputBuffer* buffer, Ast_Type* type) {
 			buffer->Write(")");
 		} break;
 
-		case AST_BASETYPE_FUNCTION: {
+		case Ast::BASETYPE_FUNCTION: {
 			buffer->Write("(");
 			Write(buffer, type->basetype.function.input);
 			buffer->Write(") -> (");
@@ -327,72 +327,72 @@ static void Write(OutputBuffer* buffer, Ast_Type* type) {
 	}
 }
 
-static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
+static void Write(OutputBuffer* buffer, Ast::Expression* expression) {
 	if (!expression) {
 		buffer->Write("null");
 		return;
 	}
 
 	switch (expression->kind) {
-		case AST_EXPRESSION_TERMINAL_VARIABLE: {
-			Ast_Expression_Variable* variable = (Ast_Expression_Variable*)expression;
+		case Ast::EXPRESSION_TERMINAL_VARIABLE: {
+			Ast::Expression_Variable* variable = (Ast::Expression_Variable*)expression;
 			buffer->Write("(Variable: ");
 			Write(buffer, variable->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_FUNCTION: {
-			Ast_Expression_Function* function = (Ast_Expression_Function*)expression;
+		case Ast::EXPRESSION_TERMINAL_FUNCTION: {
+			Ast::Expression_Function* function = (Ast::Expression_Function*)expression;
 			buffer->Write("(Function: ");
 			Write(buffer, function->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_INTRINSIC: {
-			Ast_Expression_Intrinsic* intrinsic = (Ast_Expression_Intrinsic*)expression;
+		case Ast::EXPRESSION_TERMINAL_INTRINSIC: {
+			Ast::Expression_Intrinsic* intrinsic = (Ast::Expression_Intrinsic*)expression;
 			buffer->Write("(Intrinsic: ");
 			Write(buffer, intrinsic->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_STRUCT: {
-			Ast_Expression_Struct* structure = (Ast_Expression_Struct*)expression;
+		case Ast::EXPRESSION_TERMINAL_STRUCT: {
+			Ast::Expression_Struct* structure = (Ast::Expression_Struct*)expression;
 			buffer->Write("(Struct: ");
 			Write(buffer, structure->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_ENUM: {
-			Ast_Expression_Enum* enumeration = (Ast_Expression_Enum*)expression;
+		case Ast::EXPRESSION_TERMINAL_ENUM: {
+			Ast::Expression_Enum* enumeration = (Ast::Expression_Enum*)expression;
 			buffer->Write("(Enum: ");
 			Write(buffer, enumeration->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_STRUCT_MEMBER: {
-			Ast_Expression_Struct_Member* member = (Ast_Expression_Struct_Member*)expression;
+		case Ast::EXPRESSION_TERMINAL_STRUCT_MEMBER: {
+			Ast::Expression_Struct_Member* member = (Ast::Expression_Struct_Member*)expression;
 			buffer->Write("(Struct_Member: ");
 			Write(buffer, member->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_ENUM_MEMBER: {
-			Ast_Expression_Enum_Member* member = (Ast_Expression_Enum_Member*)expression;
+		case Ast::EXPRESSION_TERMINAL_ENUM_MEMBER: {
+			Ast::Expression_Enum_Member* member = (Ast::Expression_Enum_Member*)expression;
 			buffer->Write("(Enum_Member: ");
 			Write(buffer, member->token);
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_ARRAY: {
-			Ast_Expression_Array* array = (Ast_Expression_Array*)expression;
+		case Ast::EXPRESSION_ARRAY: {
+			Ast::Expression_Array* array = (Ast::Expression_Array*)expression;
 			buffer->Write("[ ");
 			Write(buffer, array->left);
 			buffer->Write(" .. ");
 			Write(buffer, array->right);
 			buffer->Write(" ]");
 		}
-		case AST_EXPRESSION_FIXED_ARRAY: {
-			Ast_Expression_Fixed_Array* fixed_array = (Ast_Expression_Fixed_Array*)expression;
+		case Ast::EXPRESSION_FIXED_ARRAY: {
+			Ast::Expression_Fixed_Array* fixed_array = (Ast::Expression_Fixed_Array*)expression;
 
 			buffer->Write("{ ");
 
@@ -405,36 +405,36 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(" }");
 		} break;
 
-		case AST_EXPRESSION_TERMINAL_NAME:
-		case AST_EXPRESSION_TERMINAL_LITERAL:
-		case AST_EXPRESSION_TERMINAL_PRIMITIVE:
-		case AST_EXPRESSION_TERMINAL_ARRAY_BEGIN:
-		case AST_EXPRESSION_TERMINAL_ARRAY_END:
-		case AST_EXPRESSION_TERMINAL_ARRAY_LENGTH: {
-			Ast_Expression_Literal* literal = (Ast_Expression_Literal*)expression;
+		case Ast::EXPRESSION_TERMINAL_NAME:
+		case Ast::EXPRESSION_TERMINAL_LITERAL:
+		case Ast::EXPRESSION_TERMINAL_PRIMITIVE:
+		case Ast::EXPRESSION_TERMINAL_ARRAY_BEGIN:
+		case Ast::EXPRESSION_TERMINAL_ARRAY_END:
+		case Ast::EXPRESSION_TERMINAL_ARRAY_LENGTH: {
+			Ast::Expression_Literal* literal = (Ast::Expression_Literal*)expression;
 			Write(buffer, literal->token);
 		} break;
 
-		case AST_EXPRESSION_BINARY_COMPARE_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_LESS:
-		case AST_EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:
-		case AST_EXPRESSION_BINARY_COMPARE_GREATER:
-		case AST_EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
-		case AST_EXPRESSION_BINARY_DOT:
-		case AST_EXPRESSION_BINARY_ADD:
-		case AST_EXPRESSION_BINARY_SUBTRACT:
-		case AST_EXPRESSION_BINARY_MULTIPLY:
-		case AST_EXPRESSION_BINARY_DIVIDE:
-		case AST_EXPRESSION_BINARY_MODULO:
-		case AST_EXPRESSION_BINARY_BITWISE_OR:
-		case AST_EXPRESSION_BINARY_BITWISE_XOR:
-		case AST_EXPRESSION_BINARY_BITWISE_AND:
-		case AST_EXPRESSION_BINARY_LEFT_SHIFT:
-		case AST_EXPRESSION_BINARY_RIGHT_SHIFT:
-		case AST_EXPRESSION_BINARY_AND:
-		case AST_EXPRESSION_BINARY_OR: {
-			Ast_Expression_Binary* binary = (Ast_Expression_Binary*)expression;
+		case Ast::EXPRESSION_BINARY_COMPARE_EQUAL:
+		case Ast::EXPRESSION_BINARY_COMPARE_NOT_EQUAL:
+		case Ast::EXPRESSION_BINARY_COMPARE_LESS:
+		case Ast::EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:
+		case Ast::EXPRESSION_BINARY_COMPARE_GREATER:
+		case Ast::EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL:
+		case Ast::EXPRESSION_BINARY_DOT:
+		case Ast::EXPRESSION_BINARY_ADD:
+		case Ast::EXPRESSION_BINARY_SUBTRACT:
+		case Ast::EXPRESSION_BINARY_MULTIPLY:
+		case Ast::EXPRESSION_BINARY_DIVIDE:
+		case Ast::EXPRESSION_BINARY_MODULO:
+		case Ast::EXPRESSION_BINARY_BITWISE_OR:
+		case Ast::EXPRESSION_BINARY_BITWISE_XOR:
+		case Ast::EXPRESSION_BINARY_BITWISE_AND:
+		case Ast::EXPRESSION_BINARY_LEFT_SHIFT:
+		case Ast::EXPRESSION_BINARY_RIGHT_SHIFT:
+		case Ast::EXPRESSION_BINARY_AND:
+		case Ast::EXPRESSION_BINARY_OR: {
+			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
 			buffer->Write("(");
 			Write(buffer, binary->left);
 			buffer->Write(" ");
@@ -444,13 +444,13 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_UNARY_REFERENCE_OF:
-		case AST_EXPRESSION_UNARY_ADDRESS_OF:
-		case AST_EXPRESSION_UNARY_MINUS:
-		case AST_EXPRESSION_UNARY_PLUS:
-		case AST_EXPRESSION_UNARY_BITWISE_NOT:
-		case AST_EXPRESSION_UNARY_NOT: {
-			Ast_Expression_Unary* unary = (Ast_Expression_Unary*)expression;
+		case Ast::EXPRESSION_UNARY_REFERENCE_OF:
+		case Ast::EXPRESSION_UNARY_ADDRESS_OF:
+		case Ast::EXPRESSION_UNARY_MINUS:
+		case Ast::EXPRESSION_UNARY_PLUS:
+		case Ast::EXPRESSION_UNARY_BITWISE_NOT:
+		case Ast::EXPRESSION_UNARY_NOT: {
+			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
 			buffer->Write("(");
 			Write(buffer, unary->op);
 			buffer->Write(" ");
@@ -458,19 +458,19 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_SUBSCRIPT: {
-			Ast_Expression_Subscript* subscript = (Ast_Expression_Subscript*)expression;
+		case Ast::EXPRESSION_SUBSCRIPT: {
+			Ast::Expression_Subscript* subscript = (Ast::Expression_Subscript*)expression;
 			Write(buffer, subscript->array);
 			buffer->Write("[");
 			Write(buffer, subscript->index);
 			buffer->Write("]");
 		} break;
 
-		case AST_EXPRESSION_DOT_CALL:
-		case AST_EXPRESSION_CALL: {
-			Ast_Expression_Call* call = (Ast_Expression_Call*)expression;
+		case Ast::EXPRESSION_DOT_CALL:
+		case Ast::EXPRESSION_CALL: {
+			Ast::Expression_Call* call = (Ast::Expression_Call*)expression;
 			Write(buffer, call->function);
-			if (call->parameters->kind != AST_EXPRESSION_TUPLE) {
+			if (call->parameters->kind != Ast::EXPRESSION_TUPLE) {
 				buffer->Write("(");
 				Write(buffer, call->parameters);
 				buffer->Write(")");
@@ -481,8 +481,8 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			}
 		} break;
 
-		case AST_EXPRESSION_TUPLE: {
-			Ast_Expression_Tuple* tuple = (Ast_Expression_Tuple*)expression;
+		case Ast::EXPRESSION_TUPLE: {
+			Ast::Expression_Tuple* tuple = (Ast::Expression_Tuple*)expression;
 			buffer->Write("(");
 			for (u32 i = 0; i < tuple->elements.length; i++) {
 				if (i) buffer->Write(", ");
@@ -491,8 +491,8 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_IF_ELSE: {
-			Ast_Expression_Ternary* ternary = (Ast_Expression_Ternary*)expression;
+		case Ast::EXPRESSION_IF_ELSE: {
+			Ast::Expression_Ternary* ternary = (Ast::Expression_Ternary*)expression;
 			buffer->Write("(");
 			Write(buffer, ternary->left);
 			buffer->Write(" if ");
@@ -502,8 +502,8 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_AS: {
-			Ast_Expression_As* as = (Ast_Expression_As*)expression;
+		case Ast::EXPRESSION_AS: {
+			Ast::Expression_As* as = (Ast::Expression_As*)expression;
 
 			buffer->Write("(");
 			Write(buffer, as->expression);
@@ -512,8 +512,8 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_IMPLICIT_CAST: {
-			Ast_Expression_Implicit_Cast* cast = (Ast_Expression_Implicit_Cast*)expression;
+		case Ast::EXPRESSION_IMPLICIT_CAST: {
+			Ast::Expression_Implicit_Cast* cast = (Ast::Expression_Implicit_Cast*)expression;
 			buffer->Write("(Implicit_Cast: ");
 			Write(buffer, cast->type);
 			buffer->Write(", ");
@@ -521,7 +521,7 @@ static void Write(OutputBuffer* buffer, Ast_Expression* expression) {
 			buffer->Write(")");
 		} break;
 
-		case AST_EXPRESSION_LAMBDA: {
+		case Ast::EXPRESSION_LAMBDA: {
 			buffer->Write("(LAMBDA)");
 		} break;
 	}

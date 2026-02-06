@@ -18,7 +18,7 @@ static void FlushAndTerminate() {
 
 template<typename... Args>
 [[noreturn]]
-static void LexerError(Ast_Module* module, SourceLocation where, String format, Args&&... message_args) {
+static void LexerError(Ast::Module* module, SourceLocation where, String format, Args&&... message_args) {
 	s64 margin = 2;
 	s64 begin = where.line;
 	s64 number_of_lines = 1 + margin;
@@ -32,7 +32,7 @@ static void LexerError(Ast_Module* module, SourceLocation where, String format, 
 // @RemoveMe? Span<Token> should be sufficient.
 template<typename... Args>
 [[noreturn]]
-static void Error(Ast_Module* module, SourceLocation where, String format, Args&&... message_args) {
+static void Error(Ast::Module* module, SourceLocation where, String format, Args&&... message_args) {
 	s64 margin = 2;
 	s64 begin = where.line;
 	s64 number_of_lines = 1 + margin;
@@ -48,7 +48,7 @@ static void Error(Ast_Module* module, SourceLocation where, String format, Args&
 
 template<typename... Args>
 [[noreturn]]
-static void Error(Ast_Module* module, Ast_Expression* expr, String format, Args&&... message_args) {
+static void Error(Ast::Module* module, Ast::Expression* expr, String format, Args&&... message_args) {
 	Token* begin = expr->begin;
 	Token* end   = expr->end;
 

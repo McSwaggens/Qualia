@@ -771,6 +771,10 @@ void Lexer::Parse() {
 				cursor++, current_token->kind = TOKEN_MOD;
 				break;
 
+			case '~':
+				cursor++, current_token->kind = TOKEN_TILDE;
+				break;
+
 			case '^':
 				cursor++, current_token->kind = TOKEN_CARET;
 				if (*cursor == '=') cursor++, current_token->kind = TOKEN_CARET_EQUAL;

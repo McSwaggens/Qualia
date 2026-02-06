@@ -47,7 +47,7 @@ TestBitwise():
 	c0 := a & b
 	c1 := a | b
 	c2 := a ^ b
-	c3 := ~a        // BUG: '~' (TOKEN_TILDE) has no case in lexer - never lexed
+	c3 := ~a
 	c4 := a << b
 	c5 := a >> b
 
@@ -55,7 +55,7 @@ TestUnary():
 	a := 42
 	b := -a
 	c := +a
-	d := ~a         // BUG: '~' not in lexer (same as above)
+	d := ~a
 
 TestTernary():
 	a := 10

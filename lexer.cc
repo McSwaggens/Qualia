@@ -535,7 +535,6 @@ void Lexer::Parse() {
 				goto PARSE_IDENTIFIER;
 
 			case 'o':
-				if (TestKeyword(TOKEN_OR))      break;
 				goto PARSE_IDENTIFIER;
 
 			case 'r':
@@ -808,6 +807,7 @@ void Lexer::Parse() {
 
 			case '|':
 				cursor++, current_token->kind = TOKEN_BAR;
+				if (*cursor == '|') cursor++, current_token->kind = TOKEN_OR;
 				break;
 
 			default: {

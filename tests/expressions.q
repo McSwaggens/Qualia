@@ -34,8 +34,7 @@ TestLogical():
 
 	// Logical operators
 	c0 := a && b
-	c1 := a and b   // BUG: 'and' keyword missing from lexer case 'a:' handler (only && works)
-	c2 := a or b    // BUG: 'or' keyword broken - ToString(TOKEN_OR) returns "||", so TestKeyword compares cursor against "||" instead of "or"
+	c1 := a || b
 	c3 := not a
 	c4 := !a
 
@@ -82,5 +81,5 @@ TestPrecedence():
 	b := (2 + 3) * 4
 	c := 1 + 2 + 3
 	d := 10 - 2 - 3
-	e := 1 < 2 and 3 < 4        // BUG: 'and' keyword not lexed
-	f := true or false and true  // BUG: both 'or' and 'and' keywords broken/missing in lexer
+	e := 1 < 2 && 3 < 4
+	f := true || false && true

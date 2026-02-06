@@ -7,6 +7,7 @@
 #include "string.h"
 #include "print.h"
 #include "token.h"
+#include "error.h"
 
 struct Lexer {
 	Ast::Module* module;
@@ -27,6 +28,12 @@ struct Lexer {
 	bool TestKeyword(TokenKind keyword);
 	void PushToken(Token token);
 	void PushLine();
+
+	template<typename... Args>
+	[[noreturn]]
+	void Error(String format, Args&&... args) {
+		LexerError(module, location, format, args...);
+	}
 };
 
 static Lexer CreateLexer(Ast::Module* module, String file_path) {

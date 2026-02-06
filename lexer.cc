@@ -1,6 +1,5 @@
 #include "lexer.h"
 
-#include "error.h"
 #include "general.h"
 #include "parser.h"
 #include "memory.h"
@@ -8,7 +7,6 @@
 #include "ascii.h"
 #include "string.h"
 #include "token.h"
-
 
 using LiteralQualifier = u64;
 
@@ -263,10 +261,10 @@ void Lexer::ParseLiteral() {
 	Base qbase = GetBaseFromQualifier(qualifier);
 
 	if (base == BASE_HEX && (qualifier & QUALIFIER_BASE_MASK) == 0)
-		LexerError(module, location, "Hexadecimal missing 'h' qualifier.\n");
+		Error("Hexadecimal missing 'h' qualifier.\n");
 
 	if ((qualifier & QUALIFIER_BASE_MASK) && qbase < base)
-		LexerError(module, location, "% literal with % digits.\n", ToString(qbase), ToString(base));
+		Error("% literal with % digits.\n", ToString(qbase), ToString(base));
 
 	base = qbase;
 
@@ -277,10 +275,10 @@ void Lexer::ParseLiteral() {
 			case QUALIFIER_64: current_token->kind = TOKEN_LITERAL_FLOAT64; break;
 
 			case QUALIFIER_16:
-				LexerError(module, location, "Invalid float literal qualifier: float16 is not a valid type.\n");
+				Error("Invalid float literal qualifier: float16 is not a valid type.\n");
 
 			case QUALIFIER_8:
-				LexerError(module, location, "Invalid float literal qualifier: float8 is not a valid type.\n");
+				Error("Invalid float literal qualifier: float8 is not a valid type.\n");
 		}
 
 		float64 value = AsciiToFloat(whole.begin, whole.count, base);
@@ -315,11 +313,11 @@ void Lexer::ParseLiteral() {
 		u64 fractional_scaled = 0;
 
 		if (overflow)
-			LexerError(module, location, "Integer literal exceeds %-bits.\n", effective_size);
+			Error("Integer literal exceeds %-bits.\n", effective_size);
 
 		if (has_fractional) {
 			if (!scaler)
-				LexerError(module, location, "Integer missing scaler qualifier.\n");
+				Error("Integer missing scaler qualifier.\n");
 
 			float64 fractional_value = AsciiToFloat_Fractional(fractional.begin, fractional.count, base);
 			fractional_scaled = (u64)(fractional_value * (float64)scaler);
@@ -329,13 +327,13 @@ void Lexer::ParseLiteral() {
 			u64 scaled_value = 0;
 
 			if (CheckedMultiply(value, scaler, &scaled_value) || CheckedAdd(scaled_value, fractional_scaled, &scaled_value))
-				LexerError(module, location, "Integer literal with scaler exceeds %-bits.\n", effective_size);
+				Error("Integer literal with scaler exceeds %-bits.\n", effective_size);
 
 			value = scaled_value;
 		}
 
 		if (Boi64(value) > effective_size)
-			LexerError(module, location, "Integer literal exceeds %-bits.\n", effective_size);
+			Error("Integer literal exceeds %-bits.\n", effective_size);
 
 		current_token->literal_int = value;
 	}
@@ -343,7 +341,7 @@ void Lexer::ParseLiteral() {
 	cursor = p;
 
 	if (IsAlpha(*p))
-		LexerError(module, location, "Unexpected character after literal: '%'.\n", *p);
+		Error("Unexpected character after literal: '%'.\n", *p);
 }
 
 static bool CheckIfHexadecimal(char* p) {
@@ -584,20 +582,20 @@ void Lexer::Parse() {
 					if (IsUpperCase(*cursor)) upper++;
 
 					if (CompareStringRaw(cursor, "__"))
-						LexerError(module, location, "Consecutive underscores aren't allowed.\n");
+						Error("Consecutive underscores aren't allowed.\n");
 				}
 
 				u64 size = cursor - begin;
 				String str = String(begin, size);
 
 				if (*begin == '_') COLD
-					LexerError(module, location, "Identifier beginning with an underscore.\n");
+					Error("Identifier beginning with an underscore.\n");
 
 				if (cursor[-1] == '_') COLD
-					LexerError(module, location, "Identifier with trailing underscore: '%'\n", str);
+					Error("Identifier with trailing underscore: '%'\n", str);
 
 				if (CompareStringRaw(cursor-2, "_t") || CompareStringRaw(cursor-2, "_T")) COLD
-					LexerError(module, location, "Identifier with '_t' is banned.\n", str);
+					Error("Identifier with '_t' is banned.\n", str);
 
 				current_token->kind = TOKEN_IDENTIFIER_CASUAL;
 				current_token->identifier_string = String(begin, size);
@@ -627,7 +625,7 @@ void Lexer::Parse() {
 
 				for (; cursor < end && *cursor != '"'; cursor++) {
 					if (*cursor == '\n')
-						LexerError(module, location, "String literal not completed before end of the line.\n");
+						Error("String literal not completed before end of the line.\n");
 
 					if (*cursor == '\\' && IsEscapeCharacter(cursor[1])) {
 						escapes++;
@@ -636,7 +634,7 @@ void Lexer::Parse() {
 				}
 
 				if (cursor >= end || *cursor != '"')
-					LexerError(module, location, "String literal not completed before end of the file.\n");
+					Error("String literal not completed before end of the file.\n");
 
 				char* end = cursor++;
 
@@ -666,7 +664,7 @@ void Lexer::Parse() {
 							case '\"': *s = '\"'; break;
 
 							default:
-								LexerError(module, location, "Invalid escape character: \\%\n", *c);
+								Error("Invalid escape character: \\%\n", *c);
 						}
 					}
 				}
@@ -694,8 +692,7 @@ void Lexer::Parse() {
 					break;
 
 				if (open_token->kind != doppelganger)
-					LexerError(
-						module, location,
+					Error(
 						"Expected closure '%', not: '%'\n",
 						GetMatchingParen(open_token->kind), current_token->kind
 					);
@@ -811,7 +808,7 @@ void Lexer::Parse() {
 				break;
 
 			default: {
-				LexerError(module, location, "Invalid character: '%', %\n", *cursor, Hex(*cursor));
+				Error("Invalid character: '%', %\n", *cursor, Hex(*cursor));
 			} break;
 		}
 

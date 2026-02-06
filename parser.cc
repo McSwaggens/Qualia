@@ -310,8 +310,7 @@ static void CheckScope(Token* token, u32 indent, Ast_Module* module) {
 }
 
 Ast_Struct Parser::ParseStruct(u32 indent) {
-	Ast_Struct structure;
-	ZeroMemory(&structure);
+	Ast_Struct structure = {};
 	token += 1;
 
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL) {
@@ -491,7 +490,10 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 
 	if (IsUnaryOperator(token->kind)) {
 		Ast_Expression_Unary* unary = module->stack.Allocate<Ast_Expression_Unary>();
-		ZeroMemory(unary);
+		*unary = {
+			{},
+			.op = token,
+		};
 
 		switch (token->kind) {
 			case TOKEN_ASTERISK:         unary->kind = AST_EXPRESSION_UNARY_REFERENCE_OF; break;
@@ -504,7 +506,6 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 			default: Assert();
 		}
 
-		unary->op = token;
 		token += 1;
 		CheckScope(token, indent, module);
 		unary->subexpression = ParseExpression(indent, assignment_break, GetUnaryPrecedence(unary->op->kind));
@@ -512,19 +513,20 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 	}
 	else if (IsLiteral(token->kind)) {
 		Ast_Expression_Literal* literal = module->stack.Allocate<Ast_Expression_Literal>();
-		ZeroMemory(literal);
-		literal->kind  = AST_EXPRESSION_TERMINAL_LITERAL;
-		literal->flags |= AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | AST_EXPRESSION_FLAG_PURE;
-		literal->token = token;
-		literal->value = CreateValueFromLiteralToken(token);
+		*literal = {
+			{ .kind = AST_EXPRESSION_TERMINAL_LITERAL, .flags = AST_EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | AST_EXPRESSION_FLAG_PURE },
+			.token = token,
+			.value = CreateValueFromLiteralToken(token),
+		};
 		token += 1;
 		left = literal;
 	}
 	else if (IsIdentifier(token->kind)) {
 		Ast_Expression_Terminal* term = module->stack.Allocate<Ast_Expression_Terminal>();
-		ZeroMemory(term);
-		term->kind = AST_EXPRESSION_TERMINAL_NAME;
-		term->token = token;
+		*term = {
+			{ .kind = AST_EXPRESSION_TERMINAL_NAME },
+			.token = token,
+		};
 		token += 1;
 		left = term;
 	}
@@ -532,9 +534,9 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		Token* closure = token->closure;
 
 		Ast_Expression_Array* array = module->stack.Allocate<Ast_Expression_Array>();
-		ZeroMemory(array);
-
-		array->kind = AST_EXPRESSION_ARRAY;
+		*array = {
+			{ .kind = AST_EXPRESSION_ARRAY },
+		};
 		token += 1;
 
 		if (!IsExpressionStarter(token->kind))
@@ -565,11 +567,11 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN) {
 		Ast_Expression_Tuple* tuple = module->stack.Allocate<Ast_Expression_Tuple>();
-		ZeroMemory(tuple);
+		*tuple = {
+			{ .kind = AST_EXPRESSION_TUPLE },
+		};
 
 		Token* closure = token->closure;
-
-		tuple->kind  = AST_EXPRESSION_TUPLE;
 
 		token += 1;
 
@@ -598,9 +600,9 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 	}
 	else if (token->kind == TOKEN_OPEN_BRACE) {
 		Ast_Expression_Fixed_Array* fixed_array = module->stack.Allocate<Ast_Expression_Fixed_Array>();
-		ZeroMemory(fixed_array);
-
-		fixed_array->kind = AST_EXPRESSION_FIXED_ARRAY;
+		*fixed_array = {
+			{ .kind = AST_EXPRESSION_FIXED_ARRAY },
+		};
 
 		Token* closure = token->closure;
 		ArrayBuffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
@@ -644,12 +646,12 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		// @Indent does unary operators need to be treated differently? (Error check)
 		if (token->kind == TOKEN_IF) {
 			Ast_Expression_Ternary* if_else = module->stack.Allocate<Ast_Expression_Ternary>();
-			ZeroMemory(if_else);
-
-			if_else->kind = AST_EXPRESSION_IF_ELSE;
-			if_else->ops[0] = token;
+			*if_else = {
+				{ .kind = AST_EXPRESSION_IF_ELSE },
+				.left = left,
+				.ops = {token},
+			};
 			token += 1;
-			if_else->left = left;
 			CheckScope(token, indent, module);
 			if_else->middle = ParseExpression(indent, false);
 
@@ -666,32 +668,33 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		}
 		else if (token->kind == TOKEN_AS) {
 			Ast_Expression_As* as = module->stack.Allocate<Ast_Expression_As>();
-			ZeroMemory(as);
+			*as = {
+				{ .kind = AST_EXPRESSION_AS },
+				.expression = left,
+				.op = token,
+			};
 
 			CheckScope(token, indent, module);
-			as->op = token++;
+			token++;
 
-			as->kind = AST_EXPRESSION_AS;
 			as->ast_type = ParseType(indent);
-			as->expression = left;
 
 			left = as;
 		}
 		else if (token->kind == TOKEN_OPEN_PAREN) {
 			Ast_Expression_Call* call = module->stack.Allocate<Ast_Expression_Call>();
-			ZeroMemory(call);
+			*call = {
+				{ .kind = AST_EXPRESSION_CALL },
+				.function = left,
+			};
 
 			Token* open = token;
 			Token* closure = open->closure;
-			List<Ast_Expression*> arguments = null;
 
 			CheckScope(token, indent, module);
 			call->parameters = (Ast_Expression_Tuple*)ParseExpression(indent, false, GetOperatorPrecedence(token->kind));
 
 			token = closure + 1;
-
-			call->kind  = AST_EXPRESSION_CALL;
-			call->function = left;
 			left = call;
 		}
 		else if (token->kind == TOKEN_OPEN_BRACKET) {
@@ -699,10 +702,10 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 			Token* closure = open->closure;
 
 			Ast_Expression_Subscript* subscript = module->stack.Allocate<Ast_Expression_Subscript>();
-			ZeroMemory(subscript);
-
-			subscript->kind  = AST_EXPRESSION_SUBSCRIPT;
-			subscript->array = left;
+			*subscript = {
+				{ .kind = AST_EXPRESSION_SUBSCRIPT },
+				.array = left,
+			};
 
 			if (token != closure) {
 				CheckScope(token, indent+1, module);
@@ -722,7 +725,10 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		{
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
 			Ast_Expression_Binary* binary = module->stack.Allocate<Ast_Expression_Binary>();
-			ZeroMemory(binary);
+			*binary = {
+				{},
+				.left = left,
+			};
 
 			switch (token->kind) {
 				case TOKEN_EQUAL:            binary->kind = AST_EXPRESSION_BINARY_COMPARE_EQUAL;            break;
@@ -870,9 +876,9 @@ Ast_Type Parser::ParseType(u32 indent) {
 		else
 		{
 			type.basetype.function.input = module->stack.Allocate<Ast_Type>();
-			ZeroMemory(type.basetype.function.input);
-			type.basetype.function.input->basetype.kind = AST_BASETYPE_TUPLE;
-			type.basetype.function.input->basetype.tuple = params.ToArray();
+			*type.basetype.function.input = {
+				.basetype = { .kind = AST_BASETYPE_TUPLE, .tuple = params.ToArray() },
+			};
 		}
 
 		// () -> () -> XXX
@@ -928,11 +934,7 @@ void Parser::ParseParameters(Ast_Function* function, Token* open_paren, u32 inde
 	CheckScope(closure, indent, module);
 
 	while (cursor < closure) {
-		Ast_Variable param;
-		ZeroMemory(&param);
-		param.type = TYPE_NULL;
-		param.ast_type = null;
-		param.flags |= AST_VARIABLE_FLAG_PARAMETER;
+		Ast_Variable param = { .flags = AST_VARIABLE_FLAG_PARAMETER };
 
 		if (cursor->kind == TOKEN_COMMA)
 			Error(module, cursor->location, "Empty parameters not allowed. (Remove redundant ',')\n");
@@ -977,15 +979,13 @@ void Parser::ParseParameters(Ast_Function* function, Token* open_paren, u32 inde
 }
 
 Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
-	Ast_BranchBlock branch_block;
-	ZeroMemory(&branch_block);
+	Ast_BranchBlock branch_block = {};
 	ArrayBuffer<Ast_Branch> branches = CreateArrayBuffer<Ast_Branch>();
 
 	Token* branch_block_begin_token = token;
 
 	do {
-		Ast_Branch branch;
-		ZeroMemory(&branch);
+		Ast_Branch branch = {};
 
 		Token* clause_token = token;
 
@@ -1033,10 +1033,11 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 					branch.kind = AST_BRANCH_FOR_RANGE;
 
 					Ast_Variable* iterator = module->stack.Allocate<Ast_Variable>();
-					ZeroMemory(iterator);
-					iterator->name_token = token;
-					iterator->name = token->identifier_string;
-					iterator->flags |= AST_VARIABLE_FLAG_ITERATOR;
+					*iterator = {
+						.name       = token->identifier_string,
+						.name_token = token,
+						.flags      = AST_VARIABLE_FLAG_ITERATOR,
+					};
 					branch.for_range.iterator = iterator;
 
 					CheckScope(token, indent+1, module);
@@ -1060,10 +1061,10 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 					branch.kind = AST_BRANCH_FOR_VERBOSE;
 
 					Ast_Variable* variable = module->stack.Allocate<Ast_Variable>();
-					ZeroMemory(variable);
-
-					variable->name_token = token;
-					variable->name = token->identifier_string;
+					*variable = {
+						.name       = token->identifier_string,
+						.name_token = token,
+					};
 
 					CheckScope(token, indent+1, module);
 					token += 1;
@@ -1146,7 +1147,6 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 
 Ast_Statement Parser::ParseStatement(u32 indent) {
 	Ast_Statement statement = Ast_Statement();
-	ZeroMemory(&statement);
 
 	if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
 		Error(module, token->location, "Variable names must start with a lowercase letter.\n");
@@ -1276,8 +1276,7 @@ static bool IsScopeTerminator(TokenKind kind) {
 }
 
 Ast_Code Parser::ParseCode(u32 indent) {
-	Ast_Code code;
-	ZeroMemory(&code);
+	Ast_Code code = {};
 
 	ArrayBuffer<Ast_Statement> statements = CreateArrayBuffer<Ast_Statement>();
 	ArrayBuffer<Ast_Struct>    structs    = CreateArrayBuffer<Ast_Struct>();

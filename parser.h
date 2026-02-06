@@ -398,7 +398,6 @@ struct Ast_Variable {
 	Ast_Expression* assignment;
 	// Value ir_stack;
 	// @Todo: Add span
-	Ast_Variable() = default;
 };
 
 struct StackFrame

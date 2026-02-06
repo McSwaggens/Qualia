@@ -767,6 +767,10 @@ void Lexer::Parse() {
 				if (*cursor == '=') cursor++, current_token->kind = TOKEN_DIVIDE_EQUAL;
 				break;
 
+			case '%':
+				cursor++, current_token->kind = TOKEN_MOD;
+				break;
+
 			case '^':
 				cursor++, current_token->kind = TOKEN_CARET;
 				if (*cursor == '=') cursor++, current_token->kind = TOKEN_CARET_EQUAL;

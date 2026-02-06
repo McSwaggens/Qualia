@@ -9,7 +9,7 @@ TestArithmetic():
 	c1 := a - b
 	c2 := a * b
 	c3 := a / b
-	c4 := a % b     // BUG: '%' (TOKEN_MOD) has no case in lexer - never lexed
+	c4 := a % b
 
 	// Nested arithmetic
 	c5 := (a + b) * (a - b)

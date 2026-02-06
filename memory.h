@@ -13,7 +13,7 @@
 static void* AllocMemory(u64 size);
 static void* ReAllocMemory(void* p, u64 old_size, u64 new_size);
 static void  FreeMemory(void* p, u64 size);
-static void* CopyAllocMemory(void* p, u64 size);
+static void* CopyAllocMemory(const void* p, u64 size);
 
 // ------------------------------------------- //
 

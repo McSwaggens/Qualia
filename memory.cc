@@ -38,7 +38,7 @@ static void* ReAllocMemory(void* p, u64 old_size, u64 new_size) {
 	return result;
 }
 
-static void* CopyAllocMemory(void* p, u64 size) {
+static void* CopyAllocMemory(const void* p, u64 size) {
 	// Print("CopyAllocMemory(p = %, size = %)\n", p, size);
 	void* result = global_allocator.Allocate(size);
 	CopyMemory((byte*)result, (byte*)p, size);

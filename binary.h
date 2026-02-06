@@ -187,6 +187,7 @@ namespace Integer {
 }
 
 static u64 BitToByteCount(u64 bitcount) { return (bitcount + 7) >> 3; }
+static const byte BIG_ARRAY_OF_ZEROES[1024] = { };
 
 struct Binary {
 	static constexpr u64 INLINE_BITS = 64;
@@ -197,44 +198,47 @@ struct Binary {
 		byte* data;
 	};
 
-	static Binary FindBinary(Array<byte> data);
+	static Binary LARGE_ZERO;
+
+	static Binary Create(Array<const byte> data);
 
 	template<typename T>
-	static Binary FindBinary(T value) {
-		return FindBinary(Array<byte>(&value, sizeof(T)));
+	static Binary Create(T value) {
+		return Create(Array<const byte>((const byte*)&value, sizeof(T)));
 	}
 
 	constexpr Binary() = default;
-
-	constexpr Binary(u64 n, u64 bitcount) : inlined64(n),  bitcount(bitcount) { Assert(bitcount <= 64); }
-
-	constexpr Binary(u8  n) : inlined64(n),  bitcount( 8) { }
-	constexpr Binary(u16 n) : inlined64(n),  bitcount(16) { }
-	constexpr Binary(u32 n) : inlined64(n),  bitcount(32) { }
-	constexpr Binary(u64 n) : inlined64(n),  bitcount(64) { }
-
+	constexpr Binary(u64 n, u64 bitcount) : inlined64(n),  bitcount(bitcount) { Assert(bitcount <= INLINE_BITS); }
+	constexpr Binary(byte* data, u64 bitcount) : data(data), bitcount(bitcount) { }
+	constexpr Binary(u8  n)  : inlined64(n), bitcount( 8) { }
+	constexpr Binary(u16 n)  : inlined64(n), bitcount(16) { }
+	constexpr Binary(u32 n)  : inlined64(n), bitcount(32) { }
+	constexpr Binary(u64 n)  : inlined64(n), bitcount(64) { }
 	constexpr Binary(s8  n)  : inlined64(n), bitcount( 8) { }
 	constexpr Binary(s16 n)  : inlined64(n), bitcount(16) { }
 	constexpr Binary(s32 n)  : inlined64(n), bitcount(32) { }
 	constexpr Binary(s64 n)  : inlined64(n), bitcount(64) { }
 
-	// Okay all this code is fucked. Please redo x'|
-	// @todo
-	constexpr Binary(byte* data, u64 bitcount) : bitcount(bitcount) {
-		data = FindBinary(Array<byte>(data, BitToByteCount(bitcount))).GetData();
-	}
-
 	static Binary Create(u64 bitcount) {
 		bitcount = RaisePow2(bitcount);
 		u64 byte_count = BitToByteCount(bitcount);
 
-		if (bitcount <= 64)
+		if (bitcount <= INLINE_BITS)
 			return Binary(0ull, bitcount);
 
-		return Binary(memory, bitcount);
+		if (bitcount <= LARGE_ZERO.bitcount)
+			return Binary(LARGE_ZERO.data, bitcount);
+
+		// Gross!
+		byte* xxx = (byte*)AllocMemory(byte_count);
+		ZeroMemory(xxx, byte_count);
+		Binary result = Create(Array<byte>(xxx, byte_count));
+		FreeMemory(xxx, byte_count);
+		return result;
 	}
 
-	bool IsInlined() { return bitcount <= 64; }
+
+	bool IsInlined() { return bitcount <= INLINE_BITS; }
 	u64  ByteCount() { return BitToByteCount(bitcount); }
 
 	byte* GetData() {
@@ -242,13 +246,6 @@ struct Binary {
 			return (byte*)&inlined64;
 
 		return data;
-	}
-
-	Binary Copy(Stack* stack) {
-		if (IsInlined())
-			return *this;
-
-		return Binary((byte*)stack->CopyAllocMemory(data, ByteCount()), bitcount);
 	}
 };
 
@@ -258,16 +255,12 @@ struct IntegerOperationResult {
 	bool underflow;
 };
 
-static Stack binstack;
-
-static void InitEvalSystem() {
-	binstack = CreateStack(1llu<<32);
-}
+static void InitEvalSystem();
 
 namespace Integer {
 	static Binary Add(Binary a, Binary b) {
 		u64 result_bitcount = Max(a.bitcount, b.bitcount);
-		Binary result = Binary::Create(result_bitcount, binstack);
+		Binary result = Binary::Create(result_bitcount);
 
 		// Perform addition based on the element size
 		if      (result_bitcount <=  8) Integer::Add8(a.GetData(), b.GetData(), result.GetData(), 1);
@@ -285,7 +278,7 @@ namespace Integer {
 
 	static Binary Sub(Binary a, Binary b) {
 		u64 result_bitcount = Max(a.bitcount, b.bitcount);
-		Binary result = Binary::Create(result_bitcount, binstack);
+		Binary result = Binary::Create(result_bitcount);
 
 		// Perform subtraction based on the element size
 		if      (result_bitcount <=  8) Integer::Sub8(a.GetData(), b.GetData(), result.GetData(), 1);

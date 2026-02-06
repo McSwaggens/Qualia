@@ -17,17 +17,28 @@ static BinaryNode root_node = {
 	.children = { },
 };
 
-static u64 FindDisagreement(byte* a, byte* b, u64 size) {
+static u64 FindDisagreement(const byte* a, const byte* b, u64 size) {
 	for (u64 i = 0; i < size; i++)
 		if (a[i] != b[i])
 			return i;
 	return size;
 }
 
+static Stack binstack;
+Binary Binary::LARGE_ZERO;
+
+static void InitEvalSystem() {
+	binstack = CreateStack(1llu<<32);
+	Binary::LARGE_ZERO = Binary::Create(Array<const byte>(BIG_ARRAY_OF_ZEROES, sizeof(BIG_ARRAY_OF_ZEROES)));
+}
+
 // Find or insert binary data, returning a canonical Binary handle.
-static Binary Binary::Find(Array<byte> data) {
-	if (data.length * 8 <= Binary::INLINE_BITS)
-		return Binary(data.data, data.length);
+Binary Binary::Create(Array<const byte> data) {
+	if (data.length * 8 <= Binary::INLINE_BITS) {
+		u64 value = 0;
+		CopyMemory((byte*)&value, data.data, data.length);
+		return Binary(value, data.length * 8);
+	}
 
 	u64 head = 0;
 	u64 size = data.length;
@@ -43,7 +54,7 @@ static Binary Binary::Find(Array<byte> data) {
 		if (head == node->size) {
 			// Matched entire node prefix
 			if (head == size)
-				return Binary(node->data, size);  // Exact match
+				return Binary((byte*)node->data, size * 8);  // Exact match
 
 			// Traverse to child, or create new leaf
 			BinaryNode*& child = node->children[data[head]];
@@ -56,7 +67,7 @@ static Binary Binary::Find(Array<byte> data) {
 			BinaryNode* leaf = binstack.Allocate<BinaryNode>();
 			*leaf = {
 				.size = size,
-				.data = (char*)CopyAllocMemory(data, size),
+				.data = (char*)binstack.CopyAllocMemory(data, size),
 			};
 			child = leaf;
 			node = leaf;
@@ -68,18 +79,22 @@ static Binary Binary::Find(Array<byte> data) {
 		Assert(pnode);
 
 		BinaryNode* split = binstack.Allocate<BinaryNode>();
-		BinaryNode* leaf  = binstack.Allocate<BinaryNode>();
-
 		*split = { .size = head, .data = node->data, };
-		*leaf  = { .size = size, .data = (char*)CopyAllocMemory(data, size), };
+		split->children[node->data[head]] = node; // Old node as child
 
-		split->children[node->data[head]] = node;  // Old node as child
-		split->children[data[head]] = leaf;        // New data as child
-
-		*pnode = split;
-		node = leaf;
+		if (head == size) {
+			// New data is a prefix of the existing node
+			*pnode = split;
+			node = split;
+		} else {
+			BinaryNode* leaf = binstack.Allocate<BinaryNode>();
+			*leaf = { .size = size, .data = (char*)binstack.CopyAllocMemory(data, size), };
+			split->children[data[head]] = leaf;
+			*pnode = split;
+			node = leaf;
+		}
 		break;
 	}
 
-	return Binary(node->data, size);
+	return Binary((byte*)node->data, size * 8);
 }

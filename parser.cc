@@ -7,6 +7,11 @@
 #include "assert.h"
 #include "array_buffer.h"
 
+template<typename... Args>
+[[noreturn]] void Parser::Error(String format, Args&&... args) {
+	::Error(module, token->location, format, args...);
+}
+
 static bool IsSpecifier(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_ASTERISK:
@@ -315,9 +320,9 @@ Ast_Struct Parser::ParseStruct(u32 indent) {
 
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL) {
 		if (IsIdentifier(token->kind))
-			Error(module, token->location, "Struct name must start with an uppercase letter.\n");
+			Error("Struct name must start with an uppercase letter.\n");
 		else
-			Error(module, token->location, "Struct name missing\n");
+			Error("Struct name missing\n");
 	}
 
 	CheckScope(token, indent+1, module);
@@ -326,7 +331,7 @@ Ast_Struct Parser::ParseStruct(u32 indent) {
 	token += 1;
 
 	if (token->kind != TOKEN_COLON)
-		Error(module, token->location, "Invalid struct declaration syntax, unexpected token %, Expected ':'\n", token);
+		Error("Invalid struct declaration syntax, unexpected token %, Expected ':'\n", token);
 
 	CheckScope(token, indent, module);
 	token += 1;
@@ -342,7 +347,7 @@ Ast_Struct Parser::ParseStruct(u32 indent) {
 			token += 1;
 
 			if (token->kind != TOKEN_COLON)
-				Error(module, token->location, "Expected ':', not: '%'\n", token);
+				Error("Expected ':', not: '%'\n", token);
 
 			CheckScope(token, indent+1, module);
 			token += 1;
@@ -351,7 +356,7 @@ Ast_Struct Parser::ParseStruct(u32 indent) {
 			members.Add(member);
 
 			if (!token->IsNewLine() && token->kind != TOKEN_SEMICOLON)
-				Error(module, token->location, "Unexpected token: % after struct member.\n", token);
+				Error("Unexpected token: % after struct member.\n", token);
 
 			if (token->kind == TOKEN_SEMICOLON) {
 				CheckScope(token, indent+1, module);
@@ -363,9 +368,9 @@ Ast_Struct Parser::ParseStruct(u32 indent) {
 			}
 		}
 		else if (token->kind == TOKEN_IDENTIFIER_FORMAL)
-			Error(module, token->location, "Struct member names must start with a lowercase letter.\n");
+			Error("Struct member names must start with a lowercase letter.\n");
 		else
-			Error(module, token->location, "Unexpected token in struct: '%'\n", token);
+			Error("Unexpected token in struct: '%'\n", token);
 	}
 
 	structure.members = members.Lock();
@@ -379,9 +384,9 @@ Ast_Enum Parser::ParseEnum(u32 indent) {
 
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL) {
 		if (IsIdentifier(token->kind))
-			Error(module, token->location, "Enum names must start with an uppercase letter.\n");
+			Error("Enum names must start with an uppercase letter.\n");
 		else
-			Error(module, token->location, "Enum name missing.\n");
+			Error("Enum name missing.\n");
 	}
 
 	CheckScope(token, indent+1, module);
@@ -390,7 +395,7 @@ Ast_Enum Parser::ParseEnum(u32 indent) {
 	token += 1;
 
 	if (token->kind != TOKEN_COLON)
-		Error(module, token->location, "Invalid enum declaration syntax, unexpected token '%', Expected ':'\n", token);
+		Error("Invalid enum declaration syntax, unexpected token '%', Expected ':'\n", token);
 
 	CheckScope(token, indent, module);
 	token += 1;
@@ -406,19 +411,19 @@ Ast_Enum Parser::ParseEnum(u32 indent) {
 			token += 1;
 
 			if (token->kind != TOKEN_EQUAL)
-				Error(module, token->location, "Expected '=', not: '%'\n", token);
+				Error("Expected '=', not: '%'\n", token);
 
 			CheckScope(token, indent+2, module);
 			token += 1;
 
 			if (token->kind == TOKEN_SEMICOLON)
-				Error(module, token->location, "Expected expression before ';'\n");
+				Error("Expected expression before ';'\n");
 
 			CheckScope(token, indent+2, module);
 			member.expression = ParseExpression(indent+2);
 
 			if (!token->IsNewLine() && token->kind != TOKEN_SEMICOLON)
-				Error(module, token->location, "Unexpected token: '%' after enum member.\n", token);
+				Error("Unexpected token: '%' after enum member.\n", token);
 
 			if (token->kind == TOKEN_SEMICOLON) {
 				CheckScope(token, indent+1, module);
@@ -428,9 +433,9 @@ Ast_Enum Parser::ParseEnum(u32 indent) {
 			members.Add(member);
 		}
 		else if (token->kind == TOKEN_IDENTIFIER_CASUAL)
-			Error(module, token->location, "Enum member names must start with a uppercase letter.\n");
+			Error("Enum member names must start with a uppercase letter.\n");
 		else
-			Error(module, token->location, "Unexpected token in enum: '%'\n", token);
+			Error("Unexpected token in enum: '%'\n", token);
 	}
 
 	enumeration.members = members.Lock();
@@ -540,25 +545,25 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		token += 1;
 
 		if (!IsExpressionStarter(token->kind))
-			Error(module, token->location, "Expected expression after '['\n");
+			Error("Expected expression after '['\n");
 
 		CheckScope(token, indent, module);
 		array->left = ParseExpression(indent+1);
 
 		if (token->kind != TOKEN_DOT_DOT)
-			Error(module, token->location, "Expected '..' operator, not: \n", token);
+			Error("Expected '..' operator, not: \n", token);
 
 		CheckScope(token, indent, module);
 		token += 1;
 
 		if (!IsExpressionStarter(token->kind))
-			Error(module, token->location, "Array extent not specified\n");
+			Error("Array extent not specified\n");
 
 		CheckScope(token, indent+1, module);
 		array->right = ParseExpression(indent+1);
 
 		if (token->kind != TOKEN_CLOSE_BRACKET)
-			Error(module, token->location, "End of array expression missing, expected ']', not: '%'\n", token);
+			Error("End of array expression missing, expected ']', not: '%'\n", token);
 
 		CheckScope(token, indent, module);
 		token += 1;
@@ -578,7 +583,7 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		ArrayBuffer<Ast_Expression*> elements = CreateArrayBuffer<Ast_Expression*>();
 
 		if (closure[-1].kind == TOKEN_COMMA)
-			Error(module, token->location, "Expected expression after ','\n");
+			Error("Expected expression after ','\n");
 
 		while (token < closure) {
 			CheckScope(token, indent+1, module);
@@ -589,7 +594,7 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 				token += 1;
 			}
 			else if (token < closure)
-				Error(module, token->location, "Invalid expression, unexpected token: '%'\n", token);
+				Error("Invalid expression, unexpected token: '%'\n", token);
 		}
 
 		tuple->elements = elements.Lock();
@@ -610,7 +615,7 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 		CheckScope(closure, indent, module);
 
 		if (token+1 == closure)
-			Error(module, token->location, "Empty arrays literals aren't allowed.\n");
+			Error("Empty arrays literals aren't allowed.\n");
 
 		token += 1;
 
@@ -624,7 +629,7 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 				token += 1;
 
 				if (token == closure)
-					Error(module, token->location, "Expected expression after ',', not: '%'\n", token);
+					Error("Expected expression after ',', not: '%'\n", token);
 			}
 		}
 
@@ -639,7 +644,7 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 			CheckScope(token, indent, module);
 		}
 
-		Error(module, token->location, "Invalid expression, expected term, got: '%'\n", token);
+		Error("Invalid expression, expected term, got: '%'\n", token);
 	}
 
 	while (CanTakeNextOp(token, assignment_break, parent_precedence) && IsCorrectScope(token, indent)) {
@@ -656,7 +661,7 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 			if_else->middle = ParseExpression(indent, false);
 
 			if (token->kind != TOKEN_ELSE)
-				Error(module, token->location, "Invalid 'if' expression, missing 'else' clause. Unexpected: '%'\n", token);
+				Error("Invalid 'if' expression, missing 'else' clause. Unexpected: '%'\n", token);
 
 			if_else->ops[1] = token;
 			CheckScope(token, indent, module);
@@ -712,7 +717,7 @@ Ast_Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 p
 				subscript->index = ParseExpression(indent+1);
 
 				if (token != closure)
-					Error(module, token->location, "Expected ']', not: '%'\n", token);
+					Error("Expected ']', not: '%'\n", token);
 			}
 			else subscript->index = null;
 
@@ -814,7 +819,7 @@ Ast_Type Parser::ParseType(u32 indent) {
 			}
 
 			if (token != closure)
-				Error(module, token->location, "Expected ']', not: %\n", token);
+				Error("Expected ']', not: %\n", token);
 
 			token = closure + 1;
 		}
@@ -864,7 +869,7 @@ Ast_Type Parser::ParseType(u32 indent) {
 				token += 1;
 
 				if (token == closure)
-					Error(module, token->location, "Expected type after ','\n");
+					Error("Expected type after ','\n");
 			}
 		}
 
@@ -911,7 +916,7 @@ Ast_Type Parser::ParseType(u32 indent) {
 				token += 1;
 
 				if (token == closure)
-					Error(module, token->location, "Expected type after ','\n");
+					Error("Expected type after ','\n");
 			}
 		}
 
@@ -920,7 +925,7 @@ Ast_Type Parser::ParseType(u32 indent) {
 		token = closure+1;
 	}
 	else
-		Error(module, token->location, "Expected type, not: '%'\n", token);
+		Error("Expected type, not: '%'\n", token);
 
 	return type;
 }
@@ -937,13 +942,13 @@ void Parser::ParseParameters(Ast_Function* function, Token* open_paren, u32 inde
 		Ast_Variable param = { .flags = AST_VARIABLE_FLAG_PARAMETER };
 
 		if (cursor->kind == TOKEN_COMMA)
-			Error(module, cursor->location, "Empty parameters not allowed. (Remove redundant ',')\n");
+			::Error(module, cursor->location,"Empty parameters not allowed. (Remove redundant ',')\n");
 
 		if (cursor->kind != TOKEN_IDENTIFIER_CASUAL) {
 			if (cursor->kind == TOKEN_IDENTIFIER_FORMAL)
-				Error(module, cursor->location, "Parameter names must start with a lowercase letter, not: '%'\n", cursor);
+				::Error(module, cursor->location,"Parameter names must start with a lowercase letter, not: '%'\n", cursor);
 			else
-				Error(module, cursor->location, "Parameter name missing, unexpected: '%'\n", cursor);
+				::Error(module, cursor->location,"Parameter name missing, unexpected: '%'\n", cursor);
 		}
 
 		CheckScope(cursor, indent+1, module);
@@ -952,7 +957,7 @@ void Parser::ParseParameters(Ast_Function* function, Token* open_paren, u32 inde
 		cursor += 1;
 
 		if (cursor->kind != TOKEN_COLON)
-			Error(module, cursor->location, "Parameter type missing.\n");
+			::Error(module, cursor->location,"Parameter type missing.\n");
 
 		CheckScope(cursor, indent+1, module);
 		cursor += 1;
@@ -967,7 +972,7 @@ void Parser::ParseParameters(Ast_Function* function, Token* open_paren, u32 inde
 		params.Add(param);
 
 		if (cursor->kind != TOKEN_COMMA && cursor != closure)
-			Error(module, cursor->location, "Expected ',' or ')', not: '%'\n", cursor);
+			::Error(module, cursor->location,"Expected ',' or ')', not: '%'\n", cursor);
 
 		if (cursor->kind == TOKEN_COMMA) {
 			CheckScope(cursor, indent, module);
@@ -1021,10 +1026,10 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 				token += 1;
 
 				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
-					Error(module, token->location, "Variable names must start with a lowercase letter.\n");
+					Error("Variable names must start with a lowercase letter.\n");
 
 				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_IN)
-					Error(module, token->location, "Iterator names must start with a lowercase letter.\n");
+					Error("Iterator names must start with a lowercase letter.\n");
 
 				// Todo: Allow user to declare the type
 				// for n : uint in signed_nums:
@@ -1089,13 +1094,13 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 					}
 
 					if (token->kind != TOKEN_COMMA)
-						Error(module, token->location, "Expected ',' and loop condition, not: '%'\n", token);
+						Error("Expected ',' and loop condition, not: '%'\n", token);
 
 					CheckScope(token, indent, module);
 					token += 1;
 
 					if (token->kind == TOKEN_COLON)
-						Error(module, token->location, "For loop missing condition expression.\n");
+						Error("For loop missing condition expression.\n");
 
 					CheckScope(token, indent+1, module);
 					branch.for_verbose.condition = ParseExpression(indent+1, false);
@@ -1105,7 +1110,7 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 						token += 1;
 
 						if (token->kind == TOKEN_COLON)
-							Error(module, token->location, "For loop stride missing\n");
+							Error("For loop stride missing\n");
 
 						CheckScope(token, indent+1, module);
 						branch.for_verbose.next = ParseExpression(indent+1, false);
@@ -1115,11 +1120,11 @@ Ast_BranchBlock Parser::ParseBranchBlock(u32 indent) {
 
 			case TOKEN_COLON: branch.kind = AST_BRANCH_NAKED; break;
 
-			default: Error(module, token->location, "Expected 'if', 'while', 'for' or ':' after '%' clause, not: '%'\n", clause_token, token);
+			default: Error("Expected 'if', 'while', 'for' or ':' after '%' clause, not: '%'\n", clause_token, token);
 		}
 
 		if (token->kind != TOKEN_COLON)
-			Error(module, token->location, "Expected ':' after branch, not: '%'\n", token);
+			Error("Expected ':' after branch, not: '%'\n", token);
 
 		CheckScope(token, indent, module);
 		token += 1;
@@ -1149,7 +1154,7 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 	Ast_Statement statement = Ast_Statement();
 
 	if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
-		Error(module, token->location, "Variable names must start with a lowercase letter.\n");
+		Error("Variable names must start with a lowercase letter.\n");
 
 	if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON) {
 		CheckScope(token+1, indent, module);
@@ -1215,7 +1220,7 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 		token += 1;
 
 		if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
-			Error(module, statement.increment.token->location, "Expected expression after '%' keyword\n", statement.increment.token);
+			::Error(module, statement.increment.token->location,"Expected expression after '%' keyword\n", statement.increment.token);
 
 		statement.increment.expression = ParseExpression(indent+1);
 
@@ -1227,7 +1232,7 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 		token += 1;
 
 		if (token->kind != TOKEN_COLON)
-			Error(module, token->location, "Invalid 'defer' statement, Expected ':', not: '%'\n", token);
+			Error("Invalid 'defer' statement, Expected ':', not: '%'\n", token);
 
 		CheckScope(token, indent, module);
 		token += 1;
@@ -1261,14 +1266,14 @@ Ast_Statement Parser::ParseStatement(u32 indent) {
 		token += 1;
 
 		if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
-			Error(module, statement.increment.token->location, "Expected expression after '%' keyword\n", statement.increment.token);
+			::Error(module, statement.increment.token->location,"Expected expression after '%' keyword\n", statement.increment.token);
 
 		statement.claim.expression = ParseExpression(indent+1, false);
 
 		return statement;
 	}
 	else
-		Error(module, token->location, "Invalid statement starting with '%'\n", token);
+		Error("Invalid statement starting with '%'\n", token);
 }
 
 static bool IsScopeTerminator(TokenKind kind) {
@@ -1297,7 +1302,7 @@ Ast_Code Parser::ParseCode(u32 indent) {
 		}
 		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN && (token[1].closure[1].kind == TOKEN_COLON || token[1].closure[1].kind == TOKEN_ARROW)) {
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
-				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
+				Error("Function names must start with an uppercase letter.\n", token);
 
 			Ast_Function function = ParseFunction(indent);
 			function.is_global = false;
@@ -1309,7 +1314,7 @@ Ast_Code Parser::ParseCode(u32 indent) {
 			statements.Add(statement);
 
 			if (!token->IsNewLine() && !IsScopeTerminator(token->kind))
-				Error(module, token->location, "Expected ';' before end of statement, not: '%'.\n", token);
+				Error("Expected ';' before end of statement, not: '%'.\n", token);
 
 			if (token->kind == TOKEN_SEMICOLON && IsCorrectScope(token, indent))
 				token += 1;
@@ -1317,7 +1322,7 @@ Ast_Code Parser::ParseCode(u32 indent) {
 	}
 
 	if (token->indent > indent)
-		Error(module, token->location, "Token '%' is on the wrong indentation.\n", token);
+		Error("Token '%' is on the wrong indentation.\n", token);
 
 	code.statements = statements.Lock();
 	code.scope.enums = enums.Lock();
@@ -1338,7 +1343,7 @@ Ast_Function Parser::ParseFunction(u32 indent) {
 	token = token->closure+1;
 
 	if (token->kind != TOKEN_ARROW && token->kind != TOKEN_COLON)
-		Error(module, token->location, "Expected '->' or ':', not '%'\n", token);
+		Error("Expected '->' or ':', not '%'\n", token);
 
 	if (token->kind == TOKEN_ARROW) {
 		CheckScope(token, indent+1, module);
@@ -1348,7 +1353,7 @@ Ast_Function Parser::ParseFunction(u32 indent) {
 	}
 
 	if (token->kind != TOKEN_COLON)
-		Error(module, token->location, "Expected ':', not '%'\n", token);
+		Error("Expected ':', not '%'\n", token);
 
 	CheckScope(token, indent, module);
 	token += 1;
@@ -1364,7 +1369,7 @@ Ast_Import Parser::ParseImport(u32 indent) {
 	token += 1;
 
 	if (token->kind != TOKEN_IDENTIFIER_FORMAL)
-		Error(module, token->location, "Expected identifier after import token, instead got: '%'\n", token);
+		Error("Expected identifier after import token, instead got: '%'\n", token);
 
 	CheckScope(token, 1, module);
 	import.module = token;
@@ -1375,7 +1380,7 @@ Ast_Import Parser::ParseImport(u32 indent) {
 		token += 1;
 	}
 	else if (IsCorrectScope(token, 1))
-		Error(module, token->location, "Unexpected token after import statement: '%'\n", token);
+		Error("Unexpected token after import statement: '%'\n", token);
 
 	CheckScope(token, 0, module);
 
@@ -1403,13 +1408,13 @@ void Parser::ParseGlobalScope() {
 		}
 		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN) {
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
-				Error(module, token->location, "Function names must start with an uppercase letter.\n", token);
+				Error("Function names must start with an uppercase letter.\n", token);
 
 			Ast_Function function = ParseFunction(0);
 			function.is_global = true;
 			functions.Add(function);
 		}
-		else Error(module, token->location, "Unexpected token in global scope: '%'\n", token);
+		else Error("Unexpected token in global scope: '%'\n", token);
 	}
 
 	module->imports = imports.Lock();

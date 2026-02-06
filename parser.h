@@ -510,6 +510,9 @@ struct Parser {
 	Ast_Module* module;
 	Token* token;
 
+	template<typename... Args>
+	[[noreturn]] void Error(String format, Args&&... args);
+
 	void ParseGlobalScope();
 	Ast_Struct ParseStruct(u32 indent);
 	Ast_Enum ParseEnum(u32 indent);

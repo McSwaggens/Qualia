@@ -507,8 +507,23 @@ struct Ast_Module {
 	Array<Ast_Import> imports;
 };
 
-static void InitIntrinsicFunctions(Ast_Module* module);
-static Ast_Module* ParseFile(String file_path);
+struct Parser {
+	Ast_Module* module;
+	Token* token;
+
+	void ParseGlobalScope();
+	Ast_Struct ParseStruct(u32 indent);
+	Ast_Enum ParseEnum(u32 indent);
+	Ast_Expression* ParseExpression(u32 indent, bool assignment_break = false, u32 parent_precedence = (u32)-2);
+	Ast_Type ParseType(u32 indent);
+	void ParseParameters(Ast_Function* function, Token* open_paren, u32 indent);
+	Ast_BranchBlock ParseBranchBlock(u32 indent);
+	Ast_Statement ParseStatement(u32 indent);
+	Ast_Code ParseCode(u32 indent);
+	Ast_Function ParseFunction(u32 indent);
+	Ast_Import ParseImport(u32 indent);
+};
+
 static void SemanticParse(Ast_Module* module);
 static u64 CalculateStackFrameSize(Ast_Function* function);
 static u64 CalculateStackFrameSize(Ast_Code* code, u64 offset);

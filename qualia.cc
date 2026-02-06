@@ -50,7 +50,8 @@ static void CompileFile(String file_path) {
 		Print("\t%\n", token);
 
 
-	ParseGlobalScope(module);
+	Parser parser = { .module = module, .token = &module->tokens[0] };
+	parser.ParseGlobalScope();
 	SemanticParse(module);
 }
 

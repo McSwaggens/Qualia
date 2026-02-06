@@ -226,7 +226,7 @@ static void CrashHandler(int sig) {
 		case SIGABRT: name = "SIGABRT (Abort)";              break;
 	}
 
-	WriteStr("\nCrash: ");
+	WriteStr("Crash: ");
 	WriteStr(name);
 	WriteStr("\n");
 

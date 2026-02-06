@@ -39,6 +39,9 @@ run: qualia_xxx
 time: qualia_xxx
 	fish -c "time ./qualia"
 
+test: qualia_xxx
+	./run_tests.sh
+
 clean:
 	rm -f qualia
 	rm -f *.o

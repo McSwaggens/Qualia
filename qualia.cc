@@ -62,21 +62,16 @@ int main(int argc, char** args) {
 	InitIntrinsics();
 	IR::Init();
 
-	const String files[] = {
-		"tests/types.q",
-		"tests/variable_declarations.q",
-		"tests/literals.q",
-		"tests/functions.q",
-		"tests/structs.q",
-		"tests/enums.q",
-		"tests/control_flow.q",
-		"tests/expressions.q",
-		"tests/statements.q",
-	};
+	if (argc < 2) {
+		Print("Usage: qualia <file.q> [file2.q ...]\n");
+		output_buffer.Flush();
+		OS::Terminate(false);
+	}
 
-	for (u32 i = 0; i < COUNT(files); i++) {
-		Print("Compiling: %\n", files[i]);
-		CompileFile(files[i]);
+	for (int i = 1; i < argc; i++) {
+		String file = ToString(args[i]);
+		Print("Compiling: %\n", file);
+		CompileFile(file);
 	}
 
 	Print("Compiler finished.\n");

@@ -501,13 +501,13 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 		};
 
 		switch (token->kind) {
-			case TOKEN_ASTERISK:         unary->kind = Ast::EXPRESSION_UNARY_REFERENCE_OF; break;
-			case TOKEN_AMPERSAND:        unary->kind = Ast::EXPRESSION_UNARY_ADDRESS_OF;   break;
-			case TOKEN_TILDE:            unary->kind = Ast::EXPRESSION_UNARY_BITWISE_NOT;  break;
-			case TOKEN_NOT:              unary->kind = Ast::EXPRESSION_UNARY_NOT;          break;
-			case TOKEN_MINUS:            unary->kind = Ast::EXPRESSION_UNARY_MINUS;        break;
-			case TOKEN_PLUS:             unary->kind = Ast::EXPRESSION_UNARY_PLUS;         break;
-			case TOKEN_EXCLAMATION_MARK: unary->kind = Ast::EXPRESSION_UNARY_NOT;          break;
+			case TOKEN_ASTERISK:         unary->kind = Ast::Expression::UNARY_REFERENCE_OF; break;
+			case TOKEN_AMPERSAND:        unary->kind = Ast::Expression::UNARY_ADDRESS_OF;   break;
+			case TOKEN_TILDE:            unary->kind = Ast::Expression::UNARY_BITWISE_NOT;  break;
+			case TOKEN_NOT:              unary->kind = Ast::Expression::UNARY_NOT;          break;
+			case TOKEN_MINUS:            unary->kind = Ast::Expression::UNARY_MINUS;        break;
+			case TOKEN_PLUS:             unary->kind = Ast::Expression::UNARY_PLUS;         break;
+			case TOKEN_EXCLAMATION_MARK: unary->kind = Ast::Expression::UNARY_NOT;          break;
 			default: Assert();
 		}
 
@@ -519,7 +519,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 	else if (IsLiteral(token->kind)) {
 		Ast::Expression_Literal* literal = module->stack.Allocate<Ast::Expression_Literal>();
 		*literal = {
-			{ .kind = Ast::EXPRESSION_TERMINAL_LITERAL, .flags = Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE },
+			{ .kind = Ast::Expression::TERMINAL_LITERAL, .flags = Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE },
 			.token = token,
 			.value = CreateValueFromLiteralToken(token),
 		};
@@ -529,7 +529,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 	else if (IsIdentifier(token->kind)) {
 		Ast::Expression_Terminal* term = module->stack.Allocate<Ast::Expression_Terminal>();
 		*term = {
-			{ .kind = Ast::EXPRESSION_TERMINAL_NAME },
+			{ .kind = Ast::Expression::TERMINAL_NAME },
 			.token = token,
 		};
 		token += 1;
@@ -540,7 +540,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 
 		Ast::Expression_Array* array = module->stack.Allocate<Ast::Expression_Array>();
 		*array = {
-			{ .kind = Ast::EXPRESSION_ARRAY },
+			{ .kind = Ast::Expression::ARRAY },
 		};
 		token += 1;
 
@@ -573,7 +573,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 	else if (token->kind == TOKEN_OPEN_PAREN) {
 		Ast::Expression_Tuple* tuple = module->stack.Allocate<Ast::Expression_Tuple>();
 		*tuple = {
-			{ .kind = Ast::EXPRESSION_TUPLE },
+			{ .kind = Ast::Expression::TUPLE },
 		};
 
 		Token* closure = token->closure;
@@ -606,7 +606,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 	else if (token->kind == TOKEN_OPEN_BRACE) {
 		Ast::Expression_Fixed_Array* fixed_array = module->stack.Allocate<Ast::Expression_Fixed_Array>();
 		*fixed_array = {
-			{ .kind = Ast::EXPRESSION_FIXED_ARRAY },
+			{ .kind = Ast::Expression::FIXED_ARRAY },
 		};
 
 		Token* closure = token->closure;
@@ -652,7 +652,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 		if (token->kind == TOKEN_IF) {
 			Ast::Expression_Ternary* if_else = module->stack.Allocate<Ast::Expression_Ternary>();
 			*if_else = {
-				{ .kind = Ast::EXPRESSION_IF_ELSE },
+				{ .kind = Ast::Expression::IF_ELSE },
 				.left = left,
 				.ops = {token},
 			};
@@ -674,7 +674,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 		else if (token->kind == TOKEN_AS) {
 			Ast::Expression_As* as = module->stack.Allocate<Ast::Expression_As>();
 			*as = {
-				{ .kind = Ast::EXPRESSION_AS },
+				{ .kind = Ast::Expression::AS },
 				.expression = left,
 				.op = token,
 			};
@@ -689,7 +689,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 		else if (token->kind == TOKEN_OPEN_PAREN) {
 			Ast::Expression_Call* call = module->stack.Allocate<Ast::Expression_Call>();
 			*call = {
-				{ .kind = Ast::EXPRESSION_CALL },
+				{ .kind = Ast::Expression::CALL },
 				.function = left,
 			};
 
@@ -708,7 +708,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 
 			Ast::Expression_Subscript* subscript = module->stack.Allocate<Ast::Expression_Subscript>();
 			*subscript = {
-				{ .kind = Ast::EXPRESSION_SUBSCRIPT },
+				{ .kind = Ast::Expression::SUBSCRIPT },
 				.array = left,
 			};
 
@@ -736,26 +736,26 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, u32 
 			};
 
 			switch (token->kind) {
-				case TOKEN_EQUAL:            binary->kind = Ast::EXPRESSION_BINARY_COMPARE_EQUAL;            break;
-				case TOKEN_NOT_EQUAL:        binary->kind = Ast::EXPRESSION_BINARY_COMPARE_NOT_EQUAL;        break;
-				case TOKEN_LESS:             binary->kind = Ast::EXPRESSION_BINARY_COMPARE_LESS;             break;
-				case TOKEN_LESS_OR_EQUAL:    binary->kind = Ast::EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL;    break;
-				case TOKEN_GREATER:          binary->kind = Ast::EXPRESSION_BINARY_COMPARE_GREATER;          break;
-				case TOKEN_GREATER_OR_EQUAL: binary->kind = Ast::EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL; break;
-				case TOKEN_AND:              binary->kind = Ast::EXPRESSION_BINARY_AND;                      break;
-				case TOKEN_OR:               binary->kind = Ast::EXPRESSION_BINARY_OR;                       break;
-				case TOKEN_DOT:              binary->kind = Ast::EXPRESSION_BINARY_DOT;                      break;
-				// case TOKEN_DOT_DOT:          binary->kind = Ast::EXPRESSION_BINARY_RANGE;                    break;
-				case TOKEN_PLUS:             binary->kind = Ast::EXPRESSION_BINARY_ADD;                      break;
-				case TOKEN_MINUS:            binary->kind = Ast::EXPRESSION_BINARY_SUBTRACT;                 break;
-				case TOKEN_ASTERISK:         binary->kind = Ast::EXPRESSION_BINARY_MULTIPLY;                 break;
-				case TOKEN_DIVIDE:           binary->kind = Ast::EXPRESSION_BINARY_DIVIDE;                   break;
-				case TOKEN_MOD:              binary->kind = Ast::EXPRESSION_BINARY_MODULO;                   break;
-				case TOKEN_CARET:            binary->kind = Ast::EXPRESSION_BINARY_BITWISE_XOR;              break;
-				case TOKEN_BAR:              binary->kind = Ast::EXPRESSION_BINARY_BITWISE_OR;               break;
-				case TOKEN_AMPERSAND:        binary->kind = Ast::EXPRESSION_BINARY_BITWISE_AND;              break;
-				case TOKEN_LEFT_SHIFT:       binary->kind = Ast::EXPRESSION_BINARY_LEFT_SHIFT;               break;
-				case TOKEN_RIGHT_SHIFT:      binary->kind = Ast::EXPRESSION_BINARY_RIGHT_SHIFT;              break;
+				case TOKEN_EQUAL:            binary->kind = Ast::Expression::BINARY_COMPARE_EQUAL;            break;
+				case TOKEN_NOT_EQUAL:        binary->kind = Ast::Expression::BINARY_COMPARE_NOT_EQUAL;        break;
+				case TOKEN_LESS:             binary->kind = Ast::Expression::BINARY_COMPARE_LESS;             break;
+				case TOKEN_LESS_OR_EQUAL:    binary->kind = Ast::Expression::BINARY_COMPARE_LESS_OR_EQUAL;    break;
+				case TOKEN_GREATER:          binary->kind = Ast::Expression::BINARY_COMPARE_GREATER;          break;
+				case TOKEN_GREATER_OR_EQUAL: binary->kind = Ast::Expression::BINARY_COMPARE_GREATER_OR_EQUAL; break;
+				case TOKEN_AND:              binary->kind = Ast::Expression::BINARY_AND;                      break;
+				case TOKEN_OR:               binary->kind = Ast::Expression::BINARY_OR;                       break;
+				case TOKEN_DOT:              binary->kind = Ast::Expression::BINARY_DOT;                      break;
+				// case TOKEN_DOT_DOT:          binary->kind = Ast::Expression::BINARY_RANGE;                    break;
+				case TOKEN_PLUS:             binary->kind = Ast::Expression::BINARY_ADD;                      break;
+				case TOKEN_MINUS:            binary->kind = Ast::Expression::BINARY_SUBTRACT;                 break;
+				case TOKEN_ASTERISK:         binary->kind = Ast::Expression::BINARY_MULTIPLY;                 break;
+				case TOKEN_DIVIDE:           binary->kind = Ast::Expression::BINARY_DIVIDE;                   break;
+				case TOKEN_MOD:              binary->kind = Ast::Expression::BINARY_MODULO;                   break;
+				case TOKEN_CARET:            binary->kind = Ast::Expression::BINARY_BITWISE_XOR;              break;
+				case TOKEN_BAR:              binary->kind = Ast::Expression::BINARY_BITWISE_OR;               break;
+				case TOKEN_AMPERSAND:        binary->kind = Ast::Expression::BINARY_BITWISE_AND;              break;
+				case TOKEN_LEFT_SHIFT:       binary->kind = Ast::Expression::BINARY_LEFT_SHIFT;               break;
+				case TOKEN_RIGHT_SHIFT:      binary->kind = Ast::Expression::BINARY_RIGHT_SHIFT;              break;
 				default: Assert(); Unreachable();
 			}
 

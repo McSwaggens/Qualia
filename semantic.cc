@@ -111,7 +111,7 @@ static TypeID GetType(Ast::Type* ast_type, Ast::Scope* scope, Ast::Module* modul
 					Error(module, specifier->size_expression, "Fixed array size must be an integer.\n");
 
 				// @RemoveMe @Todo: Need to interpret size_expression
-				Assert(specifier->size_expression->kind == Ast::EXPRESSION_TERMINAL_LITERAL);
+				Assert(specifier->size_expression->kind == Ast::Expression::TERMINAL_LITERAL);
 
 				Ast::Expression_Literal* literal = (Ast::Expression_Literal*)specifier->size_expression;
 				u64 length = literal->token->literal_int;
@@ -224,7 +224,7 @@ static Ast::Expression* ImplicitCast(Ast::Expression* expression, TypeID type, A
 		return expression;
 
 	Ast::Expression_Implicit_Cast* cast = module->stack.Allocate<Ast::Expression_Implicit_Cast>();
-	cast->kind = Ast::EXPRESSION_IMPLICIT_CAST;
+	cast->kind = Ast::Expression::IMPLICIT_CAST;
 	cast->subexpression = expression;
 	cast->type  = type;
 	cast->flags = expression->flags & (Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE);
@@ -244,7 +244,7 @@ static void ScanExpressionTerminalName(Ast::Expression_Terminal* terminal, Ast::
 		Ast::Expression_Variable* variable_expression = (Ast::Expression_Variable*)terminal;
 		variable_expression->variable = variable;
 
-		variable_expression->kind = Ast::EXPRESSION_TERMINAL_VARIABLE;
+		variable_expression->kind = Ast::Expression::TERMINAL_VARIABLE;
 		variable_expression->type = variable->type;
 
 		variable_expression->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_REFERENTIAL;
@@ -265,17 +265,17 @@ static void ScanExpressionTerminalName(Ast::Expression_Terminal* terminal, Ast::
 		terminal->type = type;
 
 		if (GetTypeKind(type) == TYPE_STRUCT) {
-			terminal->kind = Ast::EXPRESSION_TERMINAL_STRUCT; // @FixMe
+			terminal->kind = Ast::Expression::TERMINAL_STRUCT; // @FixMe
 			Ast::Expression_Struct* struct_terminal = (Ast::Expression_Struct*)terminal;
 			struct_terminal->structure = GetTypeInfo(type)->struct_info.ast;
 		}
 		else if (GetTypeKind(type) == TYPE_ENUM) {
-			terminal->kind = Ast::EXPRESSION_TERMINAL_ENUM;
+			terminal->kind = Ast::Expression::TERMINAL_ENUM;
 			Ast::Expression_Enum* enum_terminal = (Ast::Expression_Enum*)terminal;
 			enum_terminal->enumeration = GetTypeInfo(type)->enum_info.ast;
 		}
 		else if (GetTypeKind(type) == TYPE_PRIMITIVE) {
-			terminal->kind = Ast::EXPRESSION_TERMINAL_PRIMITIVE; // @FixMe
+			terminal->kind = Ast::Expression::TERMINAL_PRIMITIVE; // @FixMe
 		}
 	}
 	else {
@@ -398,7 +398,7 @@ static void ScanExpressionTuple(Ast::Expression_Tuple* tuple, Ast::Scope* scope,
 		ScanExpression(element, scope, module);
 		types[i] = element->type;
 
-		if (element->kind == Ast::EXPRESSION_TUPLE) {
+		if (element->kind == Ast::Expression::TUPLE) {
 			tuple->recursive_count += ((Ast::Expression_Tuple*)element)->recursive_count-1;
 			tuple_flags &= element->flags;
 		}
@@ -406,7 +406,7 @@ static void ScanExpressionTuple(Ast::Expression_Tuple* tuple, Ast::Scope* scope,
 			element_flags &= element->flags;
 		}
 
-		if (element->type == TYPE_EMPTY_TUPLE && (element->kind != Ast::EXPRESSION_TUPLE || tuple->elements.length > 1))
+		if (element->type == TYPE_EMPTY_TUPLE && (element->kind != Ast::Expression::TUPLE || tuple->elements.length > 1))
 			Error(module, element, "Tuple elements aren't allowed to be of type %.\n", element->type);
 	}
 
@@ -426,9 +426,9 @@ static void ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope, As
 	ScanExpression(call->parameters, scope, module);
 	Print("Parameters: %\n", call->parameters->type);
 
-	if (dot->kind == Ast::EXPRESSION_BINARY_DOT && dot->right->kind == Ast::EXPRESSION_TERMINAL_NAME && ((Ast::Expression_Terminal*)dot->right)->token->kind == TOKEN_IDENTIFIER_FORMAL) {
+	if (dot->kind == Ast::Expression::BINARY_DOT && dot->right->kind == Ast::Expression::TERMINAL_NAME && ((Ast::Expression_Terminal*)dot->right)->token->kind == TOKEN_IDENTIFIER_FORMAL) {
 		Ast::Expression_Dot_Call* dcall = (Ast::Expression_Dot_Call*)call;
-		dcall->kind = Ast::EXPRESSION_DOT_CALL;
+		dcall->kind = Ast::Expression::DOT_CALL;
 
 		Ast::Expression_Function* function_expression = (Ast::Expression_Function*)dot->right;
 
@@ -443,7 +443,7 @@ static void ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope, As
 		if (!function)
 			Error(module, dcall, "No function exists called % with input type: %.\n", function_expression->token->identifier_string, full_param_type);
 
-		function_expression->kind = Ast::EXPRESSION_TERMINAL_FUNCTION;
+		function_expression->kind = Ast::Expression::TERMINAL_FUNCTION;
 		function_expression->function = function;
 		function_expression->type = function->type;
 
@@ -460,10 +460,10 @@ static void ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope, As
 		return;
 	}
 
-	if (call->function->kind == Ast::EXPRESSION_TERMINAL_NAME && terminal->token->kind == TOKEN_IDENTIFIER_FORMAL) {
+	if (call->function->kind == Ast::Expression::TERMINAL_NAME && terminal->token->kind == TOKEN_IDENTIFIER_FORMAL) {
 		if (Ast::Function* function = FindFunction(scope, terminal->token->identifier_string, call->parameters->type); function) {
 			Ast::Expression_Function* function_expression = (Ast::Expression_Function*)call->function;
-			call->function->kind = Ast::EXPRESSION_TERMINAL_FUNCTION;
+			call->function->kind = Ast::Expression::TERMINAL_FUNCTION;
 			function_expression->function = function;
 			function_expression->type = function->type;
 
@@ -484,7 +484,7 @@ static void ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope, As
 			intrinsic_expression->intrinsic = intrinsic_id;
 			intrinsic_expression->type = type;
 
-			call->function->kind = Ast::EXPRESSION_TERMINAL_INTRINSIC;
+			call->function->kind = Ast::Expression::TERMINAL_INTRINSIC;
 			call->type = type_info->function_info.output;
 			call->flags = 0;
 
@@ -540,13 +540,13 @@ static void ScanExpressionSubscript(Ast::Expression_Subscript* subscript, Ast::S
 
 static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::Module* module) {
 	switch (expression->kind) {
-		case Ast::EXPRESSION_TERMINAL_NAME:    ScanExpressionTerminalName((Ast::Expression_Terminal*)expression,  scope, module); break;
-		case Ast::EXPRESSION_FIXED_ARRAY:      ScanExpressionFixedArray((Ast::Expression_Fixed_Array*)expression, scope, module); break;
-		case Ast::EXPRESSION_ARRAY:            ScanExpressionArray((Ast::Expression_Array*)expression,            scope, module); break;
-		case Ast::EXPRESSION_TERMINAL_LITERAL: ScanExpressionLiteral((Ast::Expression_Literal*)expression,        scope, module); break;
-		case Ast::EXPRESSION_TUPLE:            ScanExpressionTuple((Ast::Expression_Tuple*)expression,            scope, module); break;
+		case Ast::Expression::TERMINAL_NAME:    ScanExpressionTerminalName((Ast::Expression_Terminal*)expression,  scope, module); break;
+		case Ast::Expression::FIXED_ARRAY:      ScanExpressionFixedArray((Ast::Expression_Fixed_Array*)expression, scope, module); break;
+		case Ast::Expression::ARRAY:            ScanExpressionArray((Ast::Expression_Array*)expression,            scope, module); break;
+		case Ast::Expression::TERMINAL_LITERAL: ScanExpressionLiteral((Ast::Expression_Literal*)expression,        scope, module); break;
+		case Ast::Expression::TUPLE:            ScanExpressionTuple((Ast::Expression_Tuple*)expression,            scope, module); break;
 
-		case Ast::EXPRESSION_UNARY_ADDRESS_OF: {
+		case Ast::Expression::UNARY_ADDRESS_OF: {
 			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 
@@ -558,7 +558,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			unary->type = GetPointer(unary->subexpression->type);
 		} break;
 
-		case Ast::EXPRESSION_UNARY_REFERENCE_OF: {
+		case Ast::Expression::UNARY_REFERENCE_OF: {
 			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 
@@ -571,7 +571,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			unary->type = GetSubType(unary->subexpression->type);
 		} break;
 
-		case Ast::EXPRESSION_UNARY_BITWISE_NOT: {
+		case Ast::Expression::UNARY_BITWISE_NOT: {
 			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
@@ -586,7 +586,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			else Error(module, unary->subexpression, "Type % is not an integer or pointer.\n", unary->subexpression->type);
 		} break;
 
-		case Ast::EXPRESSION_UNARY_MINUS: {
+		case Ast::Expression::UNARY_MINUS: {
 			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
@@ -598,7 +598,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			unary->type = unary->subexpression->type;
 		} break;
 
-		case Ast::EXPRESSION_UNARY_PLUS: {
+		case Ast::Expression::UNARY_PLUS: {
 			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
@@ -609,7 +609,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			unary->type = unary->subexpression->type;
 		} break;
 
-		case Ast::EXPRESSION_UNARY_NOT: {
+		case Ast::Expression::UNARY_NOT: {
 			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
 			ScanExpression(unary->subexpression, scope, module);
 			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
@@ -621,7 +621,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			unary->type = TYPE_BOOL;
 		} break;
 
-		case Ast::EXPRESSION_BINARY_DOT: {
+		case Ast::Expression::BINARY_DOT: {
 			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 
@@ -630,13 +630,13 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			if (type == TYPE_EMPTY_TUPLE)
 				Error(module, binary->left, "Cannot dot into empty tuple.\n");
 
-			if (binary->left->kind == Ast::EXPRESSION_TERMINAL_ENUM) {
+			if (binary->left->kind == Ast::Expression::TERMINAL_ENUM) {
 				Ast::Enum* ast_enum = ((Ast::Expression_Enum*)binary->left)->enumeration;
 
-				if (binary->right->kind != Ast::EXPRESSION_TERMINAL_NAME)
+				if (binary->right->kind != Ast::Expression::TERMINAL_NAME)
 					Error(module, binary->right, "Expected enum member name.\n");
 
-				binary->right->kind = Ast::EXPRESSION_TERMINAL_ENUM_MEMBER;
+				binary->right->kind = Ast::Expression::TERMINAL_ENUM_MEMBER;
 
 				Ast::Expression_Enum_Member* member_terminal = (Ast::Expression_Enum_Member*)binary->right;
 				String name = member_terminal->token->identifier_string;
@@ -653,7 +653,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 				binary->type = type;
 				binary->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 			}
-			else if (binary->right->kind == Ast::EXPRESSION_TERMINAL_NAME && ((Ast::Expression_Terminal*)binary->right)->token->kind == TOKEN_IDENTIFIER_CASUAL) {
+			else if (binary->right->kind == Ast::Expression::TERMINAL_NAME && ((Ast::Expression_Terminal*)binary->right)->token->kind == TOKEN_IDENTIFIER_CASUAL) {
 				Ast::Expression_Terminal* terminal = (Ast::Expression_Terminal*)binary->right;
 				String name = terminal->token->identifier_string;
 
@@ -673,7 +673,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 						Error(module, binary, "Struct % does not have a member named %\n", ast_struct->name, terminal->token);
 
 					binary->type = member->type;
-					terminal->kind = Ast::EXPRESSION_TERMINAL_STRUCT_MEMBER;
+					terminal->kind = Ast::Expression::TERMINAL_STRUCT_MEMBER;
 					((Ast::Expression_Struct_Member*)terminal)->member = member;
 					terminal->type = member->type;
 				}
@@ -681,7 +681,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 					bool fixed = GetTypeKind(type) == TYPE_FIXED_ARRAY;
 
 					if (name == "begin" || name == "data") {
-						binary->right->kind = Ast::EXPRESSION_TERMINAL_ARRAY_BEGIN;
+						binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
 						binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 						if (!fixed) {
@@ -691,12 +691,12 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 						binary->type = GetPointer(GetSubType(binary->left->type));
 					}
 					else if (name == "end") {
-						binary->right->kind = Ast::EXPRESSION_TERMINAL_ARRAY_END;
+						binary->right->kind = Ast::Expression::TERMINAL_ARRAY_END;
 						binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 						binary->type = GetPointer(GetSubType(binary->left->type));
 					}
 					else if (name == "length" || name == "count") {
-						binary->right->kind = Ast::EXPRESSION_TERMINAL_ARRAY_LENGTH;
+						binary->right->kind = Ast::Expression::TERMINAL_ARRAY_LENGTH;
 						binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 						if (!fixed) {
@@ -712,8 +712,8 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			else Error(module, binary, "Invalid dot expression.\n", binary->left->type);
 		} break;
 
-		case Ast::EXPRESSION_BINARY_COMPARE_EQUAL:
-		case Ast::EXPRESSION_BINARY_COMPARE_NOT_EQUAL: {
+		case Ast::Expression::BINARY_COMPARE_EQUAL:
+		case Ast::Expression::BINARY_COMPARE_NOT_EQUAL: {
 			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -731,10 +731,10 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			binary->type = TYPE_BOOL;
 		} break;
 
-		case Ast::EXPRESSION_BINARY_COMPARE_LESS:
-		case Ast::EXPRESSION_BINARY_COMPARE_LESS_OR_EQUAL:
-		case Ast::EXPRESSION_BINARY_COMPARE_GREATER:
-		case Ast::EXPRESSION_BINARY_COMPARE_GREATER_OR_EQUAL: {
+		case Ast::Expression::BINARY_COMPARE_LESS:
+		case Ast::Expression::BINARY_COMPARE_LESS_OR_EQUAL:
+		case Ast::Expression::BINARY_COMPARE_GREATER:
+		case Ast::Expression::BINARY_COMPARE_GREATER_OR_EQUAL: {
 			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -754,11 +754,11 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			binary->type = TYPE_BOOL;
 		} break;
 
-		case Ast::EXPRESSION_BINARY_ADD:
-		case Ast::EXPRESSION_BINARY_SUBTRACT:
-		case Ast::EXPRESSION_BINARY_MULTIPLY:
-		case Ast::EXPRESSION_BINARY_DIVIDE:
-		case Ast::EXPRESSION_BINARY_MODULO: {
+		case Ast::Expression::BINARY_ADD:
+		case Ast::Expression::BINARY_SUBTRACT:
+		case Ast::Expression::BINARY_MULTIPLY:
+		case Ast::Expression::BINARY_DIVIDE:
+		case Ast::Expression::BINARY_MODULO: {
 			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -769,14 +769,14 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 				// ptr - int = ptr
 				// ptr - ptr = int
 
-				if (binary->kind == Ast::EXPRESSION_BINARY_ADD) {
+				if (binary->kind == Ast::Expression::BINARY_ADD) {
 					if (!CanCast(CAST_IMPLICIT, binary->right->type, TYPE_INT64))
 						Error(module, binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
 
 					binary->right = ImplicitCast(binary->right, TYPE_INT64, module);
 					binary->type = binary->left->type;
 				}
-				else if (binary->kind == Ast::EXPRESSION_BINARY_SUBTRACT) {
+				else if (binary->kind == Ast::Expression::BINARY_SUBTRACT) {
 					if (GetTypeKind(binary->right->type) == TYPE_POINTER) {
 						TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
 
@@ -806,7 +806,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 
 				TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
 
-				if (!dominant || !IsFloat(dominant) || binary->kind == Ast::EXPRESSION_BINARY_MODULO)
+				if (!dominant || !IsFloat(dominant) || binary->kind == Ast::Expression::BINARY_MODULO)
 					Error(module, binary, "Binary expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
 
 				binary->left  = ImplicitCast(binary->left,  dominant, module);
@@ -833,9 +833,9 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			}
 		} break;
 
-		case Ast::EXPRESSION_BINARY_BITWISE_OR:
-		case Ast::EXPRESSION_BINARY_BITWISE_XOR:
-		case Ast::EXPRESSION_BINARY_BITWISE_AND: {
+		case Ast::Expression::BINARY_BITWISE_OR:
+		case Ast::Expression::BINARY_BITWISE_XOR:
+		case Ast::Expression::BINARY_BITWISE_AND: {
 			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -854,8 +854,8 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			binary->type = binary->left->type;
 		} break;
 
-		case Ast::EXPRESSION_BINARY_LEFT_SHIFT:
-		case Ast::EXPRESSION_BINARY_RIGHT_SHIFT: {
+		case Ast::Expression::BINARY_LEFT_SHIFT:
+		case Ast::Expression::BINARY_RIGHT_SHIFT: {
 			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -874,8 +874,8 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 		} break;
 
 
-		case Ast::EXPRESSION_BINARY_AND:
-		case Ast::EXPRESSION_BINARY_OR: {
+		case Ast::Expression::BINARY_AND:
+		case Ast::Expression::BINARY_OR: {
 			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
 			ScanExpression(binary->left,  scope, module);
 			ScanExpression(binary->right, scope, module);
@@ -893,7 +893,7 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			binary->type = TYPE_BOOL;
 		} break;
 
-		case Ast::EXPRESSION_IF_ELSE: {
+		case Ast::Expression::IF_ELSE: {
 			Ast::Expression_Ternary* ternary = (Ast::Expression_Ternary*)expression;
 			ScanExpression(ternary->left,   scope, module);
 			ScanExpression(ternary->middle, scope, module);
@@ -918,15 +918,15 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			ternary->type = dominant;
 		} break;
 
-		case Ast::EXPRESSION_CALL: ScanExpressionCall((Ast::Expression_Call*)expression, scope, module); break;
+		case Ast::Expression::CALL: ScanExpressionCall((Ast::Expression_Call*)expression, scope, module); break;
 		
-		case Ast::EXPRESSION_LAMBDA: {
+		case Ast::Expression::LAMBDA: {
 			Assert();
 		} break;
 
-		case Ast::EXPRESSION_SUBSCRIPT: ScanExpressionSubscript((Ast::Expression_Subscript*)expression, scope, module); break;
+		case Ast::Expression::SUBSCRIPT: ScanExpressionSubscript((Ast::Expression_Subscript*)expression, scope, module); break;
 
-		case Ast::EXPRESSION_AS: {
+		case Ast::Expression::AS: {
 			Ast::Expression_As* as = (Ast::Expression_As*)expression;
 			ScanExpression(as->expression, scope, module);
 			as->type = GetType(&as->ast_type, scope, module);

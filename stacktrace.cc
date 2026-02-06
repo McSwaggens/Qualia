@@ -53,7 +53,7 @@ static void PrintStackTrace() {
 	int naddrs = count - skip;
 	if (naddrs <= 0) return;
 
-	WriteStr("\nStack trace:\n");
+	WriteStr("Stack trace:\n");
 
 	// Format addresses as hex strings (subtract 1 to get call site, not return address)
 	// argv: addr2line -e /proc/self/exe -f -C -p addr1 addr2 ... NULL
@@ -105,27 +105,103 @@ static void PrintStackTrace() {
 		// Parent
 		close(pipefd[1]);
 
-		// Read output line by line, prefix with frame numbers
-		char readbuf[4096];
-		int frame = 0;
-		bool at_line_start = true;
+		// Read all output into buffer
+		char output[64 * 256];
+		ssize_t total = 0;
 		ssize_t n;
-		while ((n = read(pipefd[0], readbuf, sizeof(readbuf))) > 0) {
-			for (ssize_t i = 0; i < n; i++) {
-				if (at_line_start) {
-					WriteStr("  #");
-					WriteInt(frame++);
-					WriteStr("  ");
-					at_line_start = false;
-				}
-				write(STDERR_FILENO, &readbuf[i], 1);
-				if (readbuf[i] == '\n') {
-					at_line_start = true;
+		while ((n = read(pipefd[0], output + total, sizeof(output) - total - 1)) > 0) {
+			total += n;
+			if (total >= (ssize_t)sizeof(output) - 1) break;
+		}
+		output[total] = '\0';
+
+		// Parse lines into (location, function) pairs
+		struct Frame { const char* loc; int loc_len; const char* func; int func_len; };
+		Frame parsed[64];
+		int nframes = 0;
+		int max_loc_len = 0;
+
+		char* p = output;
+		while (*p && nframes < 64) {
+			// Find end of line
+			char* eol = p;
+			while (*eol && *eol != '\n') eol++;
+
+			// Look for " at " separator (addr2line -p format: "function at file:line")
+			char* at = nullptr;
+			for (char* s = p; s + 4 <= eol; s++) {
+				if (s[0] == ' ' && s[1] == 'a' && s[2] == 't' && s[3] == ' ') {
+					at = s;
 				}
 			}
+
+			if (at) {
+				// function = [p, at), location = [at+4, eol)
+				parsed[nframes].func = p;
+				parsed[nframes].func_len = (int)(at - p);
+				parsed[nframes].loc = at + 4;
+				parsed[nframes].loc_len = (int)(eol - (at + 4));
+			} else {
+				// Unknown frame like "?? ??:0" — split on last space
+				char* last_space = nullptr;
+				for (char* s = p; s < eol; s++) {
+					if (*s == ' ') last_space = s;
+				}
+				if (last_space) {
+					parsed[nframes].func = p;
+					parsed[nframes].func_len = (int)(last_space - p);
+					parsed[nframes].loc = last_space + 1;
+					parsed[nframes].loc_len = (int)(eol - (last_space + 1));
+				} else {
+					parsed[nframes].func = p;
+					parsed[nframes].func_len = (int)(eol - p);
+					parsed[nframes].loc = "??:0";
+					parsed[nframes].loc_len = 4;
+				}
+			}
+
+			// Normalize "??:?" to "??:0"
+			if (parsed[nframes].loc_len == 4
+				&& parsed[nframes].loc[0] == '?'
+				&& parsed[nframes].loc[1] == '?'
+				&& parsed[nframes].loc[2] == ':'
+				&& parsed[nframes].loc[3] == '?') {
+				parsed[nframes].loc = "??:0";
+			}
+
+			if (parsed[nframes].loc_len > max_loc_len)
+				max_loc_len = parsed[nframes].loc_len;
+
+			nframes++;
+			p = (*eol) ? eol + 1 : eol;
 		}
-		// If the last line didn't end with newline
-		if (!at_line_start) WriteStr("\n");
+
+		// Skip innermost unknown frame (signal handler / crash trampoline)
+		int start = 0;
+		if (nframes > 0
+			&& parsed[0].loc_len == 4
+			&& parsed[0].loc[0] == '?'
+			&& parsed[0].loc[1] == '?') {
+			start = 1;
+		}
+
+		// Recalculate max_loc_len after skipping
+		max_loc_len = 0;
+		for (int i = start; i < nframes; i++) {
+			if (parsed[i].loc_len > max_loc_len)
+				max_loc_len = parsed[i].loc_len;
+		}
+
+		// Print in reverse order (deepest frame first, crash site last), column-aligned
+		for (int i = nframes - 1; i >= start; i--) {
+			write(STDERR_FILENO, parsed[i].loc, parsed[i].loc_len);
+			WriteStr(":");
+			int padding = max_loc_len - parsed[i].loc_len;
+			for (int s = 0; s < padding; s++) write(STDERR_FILENO, " ", 1);
+			WriteStr(" ");
+			write(STDERR_FILENO, parsed[i].func, parsed[i].func_len);
+			WriteStr("\n");
+		}
 
 		close(pipefd[0]);
 		int status;
@@ -134,12 +210,9 @@ static void PrintStackTrace() {
 	return;
 
 fallback:
-	for (int i = 0; i < naddrs; i++) {
-		WriteStr("  #");
-		WriteInt(i);
-		WriteStr("  ");
+	for (int i = naddrs - 1; i >= 0; i--) {
 		WriteStr(hex_bufs[i]);
-		WriteStr("\n");
+		WriteStr(": ??\n");
 	}
 }
 

@@ -64,7 +64,14 @@ int main(int argc, char** args) {
 
 	const String files[] = {
 		"tests/types.q",
-		// "test_literals.q"
+		"tests/variable_declarations.q",
+		"tests/literals.q",
+		"tests/functions.q",
+		"tests/structs.q",
+		"tests/enums.q",
+		"tests/control_flow.q",
+		"tests/expressions.q",
+		"tests/statements.q",
 	};
 
 	for (u32 i = 0; i < COUNT(files); i++) {

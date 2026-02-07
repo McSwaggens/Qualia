@@ -647,24 +647,25 @@ void Lexer::Parse() {
 
 					while (c < end) {
 						if (*c != '\\') {
-							*(s++) = *(c);
+							*(s++) = *(c++);
 							continue;
 						}
 
+						c++; // skip backslash
 						switch (*(c++)) {
-							case '0':  *s = '\0'; break;
-							case 'a':  *s = '\a'; break;
-							case 'b':  *s = '\b'; break;
-							case 't':  *s = '\t'; break;
-							case 'n':  *s = '\n'; break;
-							case 'v':  *s = '\v'; break;
-							case 'f':  *s = '\f'; break;
-							case 'r':  *s = '\r'; break;
-							case '\\': *s = '\\'; break;
-							case '\"': *s = '\"'; break;
+							case '0':  *(s++) = '\0'; break;
+							case 'a':  *(s++) = '\a'; break;
+							case 'b':  *(s++) = '\b'; break;
+							case 't':  *(s++) = '\t'; break;
+							case 'n':  *(s++) = '\n'; break;
+							case 'v':  *(s++) = '\v'; break;
+							case 'f':  *(s++) = '\f'; break;
+							case 'r':  *(s++) = '\r'; break;
+							case '\\': *(s++) = '\\'; break;
+							case '\"': *(s++) = '\"'; break;
 
 							default:
-								Error("Invalid escape character: \\%\n", *c);
+								Error("Invalid escape character: \\%\n", *(c-1));
 						}
 					}
 				}

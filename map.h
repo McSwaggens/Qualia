@@ -37,8 +37,6 @@ struct Map {
 	}
 
 	void InsertIndex(u32 index, Key key, Value value) {
-		Assert(keys[index] != key);
-
 		AssureCapacity(count+1);
 
 		Move(keys   + index+1, keys   + index, count - index);
@@ -105,12 +103,12 @@ struct Map {
 
 	struct GetOrAddResult { bool was_inserted; Value* value; };
 	GetOrAddResult GetOrAdd(Key key, Value value = { }) {
-		u32 index = GetKeyIndex(key);
-		if (GetKey(index) == key)
+		u32 index = BinarySearch(Array<Key>(keys, count), key) - keys;
+
+		if (index < count && keys[index] == key)
 			return { false, &values[index] };
 
 		InsertIndex(index, key, value);
-		values[index] = value;
 		return { true, &values[index] };
 	}
 

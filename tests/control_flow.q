@@ -68,8 +68,6 @@ TestWhile():
 			dec y
 		dec x
 
-// BUG: ScanRangeFor never sets the iterator variable's type from the range element type,
-// so `x := item` crashes during semantic analysis
 TestForRange(arr: []int):
 	// Simple for-in
 	for item in arr:

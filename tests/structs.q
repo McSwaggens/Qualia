@@ -54,7 +54,5 @@ struct Rect:
 struct WithTuple:
 	pair: (int, int)
 
-// Function pointer member
-// BUG: CalculateStructSize crashes for structs with function pointer type members
 struct WithFnPtr:
-	callback: (int) -> int
+	callback: *(int) -> int

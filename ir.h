@@ -93,7 +93,7 @@ namespace IR {
 
 		auto[inserted, value] = small_constants.GetOrAdd(n);
 
-		if (!inserted) {
+		if (inserted) {
 			Value new_value = NewValue();
 			new_value->constant = n;
 			*value = new_value;

@@ -1095,6 +1095,9 @@ static void ScanScope(Ast::Scope* scope, Ast::Module* module) {
 
 			if (!member->type)
 				Error(module, member->ast_type.basetype.token->location, "Unknown type '%'\n", member->ast_type.basetype.token);
+
+			if (GetTypeKind(member->type) == TYPE_FUNCTION)
+				Error(module, member->ast_type.basetype.token->location, "Bare function type not allowed as struct member\n");
 		}
 	}
 

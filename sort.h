@@ -125,8 +125,11 @@ static bool IsSorted(T* begin, T* end) {
 
 template<typename T>
 static T* BinarySearch(Array<T> array, T value) {
-	if (array.length < 2)
+	if (array.length < 2) {
+		if (array.length == 1 && value > *array.Begin())
+			return array.Begin() + 1;
 		return array.Begin();
+	}
 
 	T* middle = array.Begin() + (array.length / 2);
 

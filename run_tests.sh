@@ -12,10 +12,10 @@ for f in tests/*.q; do
         passed=$((passed + 1))
     else
         echo "FAIL"
-        echo "$output" | sed 's/^/    /'
-        echo "    ----------------------------------------"
+        echo "$output"
+        echo "----------------------------------------"
         failed=$((failed + 1))
-        errors="$errors  $f\n"
+        errors="$errors$f\n"
     fi
 done
 

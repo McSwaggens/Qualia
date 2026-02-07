@@ -528,14 +528,6 @@ struct Parser {
 	Ast::Import ParseImport(u32 indent);
 };
 
-static void SemanticParse(Ast::Module* module);
-static u64 CalculateStackFrameSize(Ast::Function* function);
-static u64 CalculateStackFrameSize(Ast::Code* code, u64 offset);
-static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::Module* module);
-static void ScanScope(Ast::Scope* scope, Ast::Module* module);
-static void ScanCode(Ast::Code* code, Ast::Scope* scope, Ast::Function* function, Ast::Module* module);
-static void ScanFunction(Ast::Function* function, Ast::Scope* scope, Ast::Module* module);
-
 static void GenericWrite(OutputBuffer* buffer, Ast::Expression* expression);
 static void GenericWrite(OutputBuffer* buffer, Ast::Type* type);
 static void GenericWrite(OutputBuffer* buffer, Ast::Type type);

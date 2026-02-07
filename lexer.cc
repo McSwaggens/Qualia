@@ -466,8 +466,9 @@ void Lexer::Parse() {
 		if (newline) current_token->flags |= TOKEN_FLAG_NEWLINE;
 
 		if (did_skip_whitespace) {
-			current_token->flags    |= TOKEN_FLAG_LEFT_SPACED;
-			current_token[-1].flags |= TOKEN_FLAG_RIGHT_SPACED;
+			current_token->flags |= TOKEN_FLAG_LEFT_SPACED;
+			if (current_token != tokens.Begin())
+				current_token[-1].flags |= TOKEN_FLAG_RIGHT_SPACED;
 		}
 
 		if (cursor >= end)

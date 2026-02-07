@@ -224,6 +224,7 @@ static void CrashHandler(int sig) {
 		case SIGFPE:  name = "SIGFPE (Floating point exception)"; break;
 		case SIGILL:  name = "SIGILL (Illegal instruction)"; break;
 		case SIGABRT: name = "SIGABRT (Abort)";              break;
+		case SIGTRAP: _exit(1); // Assert already printed the stack trace.
 	}
 
 	WriteStr("Crash: ");
@@ -246,6 +247,7 @@ static void InitCrashHandler() {
 	sigaction(SIGFPE,  &sa, null);
 	sigaction(SIGILL,  &sa, null);
 	sigaction(SIGABRT, &sa, null);
+	sigaction(SIGTRAP, &sa, null);
 }
 
 #else

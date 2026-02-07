@@ -111,9 +111,11 @@ struct GlobalAllocator {
 		u64 upper_map = map & GA_UPPER_MASK & -bit;
 
 		if (!upper_map) {
-			u64 block_size = Max(bit << 4llu, OS::PAGE_SIZE); // This is not great.. :(
+			u64 block_size = Max(bit << 4llu, OS::PAGE_SIZE);
+			if (block_size > (1llu << 30))
+				block_size = Max(bit << 1llu, OS::PAGE_SIZE);
 			byte* block = (byte*)OS::AllocateVirtualMemory(block_size);
-			Assert(block_size > bit * 2);
+			Assert(block_size >= bit);
 			Assert(block);
 
 			pools[index].SetStack(block, block_size);

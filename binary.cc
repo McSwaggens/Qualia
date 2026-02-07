@@ -28,7 +28,7 @@ static Stack binstack;
 Binary Binary::LARGE_ZERO;
 
 static void InitEvalSystem() {
-	binstack = CreateStack(1llu<<32);
+	binstack = Stack::Create(1llu<<32);
 	Binary::LARGE_ZERO = Binary::Create(Array<const byte>(BIG_ARRAY_OF_ZEROES, sizeof(BIG_ARRAY_OF_ZEROES)));
 }
 

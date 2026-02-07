@@ -16,6 +16,8 @@ struct Stack {
 	byte* head         = null;
 	byte* end          = null;
 
+	static Stack Create(u64 size);
+
 	void* AllocateMemory(u64 size);
 
 	void* CopyAllocMemory(const byte* ptr, u64 size) {
@@ -39,7 +41,5 @@ struct Stack {
 
 	void  Free();
 };
-
-static Stack CreateStack(u64 size);
 
 #endif // STACK_H

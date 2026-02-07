@@ -31,7 +31,7 @@ static void CompileFile(String file_path) {
 		return;
 	}
 
-	Stack stack = CreateStack(1 << 21);
+	Stack stack = Stack::Create(1 << 21);
 	Ast::Module* module = stack.Allocate<Ast::Module>();
 	ZeroMemory(module);
 

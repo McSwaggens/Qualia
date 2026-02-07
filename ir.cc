@@ -2,7 +2,7 @@
 #include "print.h"
 
 static void IR::Init() {
-	stack = CreateStack(1llu<<32);
+	stack = Stack::Create(1llu<<32);
 	value_buffer.Init();
 	value_buffer.AllocIndex(); // Don't use index 0.
 

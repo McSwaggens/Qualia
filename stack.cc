@@ -2,7 +2,7 @@
 #include "assert.h"
 #include "os.h"
 
-static Stack CreateStack(u64 size) {
+Stack Stack::Create(u64 size) {
 	Assert((size & 4095) == 0);
 
 	// @cleanme

@@ -6,11 +6,11 @@
 
 struct String {
 	// @todo Short String Optimization!
-	u32 length;
-	char* data;
-	u32 capacity;
+	u32 length = 0;
+	char* data = null;
+	u32 capacity = 0;
 
-	String() = default;
+	constexpr String() = default;
 	constexpr String(Null) : data(null), length(0), capacity(0) { }
 	constexpr String(char* data, u32 length, u32 cap = 0) : data(data), length(length), capacity(cap) { }
 	constexpr String(char* begin, char* end) : data(begin), length(end-begin), capacity(0) { }

@@ -940,8 +940,6 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 		default:
 			AssertUnreachable();
 	}
-
-	Assert(expression);
 }
 
 static void GenerateClosure(Ast::Struct* target, Ast::Struct* ast_struct);

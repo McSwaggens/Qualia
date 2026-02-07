@@ -405,8 +405,6 @@ struct Variable {
 	TypeID type;
 	Type* ast_type;
 	Expression* assignment;
-	// Value ir_stack;
-	// @Todo: Add span
 };
 
 struct Assignment {
@@ -425,9 +423,9 @@ struct Statement {
 		Claim       claim;
 		Break       brk;
 		Return      ret;
-		Variable    variable_declaration = Variable(); // @FixMe @Optimization: Change to pointer, Variable is yuuuge!
+		Variable    variable_declaration; // @FixMe @Optimization: Change to pointer, Variable is yuuuge!
 		Increment   increment;
-		Expression* expression;
+		Expression* expression = null;
 	};
 };
 

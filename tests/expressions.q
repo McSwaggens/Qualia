@@ -77,9 +77,32 @@ TestTupleExpression():
 	b := (1, 2, 3)
 
 TestPrecedence():
-	a := 2 + 3 * 4
-	b := (2 + 3) * 4
-	c := 1 + 2 + 3
-	d := 10 - 2 - 3
-	e := 1 < 2 && 3 < 4
-	f := true || false && true
+	// Standard precedence (uniform spacing)
+	a := 2 + 3 * 4        // 2 + (3 * 4) = 14
+	b := (2 + 3) * 4      // 20
+	c := 1 + 2 + 3        // (1 + 2) + 3 = 6, left-associative
+	d := 10 - 2 - 3       // (10 - 2) - 3 = 5, left-associative
+	e := 1 < 2 && 3 < 4   // (1 < 2) && (3 < 4)
+	f := true || false && true  // true || (false && true)
+
+TestSpacingPrecedence():
+	a := 2
+	b := 3
+	c := 4
+
+	// Unspaced binds tighter than spaced
+	d := a+b * c           // (a+b) * c = 20
+	e := a * b+c           // a * (b+c) = 14
+	f := a+b * c+d         // (a+b) * (c+d) = 30
+
+	// Unspaced vs spaced with same operator
+	g := a+b - c           // (a+b) - c = 1
+	h := a - b+c           // a - (b+c) = -5
+
+	// Standard precedence preserved when all spaced
+	i := a + b * c         // a + (b * c) = 14
+	j := a * b + c         // (a * b) + c = 10
+
+	// Standard precedence preserved when all unspaced
+	k := a+b*c             // a+(b*c) = 14
+	l := a*b+c             // (a*b)+c = 10

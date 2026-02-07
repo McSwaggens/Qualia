@@ -518,7 +518,7 @@ struct Parser {
 	void ParseGlobalScope();
 	Ast::Struct ParseStruct(u32 indent);
 	Ast::Enum ParseEnum(u32 indent);
-	Ast::Expression* ParseExpression(u32 indent, bool assignment_break = false, u32 parent_precedence = (u32)-2);
+	Ast::Expression* ParseExpression(u32 indent, bool assignment_break = false, s32 parent_precedence = 0);
 	Ast::Type ParseType(u32 indent);
 	void ParseParameters(Ast::Function* function, Token* open_paren, u32 indent);
 	Ast::BranchBlock ParseBranchBlock(u32 indent);

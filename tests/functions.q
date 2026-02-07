@@ -77,6 +77,29 @@ TestCallInExpression():
 	b := Square(3) * Square(2)
 	c := 100 - Square(4)
 
+// Multi-arg function calls
+TestMultiArgCall():
+	result := AddTwo(10, 20)
+
+// Nested multi-arg calls
+TestNestedMultiArgCalls():
+	a := AddTwo(AddTwo(1, 2), 3)
+	b := AddTwo(AddTwo(1, 2), AddTwo(3, 4))
+
+// Multi-arg call in larger expression
+TestMultiArgCallInExpression():
+	a := AddTwo(2, 3) + 10
+	b := AddTwo(1, 2) * AddTwo(3, 4)
+	c := 100 - AddTwo(10, 20)
+
+// Three-param function call
+AddThree(a: int, b: int, c: int) -> int:
+	return a + b + c
+
+TestThreeArgCall():
+	a := AddThree(1, 2, 3)
+	b := AddThree(AddTwo(1, 2), 3, 4)
+
 // Call with boolean argument
 PassBool(x: bool) -> bool:
 	return x

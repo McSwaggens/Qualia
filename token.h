@@ -224,6 +224,8 @@ struct Token {
 	bool IsNewLine()     { return flags & TOKEN_FLAG_NEWLINE;      }
 	bool IsLeftSpaced()  { return flags & TOKEN_FLAG_LEFT_SPACED;  }
 	bool IsRightSpaced() { return flags & TOKEN_FLAG_RIGHT_SPACED; }
+	bool IsLeftTight()   { return !(flags & TOKEN_FLAG_LEFT_SPACED);  }
+	bool IsRightTight()  { return !(flags & TOKEN_FLAG_RIGHT_SPACED); }
 
 	union {
 		struct {

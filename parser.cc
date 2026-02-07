@@ -202,32 +202,32 @@ static s32 GetTernaryPrecedence(TokenKind kind) {
 	}
 }
 
-static s32 GetBinaryPrecedence(TokenKind kind, bool is_lspaced, bool is_rspaced) {
+static s32 GetBinaryPrecedence(TokenKind kind, bool is_boosted) {
 	switch (kind) {
 		case TOKEN_DOT:
-			return 15 << (is_lspaced && is_rspaced ? 0 : 16);
+			return 15 << (is_boosted ? 16 : 0);
 
 		case TOKEN_ASTERISK:
 		case TOKEN_DIVIDE:
 		case TOKEN_MOD:
-			return 12 << (is_lspaced && is_rspaced ? 0 : 16);
+			return 12 << (is_boosted ? 16 : 0);
 
 		case TOKEN_PLUS:
 		case TOKEN_MINUS:
-			return 11 << (is_lspaced && is_rspaced ? 0 : 16);
+			return 11 << (is_boosted ? 16 : 0);
 
 		case TOKEN_CARET:
 		case TOKEN_AMPERSAND:
 		case TOKEN_BAR:
 		case TOKEN_LEFT_SHIFT:
 		case TOKEN_RIGHT_SHIFT:
-			return 10 << (is_lspaced && is_rspaced ? 0 : 16);
+			return 10 << (is_boosted ? 16 : 0);
 
 		case TOKEN_AS:
-			return 9 << (is_lspaced && is_rspaced ? 0 : 16);
+			return 9 << (is_boosted ? 16 : 0);
 
 		// case TOKEN_DOT_DOT:
-		// 	return 7 << (is_lspaced && is_rspaced ? 0 : 16);
+		// 	return 7 << (is_boosted ? 16 : 0);
 
 		case TOKEN_EQUAL:
 		case TOKEN_NOT_EQUAL:
@@ -235,13 +235,13 @@ static s32 GetBinaryPrecedence(TokenKind kind, bool is_lspaced, bool is_rspaced)
 		case TOKEN_LESS_OR_EQUAL:
 		case TOKEN_GREATER:
 		case TOKEN_GREATER_OR_EQUAL:
-			return 6 << (is_lspaced && is_rspaced ? 0 : 16);
+			return 6 << (is_boosted ? 16 : 0);
 
 		case TOKEN_AND:
-			return 5 << (is_lspaced && is_rspaced ? 0 : 16);
+			return 5 << (is_boosted ? 16 : 0);
 
 		case TOKEN_OR:
-			return 4 << (is_lspaced && is_rspaced ? 0 : 16);
+			return 4 << (is_boosted ? 16 : 0);
 
 		default: {
 			Assert("Invalid binary operator.");
@@ -250,7 +250,7 @@ static s32 GetBinaryPrecedence(TokenKind kind, bool is_lspaced, bool is_rspaced)
 	}
 }
 
-static s32 GetUnaryPrecedence(TokenKind kind, bool is_rspaced) {
+static s32 GetUnaryPrecedence(TokenKind kind, bool is_boosted) {
 	switch (kind) {
 		case TOKEN_ASTERISK:
 		case TOKEN_AMPERSAND:
@@ -258,10 +258,10 @@ static s32 GetUnaryPrecedence(TokenKind kind, bool is_rspaced) {
 		case TOKEN_PLUS:
 		case TOKEN_MINUS:
 		case TOKEN_TILDE:
-			return 14 << (is_rspaced ? 0 : 16);
+			return 14 << (is_boosted ? 16 : 0);
 
 		case TOKEN_NOT:
-			return 5 << (is_rspaced ? 0 : 16);
+			return 5 << (is_boosted ? 16 : 0);
 
 		default: {
 			Assert("Invalid unary operator.");
@@ -270,11 +270,11 @@ static s32 GetUnaryPrecedence(TokenKind kind, bool is_rspaced) {
 	}
 }
 
-static s32 GetPostfixPrecedence(TokenKind kind, bool is_lspaced) {
+static s32 GetPostfixPrecedence(TokenKind kind, bool is_boosted) {
 	switch (kind) {
 		case TOKEN_OPEN_PAREN:
 		case TOKEN_OPEN_BRACKET:
-			return 15 << (is_lspaced ? 0 : 16);
+			return 15 << (is_boosted ? 16 : 0);
 
 		default: {
 			Assert("Invalid postfix operator.");
@@ -448,9 +448,9 @@ static bool CanTakeNextOp(Token* token, bool assignment_break, s32 parent_preced
 	// Adjust for right to left operators.
 	parent_precedence -= IsOperatorRightToLeft(token->kind);
 
-	if (IsBinaryOperator(token->kind))  return GetBinaryPrecedence(token->kind, token->IsLeftSpaced(), token->IsRightSpaced()) > parent_precedence;
+	if (IsBinaryOperator(token->kind))  return GetBinaryPrecedence(token->kind, token->IsLeftTight() || token->IsRightTight()) > parent_precedence;
 	if (IsTernaryOperator(token->kind)) return GetTernaryPrecedence(token->kind)                                               > parent_precedence;
-	if (IsPostfixOperator(token->kind)) return GetPostfixPrecedence(token->kind, token->IsLeftSpaced())                        > parent_precedence;
+	if (IsPostfixOperator(token->kind)) return GetPostfixPrecedence(token->kind, token->IsLeftTight())                         > parent_precedence;
 
 	AssertUnreachable();
 }
@@ -512,7 +512,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 		token += 1;
 		CheckScope(token, indent, module);
-		unary->subexpression = ParseExpression(indent, assignment_break, GetUnaryPrecedence(unary->op->kind, unary->op->IsRightSpaced()));
+		unary->subexpression = ParseExpression(indent, assignment_break, GetUnaryPrecedence(unary->op->kind, unary->op->IsRightTight()));
 		left = unary;
 	}
 	else if (IsLiteral(token->kind)) {
@@ -696,7 +696,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			Token* closure = open->closure;
 
 			CheckScope(token, indent, module);
-			call->parameters = (Ast::Expression_Tuple*)ParseExpression(indent, false, GetPostfixPrecedence(token->kind, token->IsLeftSpaced()));
+			call->parameters = (Ast::Expression_Tuple*)ParseExpression(indent, false, GetPostfixPrecedence(token->kind, token->IsLeftTight()));
 
 			token = closure + 1;
 			left = call;
@@ -761,7 +761,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			binary->op = token++;
 			binary->left  = left;
 			CheckScope(token, indent, module);
-			binary->right = ParseExpression(indent, assignment_break, GetBinaryPrecedence(binary->op->kind, binary->op->IsLeftSpaced(), binary->op->IsRightSpaced()));
+			binary->right = ParseExpression(indent, assignment_break, GetBinaryPrecedence(binary->op->kind, binary->op->IsLeftTight() || binary->op->IsRightTight()));
 			left = binary;
 		}
 

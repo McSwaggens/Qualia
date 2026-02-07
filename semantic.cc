@@ -1173,10 +1173,12 @@ static void ScanWhile(Ast::Module* module, Ast::Function* function, Ast::Code* c
 
 static void ScanRangeFor(Ast::Module* module, Ast::Function* function, Ast::Code* code, Ast::Branch* branch) {
 	ScanExpression(branch->for_range.range, &code->scope, module);
-	branch->code.scope.variables.Add(branch->for_range.iterator); // for i in i:
 
 	if (!IsArray(branch->for_range.range->type) && !IsFixedArray(branch->for_range.range->type))
 		Error(module, branch->for_range.range, "For loop cannot range over type: %\n", branch->for_range.range->type);
+
+	branch->for_range.iterator->type = GetSubType(branch->for_range.range->type);
+	branch->code.scope.variables.Add(branch->for_range.iterator);
 
 	if (branch->for_range.filter) {
 		ScanExpression(branch->for_range.filter, &branch->code.scope, module);

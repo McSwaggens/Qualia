@@ -37,3 +37,30 @@ enum HexValues:
 	Low = 0Fh
 	High = F0h
 	Full = FFh
+
+// Enum member access
+TestEnumAccess():
+	// Access enum members
+	c := Color.Red
+	g := Color.Green
+	b := Color.Blue
+
+	// Access members from different enums
+	s := Status.Active
+	p := Status.Pending
+
+	// Enum member in comparison
+	x := Color.Red
+	eq := x = Color.Red
+	ne := x != Color.Blue
+
+	// Enum member in assignment
+	flag := Flags.None
+	flag = Flags.Read
+
+	// Enum member in expression
+	combined := Flags.Read | Flags.Write
+
+	// Hex enum access
+	lo := HexValues.Low
+	hi := HexValues.High

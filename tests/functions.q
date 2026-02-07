@@ -62,3 +62,31 @@ MultiNested():
 		return 2
 	a := First()
 	b := Second()
+
+// Nested function calls (single-arg)
+TestNestedCalls():
+	Double(x: int) -> int:
+		return x + x
+	a := Double(Double(3))
+
+// Function call in larger expression
+TestCallInExpression():
+	Square(x: int) -> int:
+		return x * x
+	a := Square(5) + 10
+	b := Square(3) * Square(2)
+	c := 100 - Square(4)
+
+// Call with boolean argument
+PassBool(x: bool) -> bool:
+	return x
+
+TestBoolCall():
+	a := PassBool(true)
+	b := PassBool(false)
+
+// Call with pointer argument
+TestPointerCall():
+	x: int = 42
+	p := &x
+	q := ReturnPointer(p)

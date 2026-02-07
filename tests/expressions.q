@@ -106,3 +106,23 @@ TestSpacingPrecedence():
 	// Standard precedence preserved when all unspaced
 	k := a+b*c             // a+(b*c) = 14
 	l := a*b+c             // (a*b)+c = 10
+
+TestPointerOps():
+	x: int = 42
+	// Address-of
+	ptr := &x
+	// Dereference
+	y := *ptr
+	// Dereference in expression
+	z := *ptr + 5
+	w := *ptr * 2
+
+TestArrayRange(p: *int, count: uint64):
+	// Array range from pointer and count
+	arr := [p..count]
+	n := arr.length
+
+TestArrayRangeFromPtrs(begin: *int, end: *int):
+	// Array range from two pointers
+	arr := [begin..end]
+	n := arr.length

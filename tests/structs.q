@@ -56,3 +56,26 @@ struct WithTuple:
 
 struct WithFnPtr:
 	callback: *(int) -> int
+
+// Chained member access
+TestChainedAccess():
+	r: Rect
+	// Access nested struct member
+	x := r.origin.x
+	y := r.origin.y
+	w := r.size.x
+	h := r.size.y
+
+// Member assignment
+TestMemberAssignment():
+	s: Point
+	s.x = 10
+	s.y = 20
+
+// Chained member assignment
+TestChainedAssignment():
+	r: Rect
+	r.origin.x = 1
+	r.origin.y = 2
+	r.size.x = 100
+	r.size.y = 200

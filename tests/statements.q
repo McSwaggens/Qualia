@@ -71,6 +71,9 @@ TestSubscript(arr: []int):
 TestArrayProperties(arr: []int):
 	n := arr.length
 	c := arr.count
+	b := arr.begin
+	d := arr.data
+	e := arr.end
 
 TestMultipleDefers():
 	a: int = 0

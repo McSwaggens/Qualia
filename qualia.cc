@@ -42,9 +42,6 @@ static void CompileFile(String file_path) {
 	Lexer lexer = CreateLexer(module, file_path);
 	lexer.Parse();
 
-	for (Token token : lexer.tokens)
-		Print("\t%\n", token);
-
 	Parser parser = {
 		.module = module,
 		.token = &module->tokens[0],

@@ -484,7 +484,6 @@ struct Enum {
 };
 
 struct Module {
-	Stack stack;
 	Scope scope;
 
 	Array<char> code;
@@ -511,6 +510,7 @@ struct StackFrame
 struct Parser {
 	Ast::Module* module;
 	Token* token;
+	Stack stack;
 
 	template<typename... Args>
 	[[noreturn]] void Error(String format, Args&&... args);

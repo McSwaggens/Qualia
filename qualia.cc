@@ -31,14 +31,10 @@ static void CompileFile(String file_path) {
 		return;
 	}
 
-	Stack stack = Stack::Create(1 << 21);
-	Ast::Module* module = stack.Allocate<Ast::Module>();
-	ZeroMemory(module);
-
+	Ast::Module* module = Alloc<Ast::Module>();
 	modules.Add(module);
 
 	*module = {
-		.stack = stack,
 		.file_path = file_path,
 		.name = file_path, // @FixMe get the real name
 	};
@@ -49,8 +45,12 @@ static void CompileFile(String file_path) {
 	for (Token token : lexer.tokens)
 		Print("\t%\n", token);
 
+	Parser parser = {
+		.module = module,
+		.token = &module->tokens[0],
+		.stack = Stack::Create(1 << 21),
+	};
 
-	Parser parser = { .module = module, .token = &module->tokens[0] };
 	parser.ParseGlobalScope();
 	SemanticParse(module);
 }

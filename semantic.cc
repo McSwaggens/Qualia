@@ -223,7 +223,7 @@ static Ast::Expression* ImplicitCast(Ast::Expression* expression, TypeID type, A
 	if (expression->type == type)
 		return expression;
 
-	Ast::Expression_Implicit_Cast* cast = module->stack.Allocate<Ast::Expression_Implicit_Cast>();
+	Ast::Expression_Implicit_Cast* cast = Alloc<Ast::Expression_Implicit_Cast>(); // @fixme using general allocator and not the stack. Proper Ast stack is in the parser. Which we don't have access to here.
 	cast->kind = Ast::Expression::IMPLICIT_CAST;
 	cast->subexpression = expression;
 	cast->type  = type;

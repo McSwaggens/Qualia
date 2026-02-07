@@ -337,6 +337,7 @@ static TypeID GetFixedArray(TypeID subtype, u64 length) {
 	TypeID result = CreateType(TYPE_FIXED_ARRAY, {
 		.size = length * GetTypeSize(subtype),
 		.fixed_info = {
+			.subtype = subtype,
 			.length = length,
 		}
 	});

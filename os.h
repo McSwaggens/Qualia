@@ -14,6 +14,8 @@ namespace OS {
 
 	static constexpr u64 PAGE_SIZE = 4096;
 
+	using ThreadID = s32;
+
 	[[noreturn]]
 	void Terminate(bool success = true);
 
@@ -33,6 +35,13 @@ namespace OS {
 	s32 ReadFile(FileHandle handle, byte* out_data, u64 out_length);
 	u64 QueryFileSize(FileHandle handle);
 	bool DoesFileExist(const char* cstring_path);
+
+	ThreadID CreateThread(byte* stack_top, int (*fn)(void*), void* arg);
+	ThreadID GetCurrentThreadID();
+	void SendPauseSignal(ThreadID tid);
+	void InstallPauseHandler(void (*handler)(int));
+	void FutexWait(volatile s32* addr, s32 expected);
+	void FutexWake(volatile s32* addr);
 }
 
 #endif // OS_H

@@ -2,9 +2,13 @@
 
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 
+#include <sched.h>
+#include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <linux/futex.h>
 
 [[noreturn]]
 void OS::Terminate(bool success) {
@@ -61,5 +65,34 @@ u64 OS::QueryFileSize(FileHandle handle) {
 
 bool OS::DoesFileExist(const char* cstring_path) {
 	return access(cstring_path, F_OK) == 0;
+}
+
+OS::ThreadID OS::CreateThread(byte* stack_top, int (*fn)(void*), void* arg) {
+	int flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD | CLONE_SYSVSEM;
+	return clone(fn, stack_top, flags, arg);
+}
+
+OS::ThreadID OS::GetCurrentThreadID() {
+	return syscall(SYS_gettid);
+}
+
+void OS::SendPauseSignal(ThreadID tid) {
+	syscall(SYS_tgkill, getpid(), tid, SIGUSR1);
+}
+
+void OS::InstallPauseHandler(void (*handler)(int)) {
+	struct sigaction sa = {};
+	sa.sa_handler = handler;
+	sa.sa_flags = SA_RESTART;
+	sigemptyset(&sa.sa_mask);
+	sigaction(SIGUSR1, &sa, null);
+}
+
+void OS::FutexWait(volatile s32* addr, s32 expected) {
+	syscall(SYS_futex, (s32*)addr, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, expected, null, null, 0);
+}
+
+void OS::FutexWake(volatile s32* addr) {
+	syscall(SYS_futex, (s32*)addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, null, null, 0);
 }
 

@@ -1,24 +1,33 @@
 #pragma once
 
 #include "general.h"
+#include "fixed_buffer.h"
+#include "os.h"
 
-typedef u8 ThreadID;
+using ThreadID = u8;
 
-struct Thread
-{
-	bool  alive;
-	s32   system_thread_id;
-	byte* stack; // Beginning of allocation (left most in memory)
-	u64   stack_size;
+struct Thread {
+	enum Status {
+		UNINITIALIZED = 0,
+		RUNNING,
+		PAUSED,
+	};
+
+	volatile Status status;
+	OS::ThreadID system_thread_id;
+	Array<byte> stack;
 	// Current task? eg. Lexing, Parsing, etc..
-	// Dependencies?
+
+	static FixedBuffer<Thread, 256> thread_pool;
+	static void Init();
+	static Thread* Create(u64 stack_size, void (*thread_start_function)(ThreadID id));
+
+	inline byte* GetTopOfStack() { return stack.End(); }
+
+	inline bool IsRunning()     { return status == RUNNING; }
+	inline bool IsInitialized() { return status != UNINITIALIZED; }
+
+	void Pause();  // Stop the thread. (RUNNING -> PAUSED)
+	void Resume(); // Resume the thread after it's been paused. (PAUSED -> RUNNING)
 };
-
-static const u64 MAX_THREAD_COUNT = 256;
-static Thread threads[MAX_THREAD_COUNT];
-
-static void InitThread(void);
-static void KillThread(ThreadID thread);
-static ThreadID CreateThread(u64 stack_size, void (*thread_start_function)(ThreadID id));
-
 

@@ -58,6 +58,7 @@ static void CompileFile(String file_path) {
 int main(int argc, char** args) {
 	InitCrashHandler();
 	InitGlobalAllocator();
+	Thread::Init();
 	InitEvalSystem();
 	InitTypeSystem();
 	InitIntrinsics();

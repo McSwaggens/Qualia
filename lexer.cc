@@ -143,8 +143,11 @@ static u64 AsciiToInt(char* begin, u64 count, Base base, bool* overflow) {
 			for (u32 i = 0; i < count; i++) {
 				if (*p > "18446744073709551615"[i]) {
 					*overflow = true;
-					return value;
+					return 0;
 				}
+
+				if (*p < "18446744073709551615"[i])
+					break;
 
 				if (*++p == '_') ++p;
 			}
@@ -357,18 +360,6 @@ static bool CheckIfHexadecimal(char* p) {
 
 // -------------------------------------------- //
 
-static TokenKind GetMatchingParen(TokenKind kind) {
-	switch (kind) {
-		case TOKEN_OPEN_PAREN:    return TOKEN_OPEN_PAREN;
-		case TOKEN_OPEN_BRACE:    return TOKEN_OPEN_BRACE;
-		case TOKEN_OPEN_BRACKET:  return TOKEN_OPEN_BRACKET;
-		case TOKEN_CLOSE_PAREN:   return TOKEN_CLOSE_PAREN;
-		case TOKEN_CLOSE_BRACE:   return TOKEN_CLOSE_BRACE;
-		case TOKEN_CLOSE_BRACKET: return TOKEN_CLOSE_BRACKET;
-		default: AssertUnreachable();
-	}
-}
-
 static TokenKind GetDoppleGanger(TokenKind kind) {
 	switch (kind) {
 		case TOKEN_OPEN_PAREN:    return TOKEN_CLOSE_PAREN;
@@ -379,10 +370,6 @@ static TokenKind GetDoppleGanger(TokenKind kind) {
 		case TOKEN_CLOSE_BRACKET: return TOKEN_OPEN_BRACKET;
 		default: AssertUnreachable();
 	}
-}
-
-static inline bool IsKeyword(char* p, TokenKind kind) {
-	return true;
 }
 
 bool Lexer::TestKeyword(TokenKind keyword) {
@@ -696,7 +683,7 @@ void Lexer::Parse() {
 				if (open_token->kind != doppelganger)
 					Error(
 						"Expected closure '%', not: '%'\n",
-						GetMatchingParen(open_token->kind), current_token->kind
+						GetDoppleGanger(open_token->kind), current_token->kind
 					);
 
 				Token* prev = open_token->closure;
@@ -841,9 +828,6 @@ void Lexer::Parse() {
 	module->code   = code;
 	module->lines  = lines.ToArray();
 
-	while (open_token) {
-		Token* next = open_token->closure;
-		open_token->closure = null;
-		open_token = next;
-	}
+	if (open_token)
+		Error("Unclosed '%'.\n", open_token->kind);
 }

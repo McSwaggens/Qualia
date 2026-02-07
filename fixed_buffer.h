@@ -10,39 +10,47 @@ template<typename T, u64 N>
 struct FixedBuffer {
 	static_assert(IsPow2(N));
 
-	T* buffer = null;
+	static constexpr u64 LENGTH = N;
+
 	u64 head = 0;
+	T buffer[N] = { };
 
-	void Init() {
-		buffer = ::Alloc<T>(N);
-		head = 0;
-	}
+	constexpr FixedBuffer() = default;
 
-	Array<T> Alloc(u64 count, T value = { }) {
+	Array<T> Add(u64 count, T value = { }) {
+		Assert(head + count <= LENGTH);
 		Array<T> result = { head, count };
 		Fill(result.Begin(), result.End(), value);
 		head += count;
 		return result;
 	}
 
-	T* Alloc(T value = { }) {
+	T* Add(T value = { }) {
+		Assert(head < LENGTH);
 		T* result = buffer + head++;
 		*result = value;
 		return result;
 	}
 
-	u64 AllocIndex(T value = { }) {
+	u64 AddIndex(T value = { }) {
+		Assert(head < LENGTH);
 		buffer[head] = value;
 		return head++;
 	}
 
-	bool IsWithinBuffer(T* p) {
+	bool DoesContain(T* p) {
 		return p >= buffer && p < buffer + N;
 	}
 
-	u64 ToIndex(T* p) { return p - buffer; }
+	u64 ToIndex(T* p) {
+		Assert(DoesContain(p));
+		return p - buffer;
+	}
 
-	constexpr T& operator [](u64 n) { return buffer[n]; }
+	constexpr T& operator [](u64 n) {
+		Assert(n < LENGTH);
+		return buffer[n];
+	}
 };
 
 #endif // FIXED_BUFFER_H

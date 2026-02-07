@@ -85,7 +85,7 @@ namespace IR {
 
 	static void Init();
 
-	static Value NewValue() { return value_buffer.AllocIndex(); }
+	static Value NewValue() { return value_buffer.AddIndex(); }
 
 	static Value Constant(u64 n) {
 		if (n < 256)

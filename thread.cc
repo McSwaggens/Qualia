@@ -29,12 +29,11 @@ static void ThreadPauseHandler(int) {
 }
 
 void Thread::Init() {
-	thread_pool.Init();
 	OS::InstallPauseHandler(ThreadPauseHandler);
 }
 
 Thread* Thread::Create(u64 stack_size, void (*thread_start_function)(ThreadID id)) {
-	Thread* thread = thread_pool.Alloc();
+	Thread* thread = thread_pool.Add();
 	ThreadID id = (ThreadID)thread_pool.ToIndex(thread);
 
 	byte* stack_memory = OS::AllocateVirtualMemory(stack_size, OS::PAGE_FLAG_WRITE);

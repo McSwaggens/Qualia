@@ -39,8 +39,8 @@ struct Array {
 		if (length != o.length)
 			return false;
 
-		if (data != o.data)
-			return false;
+		if (data == o.data)
+			return true;
 
 		for (u64 i = 0; i < length; i++)
 			if (data[i] != o.data[i])

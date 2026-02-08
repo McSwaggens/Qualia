@@ -26,8 +26,8 @@ struct Stack {
 	}
 
 	template<typename T>
-	T* Allocate(u64 count = 1) {
-		return (T*)AllocateMemory(sizeof(T) * count);
+	T* Allocate() {
+		return (T*)AllocateMemory(sizeof(T));
 	}
 
 	template<typename T>

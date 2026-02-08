@@ -503,14 +503,10 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			case TOKEN_LITERAL_UINT32: literal->type = TYPE_UINT32; literal->value = IR::Constant(literal->token->literal_int); break;
 			case TOKEN_LITERAL_UINT64: literal->type = TYPE_UINT64; literal->value = IR::Constant(literal->token->literal_int); break;
 
-			case TOKEN_LITERAL_FLOAT: {
-				literal->type = TYPE_FLOAT32; // @Fixme?
-				literal->value = IR::Constant(literal->token->literal_float);
-			} break;
-
+			case TOKEN_LITERAL_FLOAT:
 			case TOKEN_LITERAL_FLOAT32: {
 				literal->type = TYPE_FLOAT32;
-				literal->value = IR::Constant(literal->token->literal_float);
+				literal->value = IR::Constant((float32)literal->token->literal_float);
 			} break;
 
 			case TOKEN_LITERAL_FLOAT64: {

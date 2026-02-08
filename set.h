@@ -42,17 +42,42 @@ struct Set {
 		return BinarySearch(elements.ToArray(), item);
 	}
 
-	void Add(T item) {
+	bool Add(T item) {
 		u32 index = GetBinaryIndex(item);
 		if (index < Count() && elements[index] == item)
-			return;
+			return false;
 		elements.Insert(item, index);
+		return true;
 	}
 
 	Set<T> Copy(u32 extra_capacity = 0) {
 		Set<T> result;
 		result.elements = elements.Copy(extra_capacity);
 		return result;
+	}
+
+	bool Contains(Set<T> other) {
+		if (other.Count() > Count())
+			return false;
+
+		u32 i = 0; // Index in this set
+		u32 j = 0; // Index in other set
+
+		while (j < other.Count()) {
+			if (i >= Count())
+				return false; // Ran out of elements in this set
+
+			if (elements[i] == other.elements[j]) {
+				i++;
+				j++;
+			} else if (elements[i] < other.elements[j]) {
+				i++;
+			} else {
+				return false; // other.elements[j] is not in this set
+			}
+		}
+
+		return true;
 	}
 };
 

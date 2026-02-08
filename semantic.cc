@@ -1,5 +1,5 @@
 #include "semantic.h"
-#include "memory.h"
+#include "alloc.h"
 #include "print.h"
 #include "assert.h"
 #include "general.h"
@@ -1077,7 +1077,7 @@ static void ScanScope(Ast::Scope* scope, Ast::Module* module) {
 	}
 
 	for (Ast::Enum* ast_enum = scope->enums; ast_enum < scope->enums.End(); ast_enum++) {
-		ZeroMemory(&ast_enum->type);
+		Zero(&ast_enum->type);
 		ast_enum->underlying_type = TYPE_INT64;
 		ast_enum->type = CreateEnumType(ast_enum, ast_enum->underlying_type);
 

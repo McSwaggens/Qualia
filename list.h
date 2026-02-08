@@ -1,8 +1,9 @@
 #pragma once
 
-#include "memory.h"
+#include "alloc.h"
 #include "assert.h"
 #include "math.h"
+#include "array.h"
 
 template<typename T>
 struct List {
@@ -157,7 +158,7 @@ struct List {
 	}
 
 	void Free() {
-		DeAllocate(data, capacity);
+		::Free(data, capacity);
 	}
 };
 

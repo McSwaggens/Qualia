@@ -3,7 +3,7 @@
 
 #include "binary.h"
 #include "fixed_array.h"
-#include "memory.h"
+#include "alloc.h"
 
 struct BinaryNode {
 	u64 size;

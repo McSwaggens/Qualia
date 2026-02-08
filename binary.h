@@ -2,7 +2,7 @@
 
 #include "int.h"
 #include "general.h"
-#include "memory.h"
+#include "alloc.h"
 #include "math.h"
 #include "stack.h"
 #include "assert.h"

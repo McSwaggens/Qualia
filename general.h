@@ -115,7 +115,54 @@ static u64 RaisePow2(u64 n) {
 	return NextPow2(n);
 }
 
-CFUNC s64 SystemCall(s64 rax, s64 rdi = 0, s64 rsi = 0, s64 rdx = 0, s64 r10 = 0, s64 r8 = 0, s64 r9 = 0);
+CFUNC s64 SystemCall(s64 rax, s64 rdi = 0, s64 rsi = 0, s64 rdx = 0, s64 r10 = 0, s64 r8 = 0, s64 r9 = 0); // @todo remove me use OS:: stuff
 
 static u64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc
+
+// ------------------------------------------- //
+
+static void CopyMemory(byte* dest, const byte* src, u64 count) { __builtin_memcpy(dest, src, count); }
+
+template<typename T> static void Copy(T* dest, const T* src, u64 count) { CopyMemory((byte*)dest, (byte*)src, count * sizeof(T)); }
+
+// ------------------------------------------- //
+
+static void MoveMemory(byte* dest, const byte* src, u64 count) { __builtin_memmove(dest, src, count); }
+
+template<typename T> static void Move(T* dest, const T* src, u64 count) { MoveMemory((byte*)dest, (byte*)src, count * sizeof(T)); }
+
+// ------------------------------------------- //
+
+static inline void ZeroMemory(byte* begin, byte* end) { __builtin_memset(begin, 0, end - begin); }
+static inline void ZeroMemory(byte* p, u64 count = 1) { ZeroMemory(p, p + count); }
+
+template<typename T> static inline void Zero(T* p, u64 count = 1) { ZeroMemory((byte*)p, (byte*)(p + count)); }
+template<typename T> static inline void Zero(T* begin, T* end)    { ZeroMemory((byte*)begin, (byte*)end); }
+
+// ------------------------------------------- //
+
+template<typename T>
+static void Fill(T* dest, u64 count, T value) {
+	for (u64 i = 0; i < count; i++) dest[i] = value;
+}
+
+template<typename T>
+static void Fill(T* begin, T* end, T value) {
+	for (; begin < end; begin++) *begin = value;
+}
+
+// ------------------------------------------- //
+
+static int CompareMemory(const byte* a, const byte* b, u64 count) {
+	return __builtin_memcmp(a, b, count);
+}
+
+template<typename T>
+static inline int Compare(const T* a, const T* b, u64 count) {
+	for (u64 i = 0; i < count; i++)
+		if (int cmp = Compare(a[i], b[i]); cmp != 0)
+			return cmp;
+
+	return 0;
+}
 

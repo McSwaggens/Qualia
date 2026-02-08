@@ -1,5 +1,5 @@
 #include "type_system.h"
-#include "memory.h"
+#include "alloc.h"
 #include "general.h"
 #include "assert.h"
 
@@ -194,14 +194,14 @@ static void AddExtensionEntry(ExtensionTable* table, ExtensionEntry entry) {
 }
 
 static void InitTypeSystem(void) {
-	ZeroMemory(&type_system);
+	Zero(&type_system);
 	type_system.info_count = CORE_TYPES_COUNT;
 	type_system.info_capacity = 1<<20;
 	type_system.infos = (TypeInfo*)AllocMemory(type_system.info_capacity*sizeof(TypeInfo));
 
 	for (s32 prim = PRIMITIVE_BEGIN; prim < PRIMITIVE_END; prim++) {
 		TypeInfo* info = &type_system.infos[prim];
-		ZeroMemory(info);
+		Zero(info);
 
 		info->size = PRIMITIVE_SIZE_LUT[prim];
 
@@ -213,9 +213,9 @@ static void InitTypeSystem(void) {
 		TypeInfo* optional = GetTypeInfo(info->optional);
 		TypeInfo* array    = GetTypeInfo(info->array);
 
-		ZeroMemory(pointer);
-		ZeroMemory(optional);
-		ZeroMemory(array);
+		Zero(pointer);
+		Zero(optional);
+		Zero(array);
 
 		pointer->size  = 8;
 		optional->size = 1 + info->size;

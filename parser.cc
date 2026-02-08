@@ -3,7 +3,7 @@
 #include "general.h"
 #include "token.h"
 #include "print.h"
-#include "memory.h"
+#include "alloc.h"
 #include "assert.h"
 #include "array_buffer.h"
 

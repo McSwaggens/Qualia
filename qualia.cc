@@ -16,7 +16,6 @@ static List<Ast::Module*> modules = null;
 #include "error.cc"
 #include "type_system.cc"
 #include "lexer.cc"
-#include "memory.cc"
 #include "array_buffer.cc"
 #include "print.cc"
 #include "semantic.cc"
@@ -24,6 +23,7 @@ static List<Ast::Module*> modules = null;
 #include "interpreter.cc"
 #include "ir.cc"
 #include "binary.cc"
+#include "alloc.cc"
 
 static void CompileFile(String file_path) {
 	if (!File::DoesExist(file_path)) {

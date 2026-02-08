@@ -1,7 +1,7 @@
 #pragma once
 
 #include "array.h"
-#include "memory.h"
+#include "alloc.h"
 #include "print.h"
 
 #define POOL_SIZE 1024

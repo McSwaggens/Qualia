@@ -1,5 +1,5 @@
 #include "array_buffer.h"
-#include "memory.h"
+#include "alloc.h"
 #include "assert.h"
 #include "os.h"
 

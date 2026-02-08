@@ -37,14 +37,14 @@ struct Lexer {
 
 static Lexer CreateLexer(Ast::Module* module, String file_path) {
 	Array<char>  code   = File::Load(file_path, 16, 64);
-	Array<Token> tokens = AllocArray<Token>(code.length + 1);
-	List<Line>   lines  = AllocateList<Line>(code.length/4);
+	List<Token> tokens  = AllocateList<Token>(code.length + 1);
+	List<Line>   lines  = AllocateList<Line>(code.length / 4);
 
 	return (Lexer){
 		.module = module,
 		.file_path = file_path,
-		.tokens = tokens,
-		.current_token = tokens,
+		.tokens = tokens.ToArray(),
+		.current_token = tokens.ToArray(),
 		.lines = lines,
 		.code = code,
 		.cursor = code,

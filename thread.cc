@@ -1,6 +1,6 @@
 #include "thread.h"
 #include "assert.h"
-#include "memory.h"
+#include "alloc.h"
 #include "os.h"
 
 FixedBuffer<Thread, 256> Thread::thread_pool;

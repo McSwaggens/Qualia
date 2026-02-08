@@ -2,7 +2,7 @@
 
 #include "general.h"
 #include "array.h"
-#include "memory.h"
+#include "alloc.h"
 
 struct Stack_Block {
 	Stack_Block* previous;

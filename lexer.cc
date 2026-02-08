@@ -2,7 +2,7 @@
 
 #include "general.h"
 #include "parser.h"
-#include "memory.h"
+#include "alloc.h"
 #include "print.h"
 #include "ascii.h"
 #include "string.h"

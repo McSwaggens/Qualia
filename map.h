@@ -2,7 +2,7 @@
 
 #include "general.h"
 #include "list.h"
-#include "memory.h"
+#include "alloc.h"
 #include "sort.h"
 #include "optional.h"
 

@@ -4,7 +4,7 @@
 #include "stack.h"
 #include "math.h"
 #include "assert.h"
-#include "memory.h"
+#include "alloc.h"
 #include "fixed_buffer.h"
 #include "set.h"
 
@@ -140,11 +140,6 @@ namespace IR {
 		return new_value;
 	}
 
-	template <typename T>
-	static Value Constant(T value) {
-		return Constant(Array<byte>((byte*)&value, sizeof(T)));
-	}
-
 	static Value Constant(Array<byte> data) {
 		Assert(data.length);
 
@@ -159,6 +154,11 @@ namespace IR {
 		new_value->constant = Binary(data);
 
 		return new_value;
+	}
+
+	template <typename T>
+	static Value Constant(T value) {
+		return Constant(Array<byte>((byte*)&value, sizeof(T)));
 	}
 };
 

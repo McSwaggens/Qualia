@@ -3,7 +3,7 @@
 #include "general.h"
 #include "math.h"
 #include "array.h"
-#include "memory.h"
+#include "alloc.h"
 
 template<typename T, u64 N>
 struct FixedBuffer {

@@ -4,6 +4,7 @@
 #include "assert.h"
 #include "general.h"
 #include "error.h"
+#include "type_system.h"
 
 static TypeID GetType(Ast::Type* ast_type, Ast::Scope* scope, Ast::Module* module);
 
@@ -247,13 +248,19 @@ static void ScanExpressionTerminalName(Ast::Expression_Terminal* terminal, Ast::
 		variable_expression->kind = Ast::Expression::TERMINAL_VARIABLE;
 		variable_expression->type = variable->type;
 
-		variable_expression->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_REFERENTIAL;
-
 		if (variable->flags & Ast::VARIABLE_FLAG_CONSTANT) {
 			variable_expression->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
+			// Constants are not lvalues - type stays as-is
 		}
-		else if (variable->flags & Ast::VARIABLE_FLAG_GLOBAL) {
-			variable_expression->flags = Ast::EXPRESSION_FLAG_REFERENTIAL;
+		else {
+			// Variables are lvalues - wrap type in reference
+			variable_expression->type = GetReference(variable_expression->type);
+			if (variable->flags & Ast::VARIABLE_FLAG_GLOBAL) {
+				// Global, not pure
+				variable_expression->flags = 0;
+			} else {
+				variable_expression->flags = Ast::EXPRESSION_FLAG_PURE;
+			}
 		}
 	}
 	else if (terminal->token->kind == TOKEN_IDENTIFIER_FORMAL) {
@@ -316,23 +323,26 @@ static void ScanExpressionArray(Ast::Expression_Array* array, Ast::Scope* scope,
 
 	array->flags = (array->left->flags & array->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
-	if (GetTypeKind(array->left->type) != TYPE_POINTER)
-		Error(module, array, "Begin expression must be a pointer type, not: %\n", array->left->type);
+	TypeID left_type = RemoveReference(array->left->type);
+	TypeID right_type = RemoveReference(array->right->type);
 
-	if (GetTypeKind(array->right->type) == TYPE_POINTER) {
-		if (!CanCast(CAST_IMPLICIT, array->right->type, array->left->type))
-			Error(module, array->right, "Array begin and end types are incompatible: [%..%]\n", array->left->type, array->right->type);
+	if (GetTypeKind(left_type) != TYPE_POINTER)
+		Error(module, array, "Begin expression must be a pointer type, not: %\n", left_type);
 
-		array->right = ImplicitCast(array->right, array->left->type, module);
+	if (GetTypeKind(right_type) == TYPE_POINTER) {
+		if (!CanCast(CAST_IMPLICIT, right_type, left_type))
+			Error(module, array->right, "Array begin and end types are incompatible: [%..%]\n", left_type, right_type);
+
+		array->right = ImplicitCast(array->right, left_type, module);
 	}
-	else if (CanCast(CAST_IMPLICIT, array->right->type, TYPE_UINT64)) {
+	else if (CanCast(CAST_IMPLICIT, right_type, TYPE_UINT64)) {
 		array->right = ImplicitCast(array->right, TYPE_UINT64, module);
 	}
 	else {
-		Error(module, array->right, "Array end must be a % or an uint, not: %\n", array->left->type, array->right->type);
+		Error(module, array->right, "Array end must be a % or an uint, not: %\n", left_type, right_type);
 	}
 
-	array->type = GetArray(GetSubType(array->left->type));
+	array->type = GetArray(GetSubType(left_type));
 }
 
 static void ScanExpressionLiteral(Ast::Expression_Literal* literal, Ast::Scope* scope, Ast::Module* module) {
@@ -370,8 +380,8 @@ static void ScanExpressionLiteral(Ast::Expression_Literal* literal, Ast::Scope* 
 		case TOKEN_NULL:  literal->type = GetPointer(TYPE_BYTE); literal->value = IR::Constant(0); break;
 
 		case TOKEN_LITERAL_STRING: {
-			literal->flags |= Ast::EXPRESSION_FLAG_REFERENTIAL;
 			literal->type = GetFixedArray(TYPE_UINT8, literal->token->literal_string.length);
+			literal->type = GetReference(literal->type);  // String literals are lvalues
 		} break;
 
 		default: Assert(); Unreachable();
@@ -384,7 +394,6 @@ static void ScanExpressionTuple(Ast::Expression_Tuple* tuple, Ast::Scope* scope,
 	TypeID types[tuple->elements.length];
 
 	Ast::Expression_Flags element_flags =
-		Ast::EXPRESSION_FLAG_REFERENTIAL |
 		Ast::EXPRESSION_FLAG_PURE |
 		Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
@@ -393,10 +402,17 @@ static void ScanExpressionTuple(Ast::Expression_Tuple* tuple, Ast::Scope* scope,
 		Ast::EXPRESSION_FLAG_PURE |
 		Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
+	bool has_references = false;
+
 	for (u32 i = 0; i < tuple->elements.length; i++) {
 		Ast::Expression* element = tuple->elements[i];
 		ScanExpression(element, scope, module);
 		types[i] = element->type;
+
+		// Check if any element is a reference type
+		if (IsReference(element->type)) {
+			has_references = true;
+		}
 
 		if (element->kind == Ast::Expression::TUPLE) {
 			tuple->recursive_count += ((Ast::Expression_Tuple*)element)->recursive_count-1;
@@ -412,7 +428,7 @@ static void ScanExpressionTuple(Ast::Expression_Tuple* tuple, Ast::Scope* scope,
 
 	tuple->flags = element_flags & tuple_flags;
 
-	if (element_flags & Ast::EXPRESSION_FLAG_REFERENTIAL) {
+	if (has_references) {
 		tuple->flags |= (tuple_flags & Ast::EXPRESSION_FLAG_INTERNALLY_REFERENTIAL);
 	}
 
@@ -518,11 +534,18 @@ static void ScanExpressionSubscript(Ast::Expression_Subscript* subscript, Ast::S
 	ScanExpression(subscript->array, scope, module);
 	ScanExpression(subscript->index, scope, module);
 
-	bool fixed = GetTypeKind(subscript->array->type) == TYPE_FIXED_ARRAY;
+	TypeID array_type = subscript->array->type;
+	bool is_lvalue = IsReference(array_type);
 
-	if (GetTypeKind(subscript->array->type) != TYPE_FIXED_ARRAY &&
-		GetTypeKind(subscript->array->type) != TYPE_ARRAY &&
-		GetTypeKind(subscript->array->type) != TYPE_POINTER)
+	// Unwrap reference if present
+	if (is_lvalue)
+		array_type = GetSubType(array_type);
+
+	bool fixed = GetTypeKind(array_type) == TYPE_FIXED_ARRAY;
+
+	if (GetTypeKind(array_type) != TYPE_FIXED_ARRAY &&
+		GetTypeKind(array_type) != TYPE_ARRAY &&
+		GetTypeKind(array_type) != TYPE_POINTER)
 		Error(module, subscript->array, "Expression with type % is not a valid array.\n", subscript->array->type);
 
 	if (!CanCast(CAST_IMPLICIT, subscript->index->type, TYPE_INT64))
@@ -530,12 +553,16 @@ static void ScanExpressionSubscript(Ast::Expression_Subscript* subscript, Ast::S
 
 	subscript->index = ImplicitCast(subscript->index, TYPE_INT64, module);
 	subscript->flags = subscript->array->flags & subscript->index->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-	subscript->flags |= subscript->array->flags & Ast::EXPRESSION_FLAG_REFERENTIAL;
 
-	if (!fixed)
-		subscript->flags |= Ast::EXPRESSION_FLAG_REFERENTIAL;
+	TypeID element_type = GetSubType(array_type);
 
-	subscript->type = GetSubType(subscript->array->type);
+	if (!fixed || is_lvalue) {
+		// Subscripting an array or lvalue gives lvalue element
+		subscript->type = GetReference(element_type);
+	} else {
+		// Fixed array rvalue gives rvalue element
+		subscript->type = element_type;
+	}
 }
 
 static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::Module* module) {
@@ -552,10 +579,12 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 
 			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
-			if (!(unary->subexpression->flags & Ast::EXPRESSION_FLAG_REFERENTIAL))
-				Error(module, unary, "Cannot take address of a non-referential value.\n");
+			if (!IsReference(unary->subexpression->type))
+				Error(module, unary, "Cannot take address of non-lvalue (type: %).\n", unary->subexpression->type);
 
-			unary->type = GetPointer(unary->subexpression->type);
+			// Take address of ref T -> get *T (pointer to T)
+			TypeID subtype = GetSubType(unary->subexpression->type);
+			unary->type = GetPointer(subtype);
 		} break;
 
 		case Ast::Expression::UNARY_REFERENCE_OF: {
@@ -563,12 +592,14 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			ScanExpression(unary->subexpression, scope, module);
 
 			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-			unary->flags |= Ast::EXPRESSION_FLAG_REFERENTIAL;
 
-			if (GetTypeKind(unary->subexpression->type) != TYPE_POINTER)
-				Error(module, unary, "Cannot take reference of type: %\n", unary->subexpression->type);
+			TypeID ptr_type = RemoveReference(unary->subexpression->type);
 
-			unary->type = GetSubType(unary->subexpression->type);
+			if (GetTypeKind(ptr_type) != TYPE_POINTER)
+				Error(module, unary, "Cannot dereference non-pointer type: %\n", ptr_type);
+
+			TypeID subtype = GetSubType(ptr_type);
+			unary->type = GetReference(subtype);  // Dereferencing gives lvalue
 		} break;
 
 		case Ast::Expression::UNARY_BITWISE_NOT: {
@@ -657,14 +688,13 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 				Ast::Expression_Terminal* terminal = (Ast::Expression_Terminal*)binary->right;
 				String name = terminal->token->identifier_string;
 
-				while (GetTypeKind(type) == TYPE_POINTER) type = GetSubType(type);
+				// Unwrap references, then pointers
+				type = RemoveReference(type);
+				while (GetTypeKind(type) == TYPE_POINTER)
+					type = GetSubType(type);
 
 				if (GetTypeKind(type) == TYPE_STRUCT) {
-					binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_REFERENTIAL);
-
-					if (GetTypeKind(binary->left->type) == TYPE_POINTER) {
-						binary->flags |= Ast::EXPRESSION_FLAG_REFERENTIAL;
-					}
+					binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 					Ast::Struct* ast_struct = GetTypeInfo(type)->struct_info.ast;
 					Ast::Struct_Member* member = FindStructMember(ast_struct, terminal->token->identifier_string);
@@ -672,7 +702,19 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 					if (!member)
 						Error(module, binary, "Struct % does not have a member named %\n", ast_struct->name, terminal->token);
 
-					binary->type = member->type;
+					TypeID member_type = member->type;
+
+					if (GetTypeKind(binary->left->type) == TYPE_POINTER) {
+						// Pointer member access gives lvalue
+						binary->type = GetReference(member_type);
+					} else if (IsReference(binary->left->type)) {
+						// Reference member access gives lvalue member
+						binary->type = GetReference(member_type);
+					} else {
+						// Value member access - preserve type
+						binary->type = member_type;
+					}
+
 					terminal->kind = Ast::Expression::TERMINAL_STRUCT_MEMBER;
 					((Ast::Expression_Struct_Member*)terminal)->member = member;
 					terminal->type = member->type;
@@ -684,11 +726,13 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 						binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
 						binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
-						if (!fixed) {
-							binary->flags |= binary->left->flags & Ast::EXPRESSION_FLAG_REFERENTIAL;
+						if (fixed) {
+							// Fixed array .data/.begin gives lvalue to first element
+							binary->type = GetReference(GetSubType(binary->left->type));
+						} else {
+							// Dynamic array .data/.begin is a pointer (not ref)
+							binary->type = GetPointer(GetSubType(binary->left->type));
 						}
-
-						binary->type = GetPointer(GetSubType(binary->left->type));
 					}
 					else if (name == "end") {
 						binary->right->kind = Ast::Expression::TERMINAL_ARRAY_END;
@@ -698,12 +742,8 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 					else if (name == "length" || name == "count") {
 						binary->right->kind = Ast::Expression::TERMINAL_ARRAY_LENGTH;
 						binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-						if (!fixed) {
-							binary->flags |= binary->left->flags & Ast::EXPRESSION_FLAG_REFERENTIAL;
-						}
-
 						binary->type = TYPE_UINT64;
+						// Length is rvalue, not ref
 					}
 					else Error(module, binary->right, "'%' does not have a member named '%'.\n", type, name);
 				}
@@ -912,10 +952,12 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 			ternary->left   = ImplicitCast(ternary->left, dominant, module);
 			ternary->right  = ImplicitCast(ternary->right, dominant, module);
 
-			if (ternary->left->type == ternary->right->type)
-				ternary->flags |= ternary->left->flags & ternary->right->flags & Ast::EXPRESSION_FLAG_REFERENTIAL;
-
-			ternary->type = dominant;
+			// If both branches produce references of the same type, result is also a reference
+			if (ternary->left->type == ternary->right->type && IsReference(ternary->left->type)) {
+				ternary->type = ternary->left->type;  // Preserve reference type
+			} else {
+				ternary->type = dominant;
+			}
 		} break;
 
 		case Ast::Expression::CALL: ScanExpressionCall((Ast::Expression_Call*)expression, scope, module); break;
@@ -1135,7 +1177,7 @@ static void ScanScope(Ast::Scope* scope, Ast::Module* module) {
 }
 
 static bool IsAssignable(Ast::Expression* expression) {
-	return expression->flags & (Ast::EXPRESSION_FLAG_REFERENTIAL | Ast::EXPRESSION_FLAG_INTERNALLY_REFERENTIAL);
+	return IsReference(expression->type);
 }
 
 static bool DoesBranchAlwaysReturn(Ast::Branch* branch) {
@@ -1180,7 +1222,9 @@ static void ScanRangeFor(Ast::Module* module, Ast::Function* function, Ast::Code
 	if (!IsArray(branch->for_range.range->type) && !IsFixedArray(branch->for_range.range->type))
 		Error(module, branch->for_range.range, "For loop cannot range over type: %\n", branch->for_range.range->type);
 
-	branch->for_range.iterator->type = GetSubType(branch->for_range.range->type);
+	TypeID range_type = RemoveReference(branch->for_range.range->type);
+
+	branch->for_range.iterator->type = GetSubType(range_type);
 	branch->code.scope.variables.Add(branch->for_range.iterator);
 
 	if (branch->for_range.filter) {
@@ -1198,12 +1242,12 @@ static void ScanRangeFor(Ast::Module* module, Ast::Function* function, Ast::Code
 static void ScanVerboseFor(Ast::Module* module, Ast::Function* function, Ast::Code* code, Ast::Branch* branch) {
 	if (branch->for_verbose.variable->assignment) {
 		ScanExpression(branch->for_verbose.variable->assignment, &code->scope, module);
-		branch->for_verbose.variable->type = branch->for_verbose.variable->assignment->type;
+		// Variables store the value type, not the reference type
+		branch->for_verbose.variable->type = RemoveReference(branch->for_verbose.variable->assignment->type);
 	}
 
-	if (branch->for_verbose.variable->ast_type) {
+	if (branch->for_verbose.variable->ast_type)
 		branch->for_verbose.variable->type = GetType(branch->for_verbose.variable->ast_type, &code->scope, module);
-	}
 
 	if (branch->for_verbose.variable->ast_type && branch->for_verbose.variable->assignment) {
 		if (!CanCast(CAST_IMPLICIT, branch->for_verbose.variable->assignment->type, branch->for_verbose.variable->type))
@@ -1293,11 +1337,13 @@ static void ScanIncDec(Ast::Statement* statement, Ast::Code* code, Ast::Function
 
 	bool direction = statement->kind == Ast::STATEMENT_INCREMENT;
 
-	if (!IsInteger(inc->expression->type) && !IsFloat(inc->expression->type) && GetTypeKind(inc->expression->type) != TYPE_POINTER)
-		Error(module, inc->expression, "Cannot % type %, expression must be either an integer, float or pointer.\n", (direction ? "increment" : "decrement"), inc->expression->type);
+	if (!IsReference(inc->expression->type))
+		Error(module, inc->expression, "Cannot % non-lvalue (type: %).\n", (direction ? "increment" : "decrement"), inc->expression->type);
 
-	if (!(inc->expression->flags & Ast::EXPRESSION_FLAG_REFERENTIAL))
-		Error(module, inc->expression, "Expression is not a referential value.\n");
+	TypeID value_type = GetSubType(inc->expression->type);
+
+	if (!IsInteger(value_type) && !IsFloat(value_type) && GetTypeKind(value_type) != TYPE_POINTER)
+		Error(module, inc->expression, "Cannot % type %, expression must be either an integer, float or pointer.\n", (direction ? "increment" : "decrement"), value_type);
 }
 
 static void ScanReturn(Ast::Statement* statement, Ast::Code* code, Ast::Function* function, Ast::Module* module) {
@@ -1314,7 +1360,7 @@ static void ScanReturn(Ast::Statement* statement, Ast::Code* code, Ast::Function
 		if (!function->return_type)
 			Error(module, statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
 
-		if (!CanCast(CAST_IMPLICIT, function->return_type, statement->ret.expression->type))
+		if (!CanCast(CAST_IMPLICIT, statement->ret.expression->type, function->return_type))
 			Error(module, statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
 	}
 	else if (function->ast_return_type)
@@ -1343,7 +1389,8 @@ static void ScanVarDecl(Ast::Statement* statement, Ast::Code* code, Ast::Functio
 		if (!var->assignment->type)
 			Error(module, var->assignment, "Expression does not have a type.\n");
 
-		var->type = var->assignment->type;
+		// Variables store the value type, not the reference type
+		var->type = RemoveReference(var->assignment->type);
 	}
 
 	if (var->ast_type) {
@@ -1373,12 +1420,15 @@ static void ScanAssignment(Ast::Statement* statement, Ast::Code* code, Ast::Func
 	ScanExpression(assignment->left,  &code->scope, module);
 
 	if (!IsAssignable(assignment->left))
-		Error(module, assignment->left, "Expression is not assignable.\n");
+		Error(module, assignment->left, "Cannot assign to non-lvalue (type: %).\n", assignment->left->type);
 
-	if (!CanCast(CAST_IMPLICIT, assignment->right->type, assignment->left->type))
-		Error(module, assignment->token->location, "Cannot cast % to %.\n", assignment->right->type, assignment->left->type);
+	// Left side is ref T, we want to assign to T
+	TypeID target_type = GetSubType(assignment->left->type);
 
-	assignment->right = ImplicitCast(assignment->right, assignment->left->type, module);
+	if (!CanCast(CAST_COERCIVE, assignment->right->type, target_type))
+		Error(module, assignment->token->location, "Cannot cast % to %.\n", assignment->right->type, target_type);
+
+	assignment->right = ImplicitCast(assignment->right, target_type, module);
 }
 
 static void ScanBinAssignment(Ast::Statement* statement, Ast::Code* code, Ast::Function* function, Ast::Module* module) {
@@ -1387,13 +1437,15 @@ static void ScanBinAssignment(Ast::Statement* statement, Ast::Code* code, Ast::F
 	ScanExpression(assignment->right, &code->scope, module);
 	ScanExpression(assignment->left,  &code->scope, module);
 
-	if (!(assignment->left->flags & Ast::EXPRESSION_FLAG_REFERENTIAL))
-		Error(module, assignment->left, "Expression is not assignable.\n");
+	if (!IsAssignable(assignment->left))
+		Error(module, assignment->left, "Cannot assign to non-lvalue (type: %).\n", assignment->left->type);
 
-	if (!IsInteger(assignment->left->type) &&
-		!IsFloat(assignment->left->type) &&
-		GetTypeKind(assignment->left->type) != TYPE_POINTER)
-		Error(module, assignment->left, "Arithmetic assignment type must be to an integer, float or pointer, not: '%'\n", assignment->left->type);
+	TypeID target_type = GetSubType(assignment->left->type);
+
+	if (!IsInteger(target_type) &&
+		!IsFloat(target_type) &&
+		GetTypeKind(target_type) != TYPE_POINTER)
+		Error(module, assignment->left, "Arithmetic assignment type must be to an integer, float or pointer, not: '%'\n", target_type);
 
 	// ptr += int
 	// ptr -= int
@@ -1408,7 +1460,7 @@ static void ScanBinAssignment(Ast::Statement* statement, Ast::Code* code, Ast::F
 	// float *= float
 	// float /= float
 
-	if (IsPointer(assignment->left->type)) {
+	if (IsPointer(target_type)) {
 		if (statement->kind != Ast::STATEMENT_ASSIGNMENT_ADD && statement->kind != Ast::STATEMENT_ASSIGNMENT_SUBTRACT)
 			Error(module, assignment->left, "Arithmetic assignment to pointer only allows '+=' and '-='.\n");
 
@@ -1418,10 +1470,10 @@ static void ScanBinAssignment(Ast::Statement* statement, Ast::Code* code, Ast::F
 		assignment->right = ImplicitCast(assignment->right, TYPE_INT64, module);
 	}
 	else {
-		if (!CanCast(CAST_IMPLICIT, assignment->right->type, assignment->left->type))
-			Error(module, assignment->right, "Cannot implicitly cast '%' to '%'.\n", assignment->right->type, assignment->left->type);
+		if (!CanCast(CAST_IMPLICIT, assignment->right->type, target_type))
+			Error(module, assignment->right, "Cannot implicitly cast '%' to '%'.\n", assignment->right->type, target_type);
 
-		assignment->right = ImplicitCast(assignment->right, assignment->left->type, module);
+		assignment->right = ImplicitCast(assignment->right, target_type, module);
 	}
 }
 
@@ -1458,9 +1510,8 @@ static void ScanCode(Ast::Code* code, Ast::Scope* scope, Ast::Function* function
 
 static TypeID GetTypeFromParams(Array<Ast::Variable> params, Ast::Module* module) {
 	TypeID types[params.length];
-	for (u32 i = 0; i < params.length; i++) {
+	for (u32 i = 0; i < params.length; i++)
 		types[i] = params[i].type;
-	}
 
 	return GetTuple(types, params.length);
 }

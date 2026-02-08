@@ -275,6 +275,11 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 			buffer->Write(']');
 			Write(buffer, info->fixed_info.subtype);
 		} return;
+
+		case TYPE_REFERENCE: {
+			buffer->Write("(ref)");
+			Write(buffer, info->reference_info.subtype);
+		} return;
 	}
 }
 

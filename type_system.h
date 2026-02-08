@@ -21,6 +21,7 @@ enum TypeKind : u32 {
 	TYPE_ARRAY       = 7,
 
 	TYPE_FIXED_ARRAY = 8,
+	TYPE_REFERENCE   = 9,
 };
 
 static const u32 TYPE_BITCOUNT       = sizeof(u32)*8;
@@ -30,11 +31,12 @@ static const u32 TYPE_INDEX_BITCOUNT = TYPE_BITCOUNT - TYPE_KIND_BITCOUNT;
 static const u32 PRIMITIVE_COUNT = 12;
 static const u32 PRIMITIVE_BEGIN = 1;
 static const u32 PRIMITIVE_END   = PRIMITIVE_BEGIN + PRIMITIVE_COUNT;
-static const u32 TYPE_POINTER_TO_PRIMITIVE_OFFSET  = PRIMITIVE_COUNT*1;
-static const u32 TYPE_OPTIONAL_TO_PRIMITIVE_OFFSET = PRIMITIVE_COUNT*2;
-static const u32 TYPE_ARRAY_TO_PRIMITIVE_OFFSET    = PRIMITIVE_COUNT*3;
-static const u32 TYPE_EXTRA_OFFSET                 = PRIMITIVE_COUNT*4 + 1;
-static const u32 CORE_TYPES_COUNT                  = TYPE_EXTRA_OFFSET + 2 + 1;
+static const u32 TYPE_POINTER_TO_PRIMITIVE_OFFSET   = PRIMITIVE_COUNT*1;
+static const u32 TYPE_OPTIONAL_TO_PRIMITIVE_OFFSET  = PRIMITIVE_COUNT*2;
+static const u32 TYPE_ARRAY_TO_PRIMITIVE_OFFSET     = PRIMITIVE_COUNT*3;
+static const u32 TYPE_REFERENCE_TO_PRIMITIVE_OFFSET = PRIMITIVE_COUNT*4;
+static const u32 TYPE_EXTRA_OFFSET                  = PRIMITIVE_COUNT*5 + 1;
+static const u32 CORE_TYPES_COUNT                   = TYPE_EXTRA_OFFSET + 2 + 1;
 
 enum TypeID : u32 {
 
@@ -90,6 +92,19 @@ enum TypeID : u32 {
 	TYPE_ARRAY_FLOAT32    = (TYPE_ARRAY << TYPE_INDEX_BITCOUNT) | TYPE_ARRAY_TO_PRIMITIVE_OFFSET + TYPE_FLOAT32,
 	TYPE_ARRAY_FLOAT64    = (TYPE_ARRAY << TYPE_INDEX_BITCOUNT) | TYPE_ARRAY_TO_PRIMITIVE_OFFSET + TYPE_FLOAT64,
 
+	TYPE_REFERENCE_BYTE    = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_BYTE,
+	TYPE_REFERENCE_BOOL    = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_BOOL,
+	TYPE_REFERENCE_UINT8   = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_UINT8,
+	TYPE_REFERENCE_UINT16  = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_UINT16,
+	TYPE_REFERENCE_UINT32  = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_UINT32,
+	TYPE_REFERENCE_UINT64  = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_UINT64,
+	TYPE_REFERENCE_INT8    = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_INT8,
+	TYPE_REFERENCE_INT16   = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_INT16,
+	TYPE_REFERENCE_INT32   = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_INT32,
+	TYPE_REFERENCE_INT64   = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_INT64,
+	TYPE_REFERENCE_FLOAT32 = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_FLOAT32,
+	TYPE_REFERENCE_FLOAT64 = (TYPE_REFERENCE << TYPE_INDEX_BITCOUNT) | TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + TYPE_FLOAT64,
+
 	TYPE_BARE_FUNCTION    = (TYPE_FUNCTION << TYPE_INDEX_BITCOUNT) | TYPE_EXTRA_OFFSET + 0,
 	TYPE_EMPTY_TUPLE      = (TYPE_TUPLE    << TYPE_INDEX_BITCOUNT) | TYPE_EXTRA_OFFSET + 1,
 };
@@ -115,6 +130,10 @@ struct ArrayTypeInfo {
 struct FixedArrayTypeInfo {
 	TypeID subtype;
 	u64 length;
+};
+
+struct ReferenceTypeInfo {
+	TypeID subtype;
 };
 
 struct FunctionTypeInfo {
@@ -149,6 +168,7 @@ struct TypeInfo {
 	TypeID pointer;
 	TypeID optional;
 	TypeID array;
+	TypeID reference;
 	ExtensionTable extensions;
 	u64 size;
 
@@ -158,6 +178,7 @@ struct TypeInfo {
 		OptionalTypeInfo   optional_info;
 		ArrayTypeInfo      array_info;
 		FixedArrayTypeInfo fixed_info;
+		ReferenceTypeInfo  reference_info;
 		FunctionTypeInfo   function_info;
 		TupleTypeInfo      tuple_info;
 		EnumTypeInfo       enum_info;
@@ -196,8 +217,15 @@ static TypeID GetSubType(TypeID type) {
 		case TYPE_OPTIONAL:    return info->optional_info.subtype;
 		case TYPE_ARRAY:       return info->array_info.subtype;
 		case TYPE_FIXED_ARRAY: return info->fixed_info.subtype;
+		case TYPE_REFERENCE:   return info->reference_info.subtype;
 		default: return type;
 	}
+}
+
+static inline TypeID RemoveReference(TypeID type) {
+	if (GetTypeKind(type) == TYPE_REFERENCE)
+		return GetSubType(type);
+	return type;
 }
 
 static const u8 PRIMITIVE_SIZE_LUT[PRIMITIVE_COUNT+1] = {
@@ -226,6 +254,7 @@ static inline u64 GetTypeSize(TypeID type) {
 		case TYPE_OPTIONAL:    return GetTypeInfo(type)->size;
 		case TYPE_ARRAY:       return 16;
 		case TYPE_FIXED_ARRAY: return GetTypeInfo(type)->size;
+		case TYPE_REFERENCE:   return 8;
 		default: AssertUnreachable();
 	}
 }
@@ -238,6 +267,8 @@ enum CastKind : s32
 };
 
 static bool IsInteger(TypeID type) {
+	type = RemoveReference(type);
+
 	switch (type) {
 		case TYPE_UINT8:
 		case TYPE_UINT16:
@@ -255,6 +286,8 @@ static bool IsInteger(TypeID type) {
 }
 
 static bool IsSignedInteger(TypeID type) {
+	type = RemoveReference(type);
+
 	switch (type) {
 		case TYPE_INT8:
 		case TYPE_INT16:
@@ -268,6 +301,8 @@ static bool IsSignedInteger(TypeID type) {
 }
 
 static bool IsUnsignedInteger(TypeID type) {
+	type = RemoveReference(type);
+
 	switch (type) {
 		case TYPE_UINT8:
 		case TYPE_UINT16:
@@ -281,6 +316,8 @@ static bool IsUnsignedInteger(TypeID type) {
 }
 
 static bool IsFloat(TypeID type) {
+	type = RemoveReference(type);
+
 	switch (type) {
 		case TYPE_FLOAT32:
 		case TYPE_FLOAT64:
@@ -291,10 +328,25 @@ static bool IsFloat(TypeID type) {
 	}
 }
 
-static bool IsPointer(TypeID type)         { return GetTypeKind(type) == TYPE_POINTER; }
-static bool IsFunctionPointer(TypeID type) { return GetTypeKind(type) == TYPE_POINTER && GetTypeKind(GetSubType(type)) == TYPE_FUNCTION; }
-static bool IsArray(TypeID type)           { return GetTypeKind(type) == TYPE_ARRAY; }
-static bool IsFixedArray(TypeID type)      { return GetTypeKind(type) == TYPE_FIXED_ARRAY; }
+static bool IsPointer(TypeID type) {
+	type = RemoveReference(type);
+	return GetTypeKind(type) == TYPE_POINTER;
+}
+
+static bool IsFunctionPointer(TypeID type) {
+	type = RemoveReference(type);
+	return GetTypeKind(type) == TYPE_POINTER && GetTypeKind(GetSubType(type)) == TYPE_FUNCTION;
+}
+
+static bool IsArray(TypeID type) {
+	type = RemoveReference(type);
+	return GetTypeKind(type) == TYPE_ARRAY;
+}
+
+static bool IsFixedArray(TypeID type) {
+	type = RemoveReference(type);
+	return GetTypeKind(type) == TYPE_FIXED_ARRAY;
+}
 
 static TypeID GetFunctionInputType(TypeID  type) { return GetTypeInfo(type)->function_info.input; }
 static TypeID GetFunctionOutputType(TypeID type) { return GetTypeInfo(type)->function_info.output; }
@@ -333,7 +385,9 @@ static TypeID GetSubType(TypeID type);
 static TypeID GetPointer(TypeID subtype);
 static TypeID GetOptional(TypeID subtype);
 static TypeID GetArray(TypeID subtype);
+static TypeID GetReference(TypeID subtype);
 static TypeID GetTuple(Array<TypeID> types);
 static TypeID GetFixedArray(TypeID subtype, u64 length);
+static bool IsReference(TypeID type);
 static TypeID GetFunctionType(TypeID input, TypeID output);
 static TypeID GetDominantType(TypeID a, TypeID b);

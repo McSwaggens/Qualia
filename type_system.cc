@@ -3,17 +3,19 @@
 #include "general.h"
 #include "assert.h"
 
-static TypeID GetArithmeticBackingType(TypeID id) {
-	if (id == TYPE_BOOL)
+static TypeID GetArithmeticBackingType(TypeID type) {
+	type = RemoveReference(type);
+
+	if (type == TYPE_BOOL)
 		return TYPE_INT8;
 
-	TypeKind kind = GetTypeKind(id);
-	TypeInfo* info = GetTypeInfo(id);
+	TypeKind kind = GetTypeKind(type);
+	TypeInfo* info = GetTypeInfo(type);
 
 	if (kind == TYPE_ENUM)
 		return info->enum_info.backing_type;
 
-	return id;
+	return type;
 }
 
 static TypeID GetIntegerWithSign(TypeID type, bool sign) {
@@ -34,6 +36,14 @@ static TypeID GetIntegerWithSign(TypeID type, bool sign) {
 }
 
 static TypeID GetDominantType(TypeID a, TypeID b) {
+	if (a == b)
+		return a;
+
+	// Unwrap references and find dominant type of subtypes
+	a = RemoveReference(a);
+	b = RemoveReference(b);
+
+	// Check again after unwrapping - (ref)T and T should be compatible
 	if (a == b)
 		return a;
 
@@ -176,6 +186,13 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to) {
 
 			return false;
 		}
+
+		case TYPE_REFERENCE:
+		{
+			// References implicitly dereference to their subtype
+			TypeID subtype = GetSubType(from);
+			return CanCast(cast, subtype, to);
+		}
 	}
 
 	return false;
@@ -208,22 +225,27 @@ static void InitTypeSystem(void) {
 		info->pointer  = CreateTypeID(TYPE_POINTER,  TYPE_POINTER_TO_PRIMITIVE_OFFSET  + prim);
 		info->optional = CreateTypeID(TYPE_OPTIONAL, TYPE_OPTIONAL_TO_PRIMITIVE_OFFSET + prim);
 		info->array    = CreateTypeID(TYPE_ARRAY,    TYPE_ARRAY_TO_PRIMITIVE_OFFSET    + prim);
+		info->reference = CreateTypeID(TYPE_REFERENCE, TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + prim);
 
 		TypeInfo* pointer  = GetTypeInfo(info->pointer);
 		TypeInfo* optional = GetTypeInfo(info->optional);
 		TypeInfo* array    = GetTypeInfo(info->array);
+		TypeInfo* reference = GetTypeInfo(info->reference);
 
 		Zero(pointer);
 		Zero(optional);
 		Zero(array);
+		Zero(reference);
 
 		pointer->size  = 8;
 		optional->size = 1 + info->size;
 		array->size    = 16;
+		reference->size = 8;
 
 		pointer->pointer_info.subtype   = (TypeID)prim;
 		optional->optional_info.subtype = (TypeID)prim;
 		array->array_info.subtype       = (TypeID)prim;
+		reference->reference_info.subtype = (TypeID)prim;
 	}
 
 	*GetTypeInfo(TYPE_BARE_FUNCTION) = {
@@ -320,6 +342,30 @@ static TypeID GetArray(TypeID subtype) {
 	GetTypeInfo(subtype)->array = result;
 
 	return result;
+}
+
+static TypeID GetReference(TypeID subtype) {
+	Assert(subtype);
+
+	Assert(!IsReference(subtype));
+
+	TypeInfo* info = GetTypeInfo(subtype);
+
+	if (info->reference)
+		return info->reference;
+
+	TypeID result = CreateType(TYPE_REFERENCE, {
+		.size = 8,
+		.reference_info.subtype = subtype,
+	});
+
+	GetTypeInfo(subtype)->reference = result;
+
+	return result;
+}
+
+static bool IsReference(TypeID type) {
+	return GetTypeKind(type) == TYPE_REFERENCE;
 }
 
 static TypeID GetFixedArray(TypeID subtype, u64 length) {

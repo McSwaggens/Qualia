@@ -6,7 +6,7 @@ errors=""
 
 for f in tests/*.q; do
     printf "%-40s" "$f"
-    output=$(./qualia "$f" 2>&1 > /dev/null)
+    output=$(./qualia "$f" 2>&1)
     if [ $? -eq 0 ]; then
         echo "PASS"
         passed=$((passed + 1))

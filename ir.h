@@ -53,6 +53,7 @@ namespace IR {
 
 	static FixedBuffer<ValueData, 1l << 32> value_buffer;
 
+	// A value is the set of relations it has to other values.
 	struct Value {
 		u32 handle = 0;
 
@@ -62,23 +63,61 @@ namespace IR {
 		bool IsValid() { return handle != 0; }
 		constexpr operator bool() { return handle != 0; }
 		ValueData* operator ->() { return &value_buffer[handle]; }
+
+		bool operator ==(Value o) const { return handle == o.handle; }
+		bool operator !=(Value o) const { return handle != o.handle; }
+		bool operator <(Value o) const { return handle < o.handle; }
+		bool operator >(Value o) const { return handle > o.handle; }
 	};
 
 	struct Key {
 		RelationKind kind;
 		Value pivot;
 		Value to;
+
+		bool operator ==(Key o) const { return kind == o.kind && pivot == o.pivot && to == o.to; }
+		bool operator !=(Key o) const { return !(*this == o); }
+		bool operator <(Key o) const {
+			if (kind != o.kind) return kind < o.kind;
+			if (pivot != o.pivot) return pivot < o.pivot;
+			return to < o.to;
+		}
+		bool operator >(Key o) const { return o < *this; }
 	};
 
+	// Set of things that we know.
 	struct Context {
-		Set<Key> keys;
+		Context* parent;
+		Map<Key, Context*> children;
+
+		Set<Key> keys; // Things we know to be true.
+
+		explicit Context() = default;
+
+		Context(Context* parent, Key key) : parent(parent) {
+			keys = parent->keys.Copy();
+			Assert(keys.GetBinaryIndex(key) == keys.Count());
+			keys.elements.Add(key);
+		}
 	};
+
+	static Context empty_context = Context();
+
+	static Context* AddKey(Context* c, Key k) {
+		auto [inserted, child] = c->children.GetOrAdd(k);
+		if (inserted) {
+			Context* new_context = stack.Allocate<Context>();
+			*new_context = Context(c, k);
+			*child = new_context;
+		}
+		return *child;
+	}
 
 	struct Relation {
 		RelationKind kind;
 		Value value;
 		Value to;
-		Context context;
+		Context* context;
 	};
 
 	static Map<u64, Value> small_constants;
@@ -108,8 +147,7 @@ namespace IR {
 		if (data.length <= 8) {
 			union { u64 n; byte bytes[8]; } u = { 0 };
 			CopyMemory(u.bytes, data, data.length);
-			// @fixme
-			// return small_constants.TryGet(u.n).Or(Constant(u.n));
+			return small_constants.TryGet(u.n).Or(Constant(u.n));
 		}
 
 		Value new_value = NewValue();

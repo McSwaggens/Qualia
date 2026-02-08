@@ -12,6 +12,10 @@ struct Set {
 		QuickSort(elements.ToArray());
 	}
 
+	constexpr Set(const Set<T>& set) {
+		elements = set.elements.Copy();
+	}
+
 	constexpr       T* Begin()       { return elements.Begin(); }
 	constexpr const T* Begin() const { return elements.Begin(); }
 	constexpr       T* begin()       { return elements.Begin(); }
@@ -29,11 +33,11 @@ struct Set {
 	constexpr bool operator ==(Set<T> o) { return elements == o.elements; }
 	constexpr bool operator !=(Set<T> o) { return !(*this == o); }
 
-	constexpr T& Last()  { elements.Last();  }
-	constexpr T& First() { elements.First(); }
+	constexpr T& Last()  { return elements.Last();  }
+	constexpr T& First() { return elements.First(); }
 
 	u32 GetBinaryIndex(T item) {
-		return elements.End() - BinarySearch(elements.ToArray(), item);
+		return BinarySearch(elements.ToArray(), item) - elements.Begin();
 	}
 
 	u32 GetBinaryPtr(T item) {
@@ -42,11 +46,15 @@ struct Set {
 
 	void Add(T item) {
 		u32 index = GetBinaryIndex(item);
-
-		if (index == Count())
-			elements.Add(item);
-
+		if (index < Count() && elements[index] == item)
+			return;
 		elements.Insert(item, index);
+	}
+
+	Set<T> Copy(u32 extra_capacity = 0) {
+		Set<T> result;
+		result.elements = elements.Copy(extra_capacity);
+		return result;
 	}
 };
 

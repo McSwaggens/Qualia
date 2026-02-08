@@ -25,4 +25,22 @@ struct Optional {
 	}
 };
 
+template<typename T>
+struct Optional<T&> {
+	T* ptr;
+
+	constexpr Optional(OptNoneType) : ptr(null) { }
+	constexpr Optional(T& value) : ptr(&value) { }
+
+	constexpr operator bool() { return ptr != null; }
+
+	template<typename U>
+	constexpr auto Or(U alt) { return ptr ? *ptr : alt; }
+
+	T& Get() {
+		Assert(ptr);
+		return *ptr;
+	}
+};
+
 #endif // OPTIONAL_H

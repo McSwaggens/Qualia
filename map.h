@@ -96,9 +96,9 @@ struct Map {
 	Optional<Value&> TryGet(Key key) {
 		u32 index = GetKeyIndex(key);
 		if (keys[index] != key)
-			return values[index];
+			return OptNone;
 
-		return OptNone;
+		return values[index];
 	}
 
 	struct GetOrAddResult { bool was_inserted; Value* value; };

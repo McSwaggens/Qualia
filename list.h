@@ -152,12 +152,13 @@ struct List {
 		return Array<T>(data, count);
 	}
 
-	void Copy() {
-		return List<T>{
-			.capacity = capacity,
-			.count = count,
-			.data = CopyAllocate<T>(data, capacity)
-		};
+	List<T> Copy(u32 extra_capacity = 0) const {
+		List<T> result;
+		result.capacity = Max(capacity, extra_capacity);
+		result.count = count;
+		result.data = (T*)AllocMemory(result.capacity * sizeof(T));
+		CopyMemory((byte*)result.data, (byte*)data, count * sizeof(T));
+		return result;
 	}
 
 	void Free() {

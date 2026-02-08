@@ -19,7 +19,7 @@ ifeq ($(OS_NAME), Linux)
 endif
 
 FLAGS := $(DEBUG)
-FLAGS += -std=c++2c
+FLAGS += -std=c++23
 FLAGS += -mcmodel=medium -nostdinc++ -fno-rtti -fno-exceptions -Wno-vla-cxx-extension
 FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wshift-op-parentheses
 # FLAGS += -MJ compile_commands.json

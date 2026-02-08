@@ -8,10 +8,10 @@ for f in tests/*.q; do
     printf "%-40s" "$f"
     output=$(./qualia "$f" 2>&1)
     if [ $? -eq 0 ]; then
-        echo "PASS"
+        echo "✅ PASS"
         passed=$((passed + 1))
     else
-        echo "FAIL"
+        echo "❌ FAIL"
         echo "$output"
         echo "----------------------------------------"
         failed=$((failed + 1))
@@ -20,7 +20,11 @@ for f in tests/*.q; do
 done
 
 echo ""
-echo "Results: $passed passed, $failed failed"
+if [ $failed -eq 0 ]; then
+    echo "✨ Results: $passed ✅ passed, $failed ❌ failed"
+else
+    echo "Results: $passed ✅ passed, $failed ❌ failed"
+fi
 
 if [ $failed -ne 0 ]; then
     echo ""

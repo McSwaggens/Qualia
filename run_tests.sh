@@ -21,7 +21,7 @@ done
 
 echo ""
 if [ $failed -eq 0 ]; then
-    echo "✨ Results: $passed ✅ passed, $failed ❌ failed"
+    echo "Results: $passed ✅ passed, $failed ❌ failed 🎉"
 else
     echo "Results: $passed ✅ passed, $failed ❌ failed"
 fi

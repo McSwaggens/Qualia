@@ -21,11 +21,6 @@ hook global WinSetOption filetype=qualia %{
     }
 }
 
-hook global WinSetOption filetype=(?!qualia).* %{
-    remove-hooks window qualia-.*
-    remove-highlighter window/qualia
-}
-
 provide-module qualia %§
 
 # Highlighters

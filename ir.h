@@ -141,7 +141,12 @@ namespace IR {
 	}
 
 	static Value Constant(Array<byte> data) {
-		Assert(data.length);
+		if (data.length == 0) {
+			Value new_value = NewValue();
+			new_value->flags = VALUE_CONSTANT;
+			new_value->constant = Binary((u64)0, 0);
+			return new_value;
+		}
 
 		if (data.length <= 8) {
 			union { u64 n; byte bytes[8]; } u = { 0 };

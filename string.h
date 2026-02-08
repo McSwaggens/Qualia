@@ -1,7 +1,7 @@
 #pragma once
 
 #include "alloc.h"
-
+#include "array.h"
 #include "assert.h"
 
 struct String {
@@ -110,6 +110,10 @@ struct String {
 			return false;
 
 		return true;
+	}
+
+	constexpr Array<byte> ToArray() const {
+		return Array<byte>((byte*)data, length);
 	}
 
 	String Copy() {

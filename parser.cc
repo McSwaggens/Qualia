@@ -478,7 +478,7 @@ static IR::Value CreateValueFromLiteralToken(Token* token) {
 			return IR::Constant(0);
 
 		case TOKEN_LITERAL_STRING:
-			Assert();
+			return IR::Constant(token->literal_string.ToArray());
 
 		default:
 			Assert();

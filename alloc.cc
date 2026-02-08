@@ -168,8 +168,7 @@ static void* ReAllocMemory(void* p, u64 old_size, u64 new_size) {
 
 	void* result = global_allocator.Allocate(new_size);
 
-	if (old_size)
-	{
+	if (old_size) {
 		CopyMemory((byte*)result, (byte*)p, old_real_size);
 		FreeMemory(p, old_size);
 	}

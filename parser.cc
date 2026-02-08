@@ -517,11 +517,10 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 	}
 	else if (IsLiteral(token->kind)) {
 		Ast::Expression_Literal* literal = stack.Allocate<Ast::Expression_Literal>();
-		*literal = {
-			{ .kind = Ast::Expression::TERMINAL_LITERAL, .flags = Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE },
-			.token = token,
-			.value = CreateValueFromLiteralToken(token),
-		};
+		literal->kind = Ast::Expression::TERMINAL_LITERAL;
+		literal->flags = Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE;
+		literal->value = CreateValueFromLiteralToken(token);
+		literal->token = token;
 		token += 1;
 		left = literal;
 	}

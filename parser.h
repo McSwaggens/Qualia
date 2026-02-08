@@ -143,6 +143,7 @@ struct Expression {
 
 	Kind kind;
 	Expression_Flags flags;
+	IR::Value value;
 	TypeID type;
 	Token* begin;
 	Token* end;
@@ -202,14 +203,6 @@ struct Expression_As : Expression {
 
 struct Expression_Literal : Expression {
 	Token* token;
-	IR::Value value = 0;
-
-	union
-	{
-		s64     value_int;
-		float32 value_f32;
-		float64 value_f64;
-	};
 };
 
 struct Expression_Subscript : Expression {
@@ -498,14 +491,6 @@ struct Module {
 };
 
 } // namespace Ast
-
-struct StackFrame
-{
-	char* data;
-	Ast::Function* function;
-	bool do_return;
-	bool do_break;
-};
 
 struct Parser {
 	Ast::Module* module;

@@ -339,35 +339,35 @@ static void ScanExpressionLiteral(Ast::Expression_Literal* literal, Ast::Scope* 
 	literal->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
 	switch (literal->token->kind) {
-		case TOKEN_LITERAL_INT:    literal->type = TYPE_INT64;  literal->value_int = literal->token->literal_int; break;
-		case TOKEN_LITERAL_INT8:   literal->type = TYPE_INT8;   literal->value_int = literal->token->literal_int; break;
-		case TOKEN_LITERAL_INT16:  literal->type = TYPE_INT16;  literal->value_int = literal->token->literal_int; break;
-		case TOKEN_LITERAL_INT32:  literal->type = TYPE_INT32;  literal->value_int = literal->token->literal_int; break;
-		case TOKEN_LITERAL_INT64:  literal->type = TYPE_INT64;  literal->value_int = literal->token->literal_int; break;
-		case TOKEN_LITERAL_UINT:   literal->type = TYPE_UINT64; literal->value_int = literal->token->literal_int; break;
-		case TOKEN_LITERAL_UINT8:  literal->type = TYPE_UINT8;  literal->value_int = literal->token->literal_int; break;
-		case TOKEN_LITERAL_UINT16: literal->type = TYPE_UINT16; literal->value_int = literal->token->literal_int; break;
-		case TOKEN_LITERAL_UINT32: literal->type = TYPE_UINT32; literal->value_int = literal->token->literal_int; break;
-		case TOKEN_LITERAL_UINT64: literal->type = TYPE_UINT64; literal->value_int = literal->token->literal_int; break;
+		case TOKEN_LITERAL_INT:    literal->type = TYPE_INT64;  literal->value = IR::Constant(literal->token->literal_int); break;
+		case TOKEN_LITERAL_INT8:   literal->type = TYPE_INT8;   literal->value = IR::Constant(literal->token->literal_int); break;
+		case TOKEN_LITERAL_INT16:  literal->type = TYPE_INT16;  literal->value = IR::Constant(literal->token->literal_int); break;
+		case TOKEN_LITERAL_INT32:  literal->type = TYPE_INT32;  literal->value = IR::Constant(literal->token->literal_int); break;
+		case TOKEN_LITERAL_INT64:  literal->type = TYPE_INT64;  literal->value = IR::Constant(literal->token->literal_int); break;
+		case TOKEN_LITERAL_UINT:   literal->type = TYPE_UINT64; literal->value = IR::Constant(literal->token->literal_int); break;
+		case TOKEN_LITERAL_UINT8:  literal->type = TYPE_UINT8;  literal->value = IR::Constant(literal->token->literal_int); break;
+		case TOKEN_LITERAL_UINT16: literal->type = TYPE_UINT16; literal->value = IR::Constant(literal->token->literal_int); break;
+		case TOKEN_LITERAL_UINT32: literal->type = TYPE_UINT32; literal->value = IR::Constant(literal->token->literal_int); break;
+		case TOKEN_LITERAL_UINT64: literal->type = TYPE_UINT64; literal->value = IR::Constant(literal->token->literal_int); break;
 
 		case TOKEN_LITERAL_FLOAT: {
 			literal->type = TYPE_FLOAT32; // @Fixme?
-			literal->value_f32 = literal->token->literal_float;
+			literal->value = IR::Constant(literal->token->literal_float);
 		} break;
 
 		case TOKEN_LITERAL_FLOAT32: {
 			literal->type = TYPE_FLOAT32;
-			literal->value_f32 = literal->token->literal_float;
+			literal->value = IR::Constant(literal->token->literal_float);
 		} break;
 
 		case TOKEN_LITERAL_FLOAT64: {
 			literal->type = TYPE_FLOAT64;
-			literal->value_f64 = literal->token->literal_float;
+			literal->value = IR::Constant(literal->token->literal_float);
 		} break;
 
-		case TOKEN_TRUE:  literal->type = TYPE_BOOL; literal->value_int = 1; break;
-		case TOKEN_FALSE: literal->type = TYPE_BOOL; literal->value_int = 0; break;
-		case TOKEN_NULL:  literal->type = GetPointer(TYPE_BYTE); literal->value_int = 0; break;
+		case TOKEN_TRUE:  literal->type = TYPE_BOOL; literal->value = IR::Constant(1); break;
+		case TOKEN_FALSE: literal->type = TYPE_BOOL; literal->value = IR::Constant(0); break;
+		case TOKEN_NULL:  literal->type = GetPointer(TYPE_BYTE); literal->value = IR::Constant(0); break;
 
 		case TOKEN_LITERAL_STRING: {
 			literal->flags |= Ast::EXPRESSION_FLAG_REFERENTIAL;

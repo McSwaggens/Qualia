@@ -16,7 +16,6 @@ namespace IR {
 
 	struct Context;
 	struct Relation;
-	struct Key;
 	struct ValueData;
 
 	enum class RelationKind {
@@ -68,23 +67,23 @@ namespace IR {
 		bool operator >(Value o) const { return handle > o.handle; }
 	};
 
-	struct Key {
-		RelationKind kind;
-		Value pivot;
-		Value to;
-
-		bool operator ==(Key o) const { return kind == o.kind && pivot == o.pivot && to == o.to; }
-		bool operator !=(Key o) const { return !(*this == o); }
-		bool operator <(Key o) const {
-			if (kind != o.kind) return kind < o.kind;
-			if (pivot != o.pivot) return pivot < o.pivot;
-			return to < o.to;
-		}
-		bool operator >(Key o) const { return o < *this; }
-	};
-
 	// Set of things that we know.
 	struct Context {
+		struct Key {
+			RelationKind kind;
+			Value pivot;
+			Value to;
+
+			bool operator ==(Key o) const { return kind == o.kind && pivot == o.pivot && to == o.to; }
+			bool operator !=(Key o) const { return !(*this == o); }
+			bool operator <(Key o) const {
+				if (kind != o.kind) return kind < o.kind;
+				if (pivot != o.pivot) return pivot < o.pivot;
+				return to < o.to;
+			}
+			bool operator >(Key o) const { return o < *this; }
+		};
+
 		Context* parent;
 		Map<Key, Context*> children;
 
@@ -107,18 +106,16 @@ namespace IR {
 			}
 			return *child;
 		}
-
 	};
 
 	static Context empty_context = Context();
 
-	static Context* FindContext(Set<Key> keys) {
+	static Context* FindContext(Set<Context::Key> keys) {
 		Context* c = &empty_context;
 		for (auto& key : keys)
 			c = c->Get(key);
 		return c;
 	}
-
 
 	struct Relation {
 		RelationKind kind;

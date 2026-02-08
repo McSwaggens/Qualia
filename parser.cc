@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "error.h"
 #include "general.h"
+#include "ir.h"
 #include "token.h"
 #include "print.h"
 #include "alloc.h"
@@ -455,37 +456,6 @@ static bool CanTakeNextOp(Token* token, bool assignment_break, s32 parent_preced
 	AssertUnreachable();
 }
 
-static IR::Value CreateValueFromLiteralToken(Token* token) {
-	switch (token->kind) {
-		case TOKEN_LITERAL_INT:
-		case TOKEN_LITERAL_INT8:
-		case TOKEN_LITERAL_INT16:
-		case TOKEN_LITERAL_INT32:
-		case TOKEN_LITERAL_INT64:
-		case TOKEN_LITERAL_UINT:
-		case TOKEN_LITERAL_UINT8:
-		case TOKEN_LITERAL_UINT16:
-		case TOKEN_LITERAL_UINT32:
-		case TOKEN_LITERAL_UINT64:
-		case TOKEN_LITERAL_FLOAT:
-		case TOKEN_LITERAL_FLOAT32:
-		case TOKEN_LITERAL_FLOAT64:
-		case TOKEN_TRUE:
-		case TOKEN_FALSE:
-			return IR::Constant(token->literal_int);
-
-		case TOKEN_NULL:
-			return IR::Constant(0);
-
-		case TOKEN_LITERAL_STRING:
-			return IR::Constant(token->literal_string.ToArray());
-
-		default:
-			Assert();
-	}
-
-	Unreachable();
-}
 
 Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 parent_precedence) {
 	Ast::Expression* left = null;
@@ -495,7 +465,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 	if (IsUnaryOperator(token->kind)) {
 		Ast::Expression_Unary* unary = stack.Allocate<Ast::Expression_Unary>();
 		*unary = {
-			{},
+			{ .value = IR::NewValue() },
 			.op = token,
 		};
 
@@ -519,15 +489,55 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		Ast::Expression_Literal* literal = stack.Allocate<Ast::Expression_Literal>();
 		literal->kind = Ast::Expression::TERMINAL_LITERAL;
 		literal->flags = Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE;
-		literal->value = CreateValueFromLiteralToken(token);
 		literal->token = token;
+
+		switch (token->kind) {
+			case TOKEN_LITERAL_INT:    literal->type = TYPE_INT64;  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_INT8:   literal->type = TYPE_INT8;   literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_INT16:  literal->type = TYPE_INT16;  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_INT32:  literal->type = TYPE_INT32;  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_INT64:  literal->type = TYPE_INT64;  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT:   literal->type = TYPE_UINT64; literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT8:  literal->type = TYPE_UINT8;  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT16: literal->type = TYPE_UINT16; literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT32: literal->type = TYPE_UINT32; literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT64: literal->type = TYPE_UINT64; literal->value = IR::Constant(literal->token->literal_int); break;
+
+			case TOKEN_LITERAL_FLOAT: {
+				literal->type = TYPE_FLOAT32; // @Fixme?
+				literal->value = IR::Constant(literal->token->literal_float);
+			} break;
+
+			case TOKEN_LITERAL_FLOAT32: {
+				literal->type = TYPE_FLOAT32;
+				literal->value = IR::Constant(literal->token->literal_float);
+			} break;
+
+			case TOKEN_LITERAL_FLOAT64: {
+				literal->type = TYPE_FLOAT64;
+				literal->value = IR::Constant(literal->token->literal_float);
+			} break;
+
+			case TOKEN_TRUE:  literal->type = TYPE_BOOL; literal->value = IR::Constant(1); break;
+			case TOKEN_FALSE: literal->type = TYPE_BOOL; literal->value = IR::Constant(0); break;
+			case TOKEN_NULL:  literal->type = GetPointer(TYPE_BYTE); literal->value = IR::Constant(0); break;
+
+			case TOKEN_LITERAL_STRING: {
+				literal->type = GetFixedArray(TYPE_UINT8, literal->token->literal_string.length);
+				literal->type = GetReference(literal->type);  // String literals are lvalues
+				literal->value = IR::Constant(literal->token->literal_string.ToArray());
+			} break;
+
+			default: Assert(); Unreachable();
+		}
+
 		token += 1;
 		left = literal;
 	}
 	else if (IsIdentifier(token->kind)) {
 		Ast::Expression_Terminal* term = stack.Allocate<Ast::Expression_Terminal>();
 		*term = {
-			{ .kind = Ast::Expression::TERMINAL_NAME },
+			{ .kind = Ast::Expression::TERMINAL_NAME, .value = IR::NewValue(), },
 			.token = token,
 		};
 		token += 1;
@@ -538,7 +548,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 		Ast::Expression_Array* array = stack.Allocate<Ast::Expression_Array>();
 		*array = {
-			{ .kind = Ast::Expression::ARRAY },
+			{ .kind = Ast::Expression::ARRAY, .value = IR::NewValue(), },
 		};
 		token += 1;
 
@@ -571,7 +581,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 	else if (token->kind == TOKEN_OPEN_PAREN) {
 		Ast::Expression_Tuple* tuple = stack.Allocate<Ast::Expression_Tuple>();
 		*tuple = {
-			{ .kind = Ast::Expression::TUPLE },
+			{ .kind = Ast::Expression::TUPLE, .value = IR::NewValue(), },
 		};
 
 		Token* closure = token->closure;
@@ -604,7 +614,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 	else if (token->kind == TOKEN_OPEN_BRACE) {
 		Ast::Expression_Fixed_Array* fixed_array = stack.Allocate<Ast::Expression_Fixed_Array>();
 		*fixed_array = {
-			{ .kind = Ast::Expression::FIXED_ARRAY },
+			{ .kind = Ast::Expression::FIXED_ARRAY, .value = IR::NewValue(), },
 		};
 
 		Token* closure = token->closure;
@@ -650,7 +660,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		if (token->kind == TOKEN_IF) {
 			Ast::Expression_Ternary* if_else = stack.Allocate<Ast::Expression_Ternary>();
 			*if_else = {
-				{ .kind = Ast::Expression::IF_ELSE },
+				{ .kind = Ast::Expression::IF_ELSE, .value = IR::NewValue(), },
 				.left = left,
 				.ops = {token},
 			};
@@ -672,7 +682,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		else if (token->kind == TOKEN_AS) {
 			Ast::Expression_As* as = stack.Allocate<Ast::Expression_As>();
 			*as = {
-				{ .kind = Ast::Expression::AS },
+				{ .kind = Ast::Expression::AS, .value = IR::NewValue(), },
 				.expression = left,
 				.op = token,
 			};
@@ -687,7 +697,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		else if (token->kind == TOKEN_OPEN_PAREN) {
 			Ast::Expression_Call* call = stack.Allocate<Ast::Expression_Call>();
 			*call = {
-				{ .kind = Ast::Expression::CALL },
+				{ .kind = Ast::Expression::CALL, .value = IR::NewValue(), },
 				.function = left,
 			};
 
@@ -706,7 +716,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 			Ast::Expression_Subscript* subscript = stack.Allocate<Ast::Expression_Subscript>();
 			*subscript = {
-				{ .kind = Ast::Expression::SUBSCRIPT },
+				{ .kind = Ast::Expression::SUBSCRIPT, .value = IR::NewValue(), },
 				.array = left,
 			};
 
@@ -729,7 +739,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
 			Ast::Expression_Binary* binary = stack.Allocate<Ast::Expression_Binary>();
 			*binary = {
-				{},
+				{ .value = IR::NewValue() },
 				.left = left,
 			};
 

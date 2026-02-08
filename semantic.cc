@@ -226,6 +226,7 @@ static Ast::Expression* ImplicitCast(Ast::Expression* expression, TypeID type, A
 
 	Ast::Expression_Implicit_Cast* cast = Alloc<Ast::Expression_Implicit_Cast>(); // @fixme using general allocator and not the stack. Proper Ast stack is in the parser. Which we don't have access to here.
 	cast->kind = Ast::Expression::IMPLICIT_CAST;
+	cast->value = IR::NewValue();
 	cast->subexpression = expression;
 	cast->type  = type;
 	cast->flags = expression->flags & (Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE);
@@ -346,46 +347,6 @@ static void ScanExpressionArray(Ast::Expression_Array* array, Ast::Scope* scope,
 }
 
 static void ScanExpressionLiteral(Ast::Expression_Literal* literal, Ast::Scope* scope, Ast::Module* module) {
-	literal->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
-
-	switch (literal->token->kind) {
-		case TOKEN_LITERAL_INT:    literal->type = TYPE_INT64;  literal->value = IR::Constant(literal->token->literal_int); break;
-		case TOKEN_LITERAL_INT8:   literal->type = TYPE_INT8;   literal->value = IR::Constant(literal->token->literal_int); break;
-		case TOKEN_LITERAL_INT16:  literal->type = TYPE_INT16;  literal->value = IR::Constant(literal->token->literal_int); break;
-		case TOKEN_LITERAL_INT32:  literal->type = TYPE_INT32;  literal->value = IR::Constant(literal->token->literal_int); break;
-		case TOKEN_LITERAL_INT64:  literal->type = TYPE_INT64;  literal->value = IR::Constant(literal->token->literal_int); break;
-		case TOKEN_LITERAL_UINT:   literal->type = TYPE_UINT64; literal->value = IR::Constant(literal->token->literal_int); break;
-		case TOKEN_LITERAL_UINT8:  literal->type = TYPE_UINT8;  literal->value = IR::Constant(literal->token->literal_int); break;
-		case TOKEN_LITERAL_UINT16: literal->type = TYPE_UINT16; literal->value = IR::Constant(literal->token->literal_int); break;
-		case TOKEN_LITERAL_UINT32: literal->type = TYPE_UINT32; literal->value = IR::Constant(literal->token->literal_int); break;
-		case TOKEN_LITERAL_UINT64: literal->type = TYPE_UINT64; literal->value = IR::Constant(literal->token->literal_int); break;
-
-		case TOKEN_LITERAL_FLOAT: {
-			literal->type = TYPE_FLOAT32; // @Fixme?
-			literal->value = IR::Constant(literal->token->literal_float);
-		} break;
-
-		case TOKEN_LITERAL_FLOAT32: {
-			literal->type = TYPE_FLOAT32;
-			literal->value = IR::Constant(literal->token->literal_float);
-		} break;
-
-		case TOKEN_LITERAL_FLOAT64: {
-			literal->type = TYPE_FLOAT64;
-			literal->value = IR::Constant(literal->token->literal_float);
-		} break;
-
-		case TOKEN_TRUE:  literal->type = TYPE_BOOL; literal->value = IR::Constant(1); break;
-		case TOKEN_FALSE: literal->type = TYPE_BOOL; literal->value = IR::Constant(0); break;
-		case TOKEN_NULL:  literal->type = GetPointer(TYPE_BYTE); literal->value = IR::Constant(0); break;
-
-		case TOKEN_LITERAL_STRING: {
-			literal->type = GetFixedArray(TYPE_UINT8, literal->token->literal_string.length);
-			literal->type = GetReference(literal->type);  // String literals are lvalues
-		} break;
-
-		default: Assert(); Unreachable();
-	}
 }
 
 static void ScanExpressionTuple(Ast::Expression_Tuple* tuple, Ast::Scope* scope, Ast::Module* module) {

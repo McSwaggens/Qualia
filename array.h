@@ -22,18 +22,13 @@ struct Array {
 	constexpr operator       T*()       { return data; }
 	constexpr operator const T*() const { return data; }
 
-	constexpr T& operator[](u64 n)       { Assert(n < length); return data[n]; }
-	constexpr T  operator[](u64 n) const { Assert(n < length); return data[n]; }
+	constexpr auto& operator[](this auto& self, u64 n) { Assert(n < self.length); return self.data[n]; }
 
-	constexpr       T* Begin()       { return data; }
-	constexpr const T* Begin() const { return data; }
-	constexpr       T* begin()       { return data; }
-	constexpr const T* begin() const { return data; }
+	constexpr auto* Begin(this auto& self) { return self.data; }
+	constexpr auto* begin(this auto& self) { return self.data; }
 
-	constexpr       T* End()       { return data + length; }
-	constexpr const T* End() const { return data + length; }
-	constexpr       T* end()       { return data + length; }
-	constexpr const T* end() const { return data + length; }
+	constexpr auto* End(this auto& self) { return self.data + self.length; }
+	constexpr auto* end(this auto& self) { return self.data + self.length; }
 
 	constexpr bool operator ==(Array<T> o) {
 		if (length != o.length)

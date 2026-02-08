@@ -13,18 +13,13 @@ struct List {
 	constexpr List() = default;
 	constexpr List(Null) : data(null), count(0), capacity(0) { }
 
-	constexpr T& operator[](u32 n) { return data[n]; }
-	constexpr T  operator[](u32 n) const { return data[n]; }
+	constexpr auto& operator[](this auto& self, u32 n) { return self.data[n]; }
 
-	constexpr       T* Begin()       { return data; }
-	constexpr const T* Begin() const { return data; }
-	constexpr       T* begin()       { return data; }
-	constexpr const T* begin() const { return data; }
+	constexpr auto* Begin(this auto& self) { return self.data; }
+	constexpr auto* begin(this auto& self) { return self.data; }
 
-	constexpr       T* End()       { return data + count; }
-	constexpr const T* End() const { return data + count; }
-	constexpr       T* end()       { return data + count; }
-	constexpr const T* end() const { return data + count; }
+	constexpr auto* End(this auto& self) { return self.data + self.count; }
+	constexpr auto* end(this auto& self) { return self.data + self.count; }
 
 	constexpr bool operator ==(List<T> o) {
 		if (count != o.count)

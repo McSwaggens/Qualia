@@ -16,18 +16,13 @@ struct FixedArray {
 	template<typename U>
 	constexpr FixedArray(FixedArray<U, COUNT> o) : data(o.data) { }
 
-	constexpr T& operator[](u64 n)       { Assert(n < COUNT); return data[n]; }
-	constexpr T  operator[](u64 n) const { Assert(n < COUNT); return data[n]; }
+	constexpr auto& operator[](this auto& self, u64 n) { Assert(n < COUNT); return self.data[n]; }
 
-	constexpr       T* Begin()       { return data; }
-	constexpr const T* Begin() const { return data; }
-	constexpr       T* begin()       { return data; }
-	constexpr const T* begin() const { return data; }
+	constexpr auto* Begin(this auto& self) { return self.data; }
+	constexpr auto* begin(this auto& self) { return self.data; }
 
-	constexpr       T* End()       { return data + COUNT; }
-	constexpr const T* End() const { return data + COUNT; }
-	constexpr       T* end()       { return data + COUNT; }
-	constexpr const T* end() const { return data + COUNT; }
+	constexpr auto* End(this auto& self) { return self.data + COUNT; }
+	constexpr auto* end(this auto& self) { return self.data + COUNT; }
 
 	constexpr          Array<T> ToArray() { return { data, COUNT }; }
 	constexpr operator Array<T>() { return ToArray(); }

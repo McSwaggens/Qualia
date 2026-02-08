@@ -18,15 +18,11 @@ struct Set {
 		elements = set.elements.Copy();
 	}
 
-	constexpr       T* Begin()       { return elements.Begin(); }
-	constexpr const T* Begin() const { return elements.Begin(); }
-	constexpr       T* begin()       { return elements.Begin(); }
-	constexpr const T* begin() const { return elements.Begin(); }
+	constexpr auto* Begin(this auto& self) { return self.elements.Begin(); }
+	constexpr auto* begin(this auto& self) { return self.elements.Begin(); }
 
-	constexpr       T* End()       { return elements.End(); }
-	constexpr const T* End() const { return elements.End(); }
-	constexpr       T* end()       { return elements.End(); }
-	constexpr const T* end() const { return elements.End(); }
+	constexpr auto* End(this auto& self) { return self.elements.End(); }
+	constexpr auto* end(this auto& self) { return self.elements.End(); }
 
 	constexpr operator bool() { return elements; }
 	constexpr u32  Count()   { return elements.count; }

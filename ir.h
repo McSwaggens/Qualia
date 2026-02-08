@@ -14,7 +14,6 @@
 namespace IR {
 	static Stack stack;
 
-	struct Handle;
 	struct Context;
 	struct Relation;
 	struct Key;
@@ -98,19 +97,28 @@ namespace IR {
 			Assert(keys.GetBinaryIndex(key) == keys.Count());
 			keys.elements.Add(key);
 		}
+
+		Context* Get(Key key) {
+			auto [inserted, child] = children.GetOrAdd(key);
+			if (inserted) {
+				Context* new_context = stack.Allocate<Context>();
+				*new_context = Context(this, key);
+				*child = new_context;
+			}
+			return *child;
+		}
+
 	};
 
 	static Context empty_context = Context();
 
-	static Context* AddKey(Context* c, Key k) {
-		auto [inserted, child] = c->children.GetOrAdd(k);
-		if (inserted) {
-			Context* new_context = stack.Allocate<Context>();
-			*new_context = Context(c, k);
-			*child = new_context;
-		}
-		return *child;
+	static Context* FindContext(Set<Key> keys) {
+		Context* c = &empty_context;
+		for (auto& key : keys)
+			c = c->Get(key);
+		return c;
 	}
+
 
 	struct Relation {
 		RelationKind kind;
@@ -118,8 +126,6 @@ namespace IR {
 		Value to;
 		Context* context;
 	};
-
-	static Map<u64, Value> small_constants;
 
 	static void Init();
 
@@ -129,15 +135,14 @@ namespace IR {
 		if (n < 256)
 			return 1 + n;
 
-		auto[inserted, value] = small_constants.GetOrAdd(n);
+		Value new_value = NewValue();
+		new_value->constant = n;
+		return new_value;
+	}
 
-		if (inserted) {
-			Value new_value = NewValue();
-			new_value->constant = n;
-			*value = new_value;
-		}
-
-		return *value;
+	template <typename T>
+	static Value Constant(T value) {
+		return Constant(Array<byte>((byte*)&value, sizeof(T)));
 	}
 
 	static Value Constant(Array<byte> data) {
@@ -146,7 +151,7 @@ namespace IR {
 		if (data.length <= 8) {
 			union { u64 n; byte bytes[8]; } u = { 0 };
 			CopyMemory(u.bytes, data, data.length);
-			return small_constants.TryGet(u.n).Or(Constant(u.n));
+			return Constant(u.n);
 		}
 
 		Value new_value = NewValue();

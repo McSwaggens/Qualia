@@ -1,5 +1,4 @@
-#ifndef IR_H
-#define IR_H
+#pragma once
 
 #include "general.h"
 #include "stack.h"
@@ -159,5 +158,3 @@ namespace IR {
 };
 
 static void Write(struct OutputBuffer* buffer, IR::Value value);
-
-#endif // IR_H

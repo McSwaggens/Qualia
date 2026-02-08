@@ -1,5 +1,4 @@
-#ifndef FIXED_BUFFER_H
-#define FIXED_BUFFER_H
+#pragma once
 
 #include "general.h"
 #include "math.h"
@@ -52,5 +51,3 @@ struct FixedBuffer {
 		return buffer[n];
 	}
 };
-
-#endif // FIXED_BUFFER_H

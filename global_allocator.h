@@ -1,5 +1,4 @@
-#ifndef GLOBAL_ALLOCATOR_H
-#define GLOBAL_ALLOCATOR_H
+#pragma once
 
 #include "general.h"
 #include "assert.h"
@@ -159,5 +158,3 @@ struct GlobalAllocator {
 static void InitGlobalAllocator() {
 	global_allocator.Init();
 }
-
-#endif // GLOBAL_ALLOCATOR_H

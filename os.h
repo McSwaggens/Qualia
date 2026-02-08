@@ -1,5 +1,4 @@
-#ifndef OS_H
-#define OS_H
+#pragma once
 
 #include "general.h"
 
@@ -43,5 +42,3 @@ namespace OS {
 	void FutexWait(volatile s32* addr, s32 expected);
 	void FutexWake(volatile s32* addr);
 }
-
-#endif // OS_H

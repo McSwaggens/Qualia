@@ -1,5 +1,4 @@
-#ifndef GENERAL_H
-#define GENERAL_H
+#pragma once
 
 #include "int.h"
 
@@ -120,4 +119,3 @@ CFUNC s64 SystemCall(s64 rax, s64 rdi = 0, s64 rsi = 0, s64 rdx = 0, s64 r10 = 0
 
 static u64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc
 
-#endif // GENERAL_H

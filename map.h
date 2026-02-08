@@ -1,5 +1,4 @@
-#ifndef MAP_H
-#define MAP_H
+#pragma once
 
 #include "general.h"
 #include "list.h"
@@ -136,5 +135,3 @@ template<typename Key, typename Value>
 static inline void Free(Map<Key, Value> map) {
 	map.Free();
 }
-
-#endif // MAP_H

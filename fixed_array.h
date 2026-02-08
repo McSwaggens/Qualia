@@ -1,5 +1,4 @@
-#ifndef FIXED_ARRAY_H
-#define FIXED_ARRAY_H
+#pragma once
 
 #include "int.h"
 #include "array.h"
@@ -49,5 +48,3 @@ static constexpr int Compare(FixedArray<U, N> a, FixedArray<V, M> b) {
 	return Compare(a.ToArray(), b.ToArray());
 }
 
-
-#endif // FIXED_ARRAY_H

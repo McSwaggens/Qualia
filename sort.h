@@ -1,5 +1,4 @@
-#ifndef SORT_H
-#define SORT_H
+#pragma once
 
 #include "general.h"
 #include "array.h"
@@ -138,5 +137,3 @@ static T* BinarySearch(Array<T> array, T value) {
 
 	return middle;
 }
-
-#endif // SORT_H

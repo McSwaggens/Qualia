@@ -1,5 +1,4 @@
-#ifndef LEXER_H
-#define LEXER_H
+#pragma once
 
 #include "general.h"
 #include "list.h"
@@ -56,4 +55,3 @@ static Lexer CreateLexer(Ast::Module* module, String file_path) {
 	};
 }
 
-#endif // LEXER_H

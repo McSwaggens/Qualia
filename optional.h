@@ -1,5 +1,4 @@
-#ifndef OPTIONAL_H
-#define OPTIONAL_H
+#pragma once
 
 #include "assert.h"
 
@@ -42,5 +41,3 @@ struct Optional<T&> {
 		return *ptr;
 	}
 };
-
-#endif // OPTIONAL_H

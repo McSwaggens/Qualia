@@ -1,5 +1,4 @@
-#ifndef MEMORY_H
-#define MEMORY_H
+#pragma once
 
 #include "general.h"
 #include "array.h"
@@ -120,4 +119,3 @@ static inline void ZeroArray(Array<T> array) {
 	ZeroMemory(array.data, array.count);
 }
 
-#endif // MEMORY_H

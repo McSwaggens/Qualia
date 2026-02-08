@@ -1,5 +1,4 @@
-#ifndef PRINT_H
-#define PRINT_H
+#pragma once
 
 #include "general.h"
 #include "string.h"
@@ -92,4 +91,3 @@ static void Write(OutputBuffer* buffer, bool b) {
 	else   buffer->Write("false");
 }
 
-#endif // PRINT_H

@@ -1,5 +1,4 @@
-#ifndef BINARY_H
-#define BINARY_H
+#pragma once
 
 #include "int.h"
 #include "general.h"
@@ -294,5 +293,3 @@ namespace Integer {
 		return result;
 	}
 }
-
-#endif // BINARY_H

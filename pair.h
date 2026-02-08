@@ -1,5 +1,4 @@
-#ifndef PAIR_H
-#define PAIR_H
+#pragma once
 
 template<typename U, typename V>
 struct Pair {
@@ -17,4 +16,3 @@ struct Pair {
 	}
 };
 
-#endif // PAIR_H

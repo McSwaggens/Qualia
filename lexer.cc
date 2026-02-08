@@ -2,11 +2,14 @@
 
 #include "general.h"
 #include "parser.h"
-#include "alloc.h"
 #include "print.h"
 #include "ascii.h"
 #include "string.h"
 #include "token.h"
+
+static bool IsIdentifierMiddleCharacter(char c) {
+	return IsLowerCase(c) || IsUpperCase(c) || IsDecimal(c) || c == '_';
+}
 
 using LiteralQualifier = u64;
 
@@ -80,7 +83,7 @@ static LiteralQualifier ParseLiteralQualifier(char** begin) {
 		else if (CompareStringRaw(p, "8"))  { qualifier |= QUALIFIER_8;  p += 1; }
 	}
 
-	if ((qualifier & QUALIFIER_CERTAIN_MASK) == 0 && (IsHexLut(*p) || *p == '_' || *p == 'h'))
+	if (IsIdentifierMiddleCharacter(*p))
 		return 0;
 
 	*begin = p;
@@ -450,6 +453,9 @@ void Lexer::Parse() {
 			},
 		};
 
+		// Update lexer's location for error reporting
+		location = current_token->location;
+
 		if (newline) current_token->flags |= TOKEN_FLAG_NEWLINE;
 
 		if (did_skip_whitespace) {
@@ -565,7 +571,7 @@ void Lexer::Parse() {
 				u32 upper = 0;
 				u32 lower = 0;
 
-				for (; IsLowerCase(*cursor) || IsUpperCase(*cursor) || IsDecimal(*cursor) || *cursor == '_'; cursor++) {
+				for (; IsIdentifierMiddleCharacter(*cursor); cursor++) {
 					if (IsLowerCase(*cursor)) lower++;
 					if (IsUpperCase(*cursor)) upper++;
 

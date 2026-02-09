@@ -1,5 +1,6 @@
 #include "file_system.h"
 #include "int.h"
+#include "ir.h"
 #include "list.h"
 #include "sort.h"
 
@@ -24,6 +25,8 @@ static List<Ast::Module*> modules = null;
 #include "ir.cc"
 #include "binary.cc"
 #include "alloc.cc"
+
+#include "ast.cc"
 
 static void CompileFile(String file_path) {
 	if (!File::DoesExist(file_path)) {
@@ -50,6 +53,7 @@ static void CompileFile(String file_path) {
 
 	parser.ParseGlobalScope();
 	SemanticParse(module);
+	Ast::PrintAST(module);
 }
 
 int main(int argc, char** args) {
@@ -72,6 +76,8 @@ int main(int argc, char** args) {
 		Print("Compiling: %\n", file);
 		CompileFile(file);
 	}
+
+	IR::PrintState();
 
 	Print("Compiler finished.\n");
 

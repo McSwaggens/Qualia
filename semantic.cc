@@ -225,13 +225,8 @@ static Ast::Expression* ImplicitCast(Ast::Expression* expression, TypeID type, A
 		return expression;
 
 	Ast::Expression_Implicit_Cast* cast = Alloc<Ast::Expression_Implicit_Cast>(); // @fixme using general allocator and not the stack. Proper Ast stack is in the parser. Which we don't have access to here.
-	cast->kind = Ast::Expression::IMPLICIT_CAST;
-	cast->value = IR::NewValue();
-	cast->subexpression = expression;
-	cast->type  = type;
+	new (cast) Ast::Expression_Implicit_Cast(expression, type);
 	cast->flags = expression->flags & (Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE);
-	cast->begin = expression->begin;
-	cast->end   = expression->end;
 
 	return cast;
 }

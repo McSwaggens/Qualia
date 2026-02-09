@@ -139,17 +139,32 @@ struct Expression {
 
 struct Expression_Implicit_Cast : Expression {
 	Expression* subexpression;
+
+	Expression_Implicit_Cast(Expression* subexpr, TypeID target_type) :
+		Expression{IMPLICIT_CAST, 0, IR::NewValue(), target_type, subexpr->begin, subexpr->end},
+		subexpression(subexpr) { }
 };
 
 struct Expression_Unary : Expression {
 	Expression* subexpression;
 	Token* op;
+
+	Expression_Unary(Kind k, Token* op_token) :
+		Expression{k, 0, IR::NewValue(), TYPE_NULL, null, null},
+		subexpression(null),
+		op(op_token) { }
 };
 
 struct Expression_Binary : Expression {
 	Expression* left;
 	Expression* right;
 	Token* op;
+
+	Expression_Binary(Kind k, Token* op_token) :
+		Expression{k, 0, IR::NewValue(), TYPE_NULL, null, null},
+		left(null),
+		right(null),
+		op(op_token) { }
 };
 
 struct Expression_Ternary : Expression {
@@ -157,85 +172,172 @@ struct Expression_Ternary : Expression {
 	Expression* middle;
 	Expression* right;
 	Token* ops[2];
+
+	Expression_Ternary(Kind k, Token* op1, Token* op2) :
+		Expression{k, 0, IR::NewValue(), TYPE_NULL, null, null},
+		left(null),
+		middle(null),
+		right(null),
+		ops{op1, op2} { }
 };
 
 struct Expression_Call : Expression {
 	Expression* function;
 	Expression_Tuple* parameters;
+
+	Expression_Call() :
+		Expression{CALL, 0, IR::NewValue(), TYPE_NULL, null, null},
+		function(null),
+		parameters(null) { }
 };
 
 struct Expression_Dot_Call : Expression {
 	Expression_Binary* dot;
 	Expression_Tuple* parameters;
+
+	Expression_Dot_Call() :
+		Expression{DOT_CALL, 0, IR::NewValue(), TYPE_NULL, null, null},
+		dot(null),
+		parameters(null) { }
 };
 
 struct Expression_Array : Expression {
 	Expression* left;
 	Expression* right;
+
+	Expression_Array() :
+		Expression{ARRAY, 0, IR::NewValue(), TYPE_NULL, null, null},
+		left(null),
+		right(null) { }
 };
 
 struct Expression_Tuple : Expression {
 	Array<Expression*> elements;
 	u32 recursive_count;
+
+	Expression_Tuple() :
+		Expression{TUPLE, 0, IR::NewValue(), TYPE_NULL, null, null},
+		elements(),
+		recursive_count(0) { }
 };
 
 struct Expression_Fixed_Array : Expression {
 	Array<Expression*> elements;
+
+	Expression_Fixed_Array() :
+		Expression{FIXED_ARRAY, 0, IR::NewValue(), TYPE_NULL, null, null},
+		elements() { }
 };
 
 struct Expression_As : Expression {
 	Expression* expression;
 	Type ast_type;
 	Token* op;
+
+	Expression_As(Token* op_token) :
+		Expression{AS, 0, IR::NewValue(), TYPE_NULL, null, null},
+		expression(null),
+		ast_type{},
+		op(op_token) { }
 };
 
 struct Expression_Literal : Expression {
 	Token* token;
+
+	Expression_Literal(Token* tok) :
+		Expression{TERMINAL_LITERAL, EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | EXPRESSION_FLAG_PURE,
+		           IR::NewValue(), TYPE_NULL, null, null},
+		token(tok) { }
 };
 
 struct Expression_Subscript : Expression {
 	Expression* array;
 	Expression* index;
+
+	Expression_Subscript() :
+		Expression{SUBSCRIPT, 0, IR::NewValue(), TYPE_NULL, null, null},
+		array(null),
+		index(null) { }
 };
 
 struct Expression_Terminal : Expression {
 	Token* token;
 	void* ptr;
+
+	Expression_Terminal(Token* tok) :
+		Expression{TERMINAL_NAME, 0, IR::NewValue(), TYPE_NULL, null, null},
+		token(tok),
+		ptr(null) { }
 };
 
 struct Expression_Variable : Expression {
 	Token* token;
 	Variable* variable;
+
+	Expression_Variable(Token* tok, Variable* var) :
+		Expression{TERMINAL_VARIABLE, 0, IR::NewValue(), TYPE_NULL, null, null},
+		token(tok),
+		variable(var) { }
 };
 
 struct Expression_Function : Expression {
 	Token* token;
 	Function* function;
+
+	Expression_Function(Token* tok, Function* func) :
+		Expression{TERMINAL_FUNCTION, 0, IR::NewValue(), TYPE_NULL, null, null},
+		token(tok),
+		function(func) { }
 };
 
 struct Expression_Intrinsic : Expression {
 	Token* token;
 	IntrinsicID intrinsic;
+
+	Expression_Intrinsic(Token* tok, IntrinsicID intr) :
+		Expression{TERMINAL_INTRINSIC, 0, IR::NewValue(), TYPE_NULL, null, null},
+		token(tok),
+		intrinsic(intr) { }
 };
 
 struct Expression_Struct : Expression {
 	Token* token;
 	Struct* structure;
+
+	Expression_Struct(Token* tok, Struct* struc) :
+		Expression{TERMINAL_STRUCT, 0, IR::NewValue(), TYPE_NULL, null, null},
+		token(tok),
+		structure(struc) { }
 };
 
 struct Expression_Enum : Expression {
 	Token* token;
 	Enum* enumeration;
+
+	Expression_Enum(Token* tok, Enum* enu) :
+		Expression{TERMINAL_ENUM, 0, IR::NewValue(), TYPE_NULL, null, null},
+		token(tok),
+		enumeration(enu) { }
 };
 
 struct Expression_Struct_Member : Expression {
 	Token* token;
 	Struct_Member* member;
+
+	Expression_Struct_Member(Token* tok, Struct_Member* mem) :
+		Expression{TERMINAL_STRUCT_MEMBER, 0, IR::NewValue(), TYPE_NULL, null, null},
+		token(tok),
+		member(mem) { }
 };
 
 struct Expression_Enum_Member : Expression {
 	Token* token;
 	Enum_Member* member;
+
+	Expression_Enum_Member(Token* tok, Enum_Member* mem) :
+		Expression{TERMINAL_ENUM_MEMBER, 0, IR::NewValue(), TYPE_NULL, null, null},
+		token(tok),
+		member(mem) { }
 };
 
 struct Scope {
@@ -476,5 +578,7 @@ struct Module {
 	Array<Module*> users;
 	Array<Import> imports;
 };
+
+void PrintAST(Module* module);
 
 } // namespace Ast

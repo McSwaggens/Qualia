@@ -30,6 +30,12 @@ struct Stack {
 		return (T*)AllocateMemory(sizeof(T));
 	}
 
+	template<typename T, typename... Args>
+	T* New(Args&&... args) {
+		T* ptr = (T*)AllocateMemory(sizeof(T));
+		return new (ptr) T(static_cast<Args&&>(args)...);
+	}
+
 	template<typename T>
 	Array<T> AllocateArray(u64 count) {
 		if (!count)

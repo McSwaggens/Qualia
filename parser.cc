@@ -463,33 +463,26 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 	Token* begin = token;
 
 	if (IsUnaryOperator(token->kind)) {
-		Ast::Expression_Unary* unary = stack.Allocate<Ast::Expression_Unary>();
-		*unary = {
-			{ .value = IR::NewValue() },
-			.op = token,
-		};
-
+		Ast::Expression::Kind kind;
 		switch (token->kind) {
-			case TOKEN_ASTERISK:         unary->kind = Ast::Expression::UNARY_REFERENCE_OF; break;
-			case TOKEN_AMPERSAND:        unary->kind = Ast::Expression::UNARY_ADDRESS_OF;   break;
-			case TOKEN_TILDE:            unary->kind = Ast::Expression::UNARY_BITWISE_NOT;  break;
-			case TOKEN_NOT:              unary->kind = Ast::Expression::UNARY_NOT;          break;
-			case TOKEN_MINUS:            unary->kind = Ast::Expression::UNARY_MINUS;        break;
-			case TOKEN_PLUS:             unary->kind = Ast::Expression::UNARY_PLUS;         break;
-			case TOKEN_EXCLAMATION_MARK: unary->kind = Ast::Expression::UNARY_NOT;          break;
+			case TOKEN_ASTERISK:         kind = Ast::Expression::UNARY_REFERENCE_OF; break;
+			case TOKEN_AMPERSAND:        kind = Ast::Expression::UNARY_ADDRESS_OF;   break;
+			case TOKEN_TILDE:            kind = Ast::Expression::UNARY_BITWISE_NOT;  break;
+			case TOKEN_NOT:              kind = Ast::Expression::UNARY_NOT;          break;
+			case TOKEN_MINUS:            kind = Ast::Expression::UNARY_MINUS;        break;
+			case TOKEN_PLUS:             kind = Ast::Expression::UNARY_PLUS;         break;
+			case TOKEN_EXCLAMATION_MARK: kind = Ast::Expression::UNARY_NOT;          break;
 			default: Assert();
 		}
 
+		Ast::Expression_Unary* unary = stack.New<Ast::Expression_Unary>(kind, token);
 		token += 1;
 		CheckScope(token, indent, module);
 		unary->subexpression = ParseExpression(indent, assignment_break, GetUnaryPrecedence(unary->op->kind, unary->op->IsRightTight()));
 		left = unary;
 	}
 	else if (IsLiteral(token->kind)) {
-		Ast::Expression_Literal* literal = stack.Allocate<Ast::Expression_Literal>();
-		literal->kind = Ast::Expression::TERMINAL_LITERAL;
-		literal->flags = Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE;
-		literal->token = token;
+		Ast::Expression_Literal* literal = stack.New<Ast::Expression_Literal>(token);
 
 		switch (token->kind) {
 			case TOKEN_LITERAL_INT:    literal->type = TYPE_INT64;  literal->value = IR::Constant(literal->token->literal_int); break;
@@ -531,21 +524,14 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		left = literal;
 	}
 	else if (IsIdentifier(token->kind)) {
-		Ast::Expression_Terminal* term = stack.Allocate<Ast::Expression_Terminal>();
-		*term = {
-			{ .kind = Ast::Expression::TERMINAL_NAME, .value = IR::NewValue(), },
-			.token = token,
-		};
+		Ast::Expression_Terminal* term = stack.New<Ast::Expression_Terminal>(token);
 		token += 1;
 		left = term;
 	}
 	else if (token->kind == TOKEN_OPEN_BRACKET) {
 		Token* closure = token->closure;
 
-		Ast::Expression_Array* array = stack.Allocate<Ast::Expression_Array>();
-		*array = {
-			{ .kind = Ast::Expression::ARRAY, .value = IR::NewValue(), },
-		};
+		Ast::Expression_Array* array = stack.New<Ast::Expression_Array>();
 		token += 1;
 
 		if (!IsExpressionStarter(token->kind))
@@ -575,10 +561,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		left = array;
 	}
 	else if (token->kind == TOKEN_OPEN_PAREN) {
-		Ast::Expression_Tuple* tuple = stack.Allocate<Ast::Expression_Tuple>();
-		*tuple = {
-			{ .kind = Ast::Expression::TUPLE, .value = IR::NewValue(), },
-		};
+		Ast::Expression_Tuple* tuple = stack.New<Ast::Expression_Tuple>();
 
 		Token* closure = token->closure;
 
@@ -608,10 +591,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		left = tuple;
 	}
 	else if (token->kind == TOKEN_OPEN_BRACE) {
-		Ast::Expression_Fixed_Array* fixed_array = stack.Allocate<Ast::Expression_Fixed_Array>();
-		*fixed_array = {
-			{ .kind = Ast::Expression::FIXED_ARRAY, .value = IR::NewValue(), },
-		};
+		Ast::Expression_Fixed_Array* fixed_array = stack.New<Ast::Expression_Fixed_Array>();
 
 		Token* closure = token->closure;
 		ArrayBuffer<Ast::Expression*> elements = CreateArrayBuffer<Ast::Expression*>();
@@ -654,34 +634,32 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 	while (CanTakeNextOp(token, assignment_break, parent_precedence) && IsCorrectScope(token, indent)) {
 		// @Indent does unary operators need to be treated differently? (Error check)
 		if (token->kind == TOKEN_IF) {
-			Ast::Expression_Ternary* if_else = stack.Allocate<Ast::Expression_Ternary>();
-			*if_else = {
-				{ .kind = Ast::Expression::IF_ELSE, .value = IR::NewValue(), },
-				.left = left,
-				.ops = {token},
-			};
+			Token* if_token = token;
 			token += 1;
 			CheckScope(token, indent, module);
-			if_else->middle = ParseExpression(indent, false);
+
+			Ast::Expression* middle = ParseExpression(indent, false);
 
 			if (token->kind != TOKEN_ELSE)
 				Error("Invalid 'if' expression, missing 'else' clause. Unexpected: '%'\n", token);
 
-			if_else->ops[1] = token;
+			Token* else_token = token;
 			CheckScope(token, indent, module);
 			token += 1;
 
 			CheckScope(token, indent, module);
-			if_else->right = ParseExpression(indent, assignment_break, GetTernaryPrecedence(TOKEN_IF));
+			Ast::Expression* right = ParseExpression(indent, assignment_break, GetTernaryPrecedence(TOKEN_IF));
+
+			Ast::Expression_Ternary* if_else = stack.New<Ast::Expression_Ternary>(
+				Ast::Expression::IF_ELSE, if_token, else_token);
+			if_else->left = left;
+			if_else->middle = middle;
+			if_else->right = right;
 			left = if_else;
 		}
 		else if (token->kind == TOKEN_AS) {
-			Ast::Expression_As* as = stack.Allocate<Ast::Expression_As>();
-			*as = {
-				{ .kind = Ast::Expression::AS, .value = IR::NewValue(), },
-				.expression = left,
-				.op = token,
-			};
+			Ast::Expression_As* as = stack.New<Ast::Expression_As>(token);
+			as->expression = left;
 
 			CheckScope(token, indent, module);
 			token++;
@@ -691,11 +669,8 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			left = as;
 		}
 		else if (token->kind == TOKEN_OPEN_PAREN) {
-			Ast::Expression_Call* call = stack.Allocate<Ast::Expression_Call>();
-			*call = {
-				{ .kind = Ast::Expression::CALL, .value = IR::NewValue(), },
-				.function = left,
-			};
+			Ast::Expression_Call* call = stack.New<Ast::Expression_Call>();
+			call->function = left;
 
 			Token* open = token;
 			Token* closure = open->closure;
@@ -710,11 +685,8 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			Token* open = token++;
 			Token* closure = open->closure;
 
-			Ast::Expression_Subscript* subscript = stack.Allocate<Ast::Expression_Subscript>();
-			*subscript = {
-				{ .kind = Ast::Expression::SUBSCRIPT, .value = IR::NewValue(), },
-				.array = left,
-			};
+			Ast::Expression_Subscript* subscript = stack.New<Ast::Expression_Subscript>();
+			subscript->array = left;
 
 			if (token != closure) {
 				CheckScope(token, indent+1, module);
@@ -733,38 +705,34 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		else
 		{
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
-			Ast::Expression_Binary* binary = stack.Allocate<Ast::Expression_Binary>();
-			*binary = {
-				{ .value = IR::NewValue() },
-				.left = left,
-			};
-
+			Ast::Expression::Kind kind;
 			switch (token->kind) {
-				case TOKEN_EQUAL:            binary->kind = Ast::Expression::BINARY_COMPARE_EQUAL;            break;
-				case TOKEN_NOT_EQUAL:        binary->kind = Ast::Expression::BINARY_COMPARE_NOT_EQUAL;        break;
-				case TOKEN_LESS:             binary->kind = Ast::Expression::BINARY_COMPARE_LESS;             break;
-				case TOKEN_LESS_OR_EQUAL:    binary->kind = Ast::Expression::BINARY_COMPARE_LESS_OR_EQUAL;    break;
-				case TOKEN_GREATER:          binary->kind = Ast::Expression::BINARY_COMPARE_GREATER;          break;
-				case TOKEN_GREATER_OR_EQUAL: binary->kind = Ast::Expression::BINARY_COMPARE_GREATER_OR_EQUAL; break;
-				case TOKEN_AND:              binary->kind = Ast::Expression::BINARY_AND;                      break;
-				case TOKEN_OR:               binary->kind = Ast::Expression::BINARY_OR;                       break;
-				case TOKEN_DOT:              binary->kind = Ast::Expression::BINARY_DOT;                      break;
-				// case TOKEN_DOT_DOT:          binary->kind = Ast::Expression::BINARY_RANGE;                    break;
-				case TOKEN_PLUS:             binary->kind = Ast::Expression::BINARY_ADD;                      break;
-				case TOKEN_MINUS:            binary->kind = Ast::Expression::BINARY_SUBTRACT;                 break;
-				case TOKEN_ASTERISK:         binary->kind = Ast::Expression::BINARY_MULTIPLY;                 break;
-				case TOKEN_DIVIDE:           binary->kind = Ast::Expression::BINARY_DIVIDE;                   break;
-				case TOKEN_MOD:              binary->kind = Ast::Expression::BINARY_MODULO;                   break;
-				case TOKEN_CARET:            binary->kind = Ast::Expression::BINARY_BITWISE_XOR;              break;
-				case TOKEN_BAR:              binary->kind = Ast::Expression::BINARY_BITWISE_OR;               break;
-				case TOKEN_AMPERSAND:        binary->kind = Ast::Expression::BINARY_BITWISE_AND;              break;
-				case TOKEN_LEFT_SHIFT:       binary->kind = Ast::Expression::BINARY_LEFT_SHIFT;               break;
-				case TOKEN_RIGHT_SHIFT:      binary->kind = Ast::Expression::BINARY_RIGHT_SHIFT;              break;
+				case TOKEN_EQUAL:            kind = Ast::Expression::BINARY_COMPARE_EQUAL;            break;
+				case TOKEN_NOT_EQUAL:        kind = Ast::Expression::BINARY_COMPARE_NOT_EQUAL;        break;
+				case TOKEN_LESS:             kind = Ast::Expression::BINARY_COMPARE_LESS;             break;
+				case TOKEN_LESS_OR_EQUAL:    kind = Ast::Expression::BINARY_COMPARE_LESS_OR_EQUAL;    break;
+				case TOKEN_GREATER:          kind = Ast::Expression::BINARY_COMPARE_GREATER;          break;
+				case TOKEN_GREATER_OR_EQUAL: kind = Ast::Expression::BINARY_COMPARE_GREATER_OR_EQUAL; break;
+				case TOKEN_AND:              kind = Ast::Expression::BINARY_AND;                      break;
+				case TOKEN_OR:               kind = Ast::Expression::BINARY_OR;                       break;
+				case TOKEN_DOT:              kind = Ast::Expression::BINARY_DOT;                      break;
+				// case TOKEN_DOT_DOT:          kind = Ast::Expression::BINARY_RANGE;                    break;
+				case TOKEN_PLUS:             kind = Ast::Expression::BINARY_ADD;                      break;
+				case TOKEN_MINUS:            kind = Ast::Expression::BINARY_SUBTRACT;                 break;
+				case TOKEN_ASTERISK:         kind = Ast::Expression::BINARY_MULTIPLY;                 break;
+				case TOKEN_DIVIDE:           kind = Ast::Expression::BINARY_DIVIDE;                   break;
+				case TOKEN_MOD:              kind = Ast::Expression::BINARY_MODULO;                   break;
+				case TOKEN_CARET:            kind = Ast::Expression::BINARY_BITWISE_XOR;              break;
+				case TOKEN_BAR:              kind = Ast::Expression::BINARY_BITWISE_OR;               break;
+				case TOKEN_AMPERSAND:        kind = Ast::Expression::BINARY_BITWISE_AND;              break;
+				case TOKEN_LEFT_SHIFT:       kind = Ast::Expression::BINARY_LEFT_SHIFT;               break;
+				case TOKEN_RIGHT_SHIFT:      kind = Ast::Expression::BINARY_RIGHT_SHIFT;              break;
 				default: Assert(); Unreachable();
 			}
 
-			binary->op = token++;
-			binary->left  = left;
+			Ast::Expression_Binary* binary = stack.New<Ast::Expression_Binary>(kind, token);
+			binary->left = left;
+			token++;
 			CheckScope(token, indent, module);
 			binary->right = ParseExpression(indent, assignment_break, GetBinaryPrecedence(binary->op->kind, binary->op->IsLeftTight() || binary->op->IsRightTight()));
 			left = binary;

@@ -45,6 +45,8 @@ typedef unsigned int       u32;
 typedef unsigned long long u64;
 typedef unsigned __int128  u128;
 
+typedef unsigned long size_t;
+
 static_assert(sizeof(u8 )  ==  1);
 static_assert(sizeof(u16)  ==  2);
 static_assert(sizeof(u32)  ==  4);

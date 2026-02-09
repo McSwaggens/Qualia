@@ -50,7 +50,7 @@ static constexpr inline void Swap(T& a, T& b) {
 static constexpr u64 MaskLowerBits64(u64 n, u64 bits)   { return n & (-1 >> (sizeof(n) * 8 - bits)); }
 
 // Placement new operator (language feature, not stdlib)
-inline void* operator new(size_t, void* p) { return p; }
+inline void* operator new(unsigned long, void* p) { return p; }
 static constexpr u64 MaskUpperBits64(u64 n, u64 bits)   { return n >> (sizeof(n) * 8 - bits); }
 
 static constexpr bool CheckedAdd(u64 a, u64 b, u64* result)      { return __builtin_uaddll_overflow(a, b, result); }

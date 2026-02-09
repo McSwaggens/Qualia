@@ -226,7 +226,39 @@ namespace IR {
 		}
 
 		void Greater(Value a, Value b) {
-			a->relations.Add({ .context = this, .kind = RelationKind::Greater, .to = b, });
+			if (a == b)
+				return; // Can't be greater than itself
+
+			if (!a->relations.Add({ .context = this, .kind = RelationKind::Greater, .to = b, }))
+				return; // Already exists
+
+			// if a > b then a != b
+			NotEqual(a, b);
+
+			// if a > b && b > c then a > c
+			// if a > b && b >= c then a > c
+			// if a > b && b == y then a > y
+			u32 count_b = b->relations.Count();
+			for (u32 i = 0; i < count_b; i++) {
+				Relation& r = b->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if      (r.kind == RelationKind::Greater)         Greater(a, r.to);
+				else if (r.kind == RelationKind::GreaterOrEqual)  Greater(a, r.to);
+				else if (r.kind == RelationKind::Equal)           Greater(a, r.to);
+			}
+
+			// if x == a && a > b then x > b
+			// if c > a && a > b then c > b
+			// if c >= a && a > b then c > b
+			u32 count_a = a->relations.Count();
+			for (u32 i = 0; i < count_a; i++) {
+				Relation& r = a->relations.elements[i];
+				if (r.to == b) continue;
+				if (!CanSee(r)) continue;
+				if      (r.kind == RelationKind::Equal)        Greater(r.to, b);
+				else if (r.kind == RelationKind::Less)         Greater(r.to, b);
+				else if (r.kind == RelationKind::LessOrEqual)  Greater(r.to, b);
+			}
 		}
 
 		void GreaterOrEqual(Value a, Value b) {

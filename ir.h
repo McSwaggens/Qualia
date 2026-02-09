@@ -25,6 +25,8 @@
 #include "binary.h"
 #include "map.h"
 
+namespace Ast { struct Expression; };
+
 namespace IR {
 	static Stack stack;
 
@@ -67,14 +69,16 @@ namespace IR {
 		constexpr Value() = default;
 		constexpr Value(u32 index) : handle(index) { }
 
+		ValueData& Get() const { return value_buffer[handle]; }
+
 		bool IsValid() { return handle != 0; }
 		constexpr operator bool() { return handle != 0; }
-		ValueData* operator ->() { return &value_buffer[handle]; }
+		ValueData* operator ->() { return &Get(); }
 
 		bool operator ==(Value o) const { return handle == o.handle; }
 		bool operator !=(Value o) const { return handle != o.handle; }
-		bool operator <(Value o) const { return handle < o.handle; }
-		bool operator >(Value o) const { return handle > o.handle; }
+		bool operator  <(Value o) const { return handle  < o.handle; }
+		bool operator  >(Value o) const { return handle  > o.handle; }
 	};
 
 	struct Relation {
@@ -222,7 +226,36 @@ namespace IR {
 		}
 
 		void LessOrEqual(Value a, Value b) {
-			a->relations.Add({ .context = this, .kind = RelationKind::LessOrEqual, .to = b, });
+			if (a == b)
+				return; // a <= a is trivially true, skip
+
+			if (!a->relations.Add({ .context = this, .kind = RelationKind::LessOrEqual, .to = b, }))
+				return; // Already exists
+
+			// if a <= b && b < c then a < c
+			// if a <= b && b <= c then a <= c
+			// if a <= b && b == y then a <= y
+			u32 count_b = b->relations.Count();
+			for (u32 i = 0; i < count_b; i++) {
+				Relation& r = b->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if      (r.kind == RelationKind::Less)         Less(a, r.to);
+				else if (r.kind == RelationKind::LessOrEqual)  LessOrEqual(a, r.to);
+				else if (r.kind == RelationKind::Equal)        LessOrEqual(a, r.to);
+			}
+
+			// if x == a && a <= b then x <= b
+			// if c < a && a <= b then c < b
+			// if c <= a && a <= b then c <= b
+			u32 count_a = a->relations.Count();
+			for (u32 i = 0; i < count_a; i++) {
+				Relation& r = a->relations.elements[i];
+				if (r.to == b) continue;
+				if (!CanSee(r)) continue;
+				if      (r.kind == RelationKind::Equal)           LessOrEqual(r.to, b);
+				else if (r.kind == RelationKind::Greater)         Less(r.to, b);
+				else if (r.kind == RelationKind::GreaterOrEqual)  LessOrEqual(r.to, b);
+			}
 		}
 
 		void Greater(Value a, Value b) {
@@ -272,7 +305,6 @@ namespace IR {
 		void Remainder(Value a, Value b, Value remainder) {
 			a->relations.Add({ .context = this, .kind = RelationKind::Remainder, .to = b, .value = remainder, });
 		}
-
 	};
 
 	static Context empty_context = Context();
@@ -286,7 +318,11 @@ namespace IR {
 
 	static void Init();
 
-	static Value NewValue() { return value_buffer.AddIndex(); }
+	static Value NewValue() {
+		Value v = value_buffer.AddIndex();
+		v.Get() = (ValueData){ };
+		return v;
+	}
 
 	static Value Constant(u64 n) {
 		if (n < 256)
@@ -296,6 +332,23 @@ namespace IR {
 		new_value->constant = n;
 		return new_value;
 	}
+
+	static Value Constant(s64 n) {
+		if (n >= 0 && n < 256)
+			return 1 + n;
+
+		Value new_value = NewValue();
+		new_value->constant = n;
+		return new_value;
+	}
+
+	static Value Constant(u8 n)  { return Constant((u64)n); }
+	static Value Constant(u16 n) { return Constant((u64)n); }
+	static Value Constant(u32 n) { return Constant((u64)n); }
+
+	static Value Constant(s8 n)  { return Constant((s64)n); }
+	static Value Constant(s16 n) { return Constant((s64)n); }
+	static Value Constant(s32 n) { return Constant((s64)n); }
 
 	static Value Constant(Array<byte> data) {
 		if (data.length == 0) {
@@ -322,6 +375,45 @@ namespace IR {
 	static Value Constant(T value) {
 		return Constant(Array<byte>((byte*)&value, sizeof(T)));
 	}
+
+	struct Load {
+		IR::Value address;
+	};
+
+	struct Store {
+		IR::Value address;
+		IR::Value value;
+	};
+
+	struct Branch {
+		IR::Value condition; // true or false
+		struct State* left;
+		struct State* right;
+	};
+
+	struct State {
+		Context* context;
+		List<Load>  loads;
+		List<Store> stores;
+		Branch branch;
+	};
+
+	// State object, used to traverse Blocks.
+	struct State {
+		Context* prev_state_common_ancestor;
+		Block* block;
+		List<Pair<List<Context::Key>, Block*>> parents;
+
+		// Going to a previous state means dropping Keys and Adding new keys.
+		State GotoPrevState()
+	};
+
+	static void PrintState();
 };
 
 static void Write(struct OutputBuffer* buffer, IR::Value value);
+static void Write(struct OutputBuffer* buffer, IR::Relation relation);
+static void Write(struct OutputBuffer* buffer, Array<IR::Relation> relations);
+static void Write(struct OutputBuffer* buffer, IR::RelationKind kind);
+static void Write(struct OutputBuffer* buffer, IR::Context context);
+static void Write(struct OutputBuffer* buffer, IR::ValueFlag);

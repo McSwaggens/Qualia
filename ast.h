@@ -487,6 +487,7 @@ struct Variable {
 	TypeID type;
 	Type* ast_type;
 	Expression* assignment;
+	IR::Value address;
 };
 
 struct Assignment {

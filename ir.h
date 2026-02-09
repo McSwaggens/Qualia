@@ -196,7 +196,6 @@ namespace IR {
 			NotEqual(a, b);
 
 			// if a < b && b < c then a < c
-			// if a < b && b > c then a > c
 			// if a < b && b <= c then a < c
 			// if a < b && b == y then a < y
 			u32 count_b = b->relations.Count();
@@ -204,7 +203,6 @@ namespace IR {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
 				if      (r.kind == RelationKind::Less)         Less(a, r.to);
-				else if (r.kind == RelationKind::Greater)      Greater(a, r.to);
 				else if (r.kind == RelationKind::LessOrEqual)  Less(a, r.to);
 				else if (r.kind == RelationKind::Equal)        Less(a, r.to);
 			}

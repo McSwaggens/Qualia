@@ -21,7 +21,6 @@ static List<Ast::Module*> modules = null;
 #include "print.cc"
 #include "semantic.cc"
 #include "parser.cc"
-#include "interpreter.cc"
 #include "ir.cc"
 #include "binary.cc"
 #include "alloc.cc"

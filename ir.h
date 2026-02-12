@@ -295,15 +295,108 @@ namespace IR {
 		}
 
 		void GreaterOrEqual(Value a, Value b) {
-			a->relations.Add({ .context = this, .kind = RelationKind::GreaterOrEqual, .to = b, });
+			if (a == b)
+				return; // a >= a is trivially true, skip
+
+			if (!a->relations.Add({ .context = this, .kind = RelationKind::GreaterOrEqual, .to = b, }))
+				return; // Already exists
+
+			// if a >= b && b > c then a > c
+			// if a >= b && b >= c then a >= c
+			// if a >= b && b == y then a >= y
+			u32 count_b = b->relations.Count();
+			for (u32 i = 0; i < count_b; i++) {
+				Relation& r = b->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if      (r.kind == RelationKind::Greater)        Greater(a, r.to);
+				else if (r.kind == RelationKind::GreaterOrEqual) GreaterOrEqual(a, r.to);
+				else if (r.kind == RelationKind::Equal)          GreaterOrEqual(a, r.to);
+			}
+
+			// if x == a && a >= b then x >= b
+			// if x < a && a >= b then b < x (because b <= a < x, so b < x)
+			// if x <= a && a >= b then b <= x (because b <= a <= x, so b <= x)
+			u32 count_a = a->relations.Count();
+			for (u32 i = 0; i < count_a; i++) {
+				Relation& r = a->relations.elements[i];
+				if (r.to == b) continue;
+				if (!CanSee(r)) continue;
+				if      (r.kind == RelationKind::Equal)          GreaterOrEqual(r.to, b);
+				else if (r.kind == RelationKind::Less)           Greater(r.to, b);
+				else if (r.kind == RelationKind::LessOrEqual)    GreaterOrEqual(r.to, b);
+			}
 		}
 
 		void Distance(Value a, Value b, Value distance) {
-			a->relations.Add({ .context = this, .kind = RelationKind::Distance, .to = b, .value = distance, });
+			// Distance(a, b, d) means: b - a = d, or b = a + d
+
+			if (a == b)
+				return; // Distance from a to itself is trivial
+
+			if (!a->relations.Add({ .context = this, .kind = RelationKind::Distance, .to = b, .value = distance, }))
+				return; // Already exists
+
+			// if a == x then Distance(x, b, distance)
+			u32 count = a->relations.Count();
+			for (u32 i = 0; i < count; i++) {
+				Relation& r = a->relations.elements[i];
+				if (r.to == b) continue;
+				if (!CanSee(r)) continue;
+				if (r.kind == RelationKind::Equal) Distance(r.to, b, distance);
+			}
+
+			// if b == y then Distance(a, y, distance)
+			count = b->relations.Count();
+			for (u32 i = 0; i < count; i++) {
+				Relation& r = b->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if (r.kind == RelationKind::Equal) Distance(a, r.to, distance);
+			}
+
+			// if distance == z then Distance(a, b, z)
+			count = distance->relations.Count();
+			for (u32 i = 0; i < count; i++) {
+				Relation& r = distance->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if (r.kind == RelationKind::Equal) Distance(a, b, r.to);
+			}
+
+			// Note: Transitivity (Distance(a,b,d1) + Distance(b,c,d2) = Distance(a,c,d1+d2))
+			// requires arithmetic operations on values, which can be added later
 		}
 
 		void Remainder(Value a, Value b, Value remainder) {
-			a->relations.Add({ .context = this, .kind = RelationKind::Remainder, .to = b, .value = remainder, });
+			// Remainder(a, b, r) means: a % b = r
+
+			if (!a->relations.Add({ .context = this, .kind = RelationKind::Remainder, .to = b, .value = remainder, }))
+				return; // Already exists
+
+			// if a == x then Remainder(x, b, remainder)
+			u32 count = a->relations.Count();
+			for (u32 i = 0; i < count; i++) {
+				Relation& r = a->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if (r.kind == RelationKind::Equal) Remainder(r.to, b, remainder);
+			}
+
+			// if b == y then Remainder(a, y, remainder)
+			count = b->relations.Count();
+			for (u32 i = 0; i < count; i++) {
+				Relation& r = b->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if (r.kind == RelationKind::Equal) Remainder(a, r.to, remainder);
+			}
+
+			// if remainder == z then Remainder(a, b, z)
+			count = remainder->relations.Count();
+			for (u32 i = 0; i < count; i++) {
+				Relation& r = remainder->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if (r.kind == RelationKind::Equal) Remainder(a, b, r.to);
+			}
+
+			// Note: Additional inferences like "if remainder == 0 then b divides a"
+			// can be added later for alignment/stride analysis
 		}
 	};
 
@@ -334,12 +427,7 @@ namespace IR {
 	}
 
 	static Value Constant(s64 n) {
-		if (n >= 0 && n < 256)
-			return 1 + n;
-
-		Value new_value = NewValue();
-		new_value->constant = n;
-		return new_value;
+		return Constant((u64)n);
 	}
 
 	static Value Constant(u8 n)  { return Constant((u64)n); }
@@ -377,36 +465,40 @@ namespace IR {
 	}
 
 	struct Load {
-		IR::Value address;
+		Value address;
+		Value size;    // Bytes loaded
+		Value value;   // Value loaded // Maybe store bits of information (BOI) as a Value inside Value?
 	};
 
 	struct Store {
-		IR::Value address;
-		IR::Value value;
+		Value address;
+		Value size;
+		Value value; // Value to store // Maybe store bits of information (BOI) as a Value inside Value?
 	};
 
-	struct Branch {
-		IR::Value condition; // true or false
-		struct State* left;
-		struct State* right;
+	struct Touch {
+		Value begin;
+		Value end;
 	};
 
-	struct State {
+	struct ExtCall {
+		Value address;
+		List<Value> input;
+		List<Value> output;
+	};
+
+	struct Fence {
+		Fence* parent;
 		Context* context;
-		List<Load>  loads;
-		List<Store> stores;
-		Branch branch;
+		List<Load>    loads;
+		List<Store>   stores;
+		List<Touch>   touches;
+		List<ExtCall> extcalls;
+		List<Fence*> children;
+		// Closure?
 	};
 
-	// State object, used to traverse Blocks.
-	struct State {
-		Context* prev_state_common_ancestor;
-		Block* block;
-		List<Pair<List<Context::Key>, Block*>> parents;
-
-		// Going to a previous state means dropping Keys and Adding new keys.
-		State GotoPrevState()
-	};
+	static FixedBuffer<Fence, 1<<20> fences;
 
 	static void PrintState();
 };

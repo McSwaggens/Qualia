@@ -13,6 +13,32 @@
 //   - Loops, stack allocations, memory operation ordering
 //   - Load/store ordering, memory aliasing, control flow
 //   - References stateless values from relation graph
+//
+// Trigger-Based Semantic Analysis:
+//   - Types are IR::Values (not properties of values)
+//   - Triggers track which contexts each dependency value is known in
+//   - When all dependencies are known in a common context, trigger fires
+//   - Example for `a + b`:
+//       Stage 1: [ a_type = { }, b_type = { } ]
+//       Stage 2: a_type known in c0 -> [ a_type = {c0}, b_type = { } ]
+//       Stage 3: b_type known in c1 -> [ a_type = {c0}, b_type = {c1} ]
+//       Stage 4: b_type known in c0 -> [ a_type = {c0}, b_type = {c0,c1} ]
+//                TRIGGER in c0! (both known in c0)
+//
+//   - Usage:
+//       // 1. Define Trigger method on AST node
+//       struct Expression {
+//           void Trigger(Context* ctx, Trigger* t) { /* type-check */ }
+//       };
+//
+//       // 2. Create trigger at parse time
+//       Expression* expr = ...;
+//       auto callback = (void(*)(void*, Context*, Trigger*))&Expression::Trigger;
+//       CreateTrigger({type_of_a, type_of_b}, callback, expr);
+//
+//       // 3. Notify triggers when values become known
+//       ctx->Equal(type_of_a, int_type);
+//       NotifyValueKnown(type_of_a, ctx);  // Fires triggers if all deps ready
 
 #include "general.h"
 #include "stack.h"
@@ -33,6 +59,7 @@ namespace IR {
 	struct Context;
 	struct Relation;
 	struct ValueData;
+	struct Trigger;
 
 	enum class RelationKind {
 		Equal,
@@ -56,6 +83,7 @@ namespace IR {
 		u16 flags = 0;
 		Set<Relation> relations;
 		Binary constant;
+		List<Trigger*> waiting;  // Triggers waiting on this value
 
 		bool IsConstant() { return flags & VALUE_CONSTANT; }
 	};
@@ -119,7 +147,6 @@ namespace IR {
 
 		Context* parent = null;
 		Map<Key, Context*> children;
-
 		Set<Key> keys; // Things we know to be true.
 
 		explicit Context() = default;
@@ -400,6 +427,46 @@ namespace IR {
 		}
 	};
 
+	// Trigger: fires when all dependencies are satisfied in a common context
+	struct Trigger {
+		Map<Context*, u16> ready_count;     // How many dependencies satisfied per context
+		u16 dependency_count;               // Total number of dependencies
+		void (*callback)(void*, Context*, Trigger*);  // Member function: (this, context, trigger)
+		void* ast_node = null;              // Expression*, Statement*, Function*, etc.
+
+		Trigger(Array<Value> deps, void (*cb)(void*, Context*, Trigger*), void* node = null) {
+			dependency_count = deps.length;
+			callback = cb;
+			ast_node = node;
+
+			// Register this trigger with each dependency value
+			for (Value v : deps) {
+				v->waiting.Add(this);
+			}
+		}
+
+		// Called when a value becomes known in a context
+		void ValueKnownInContext(Value v, Context* ctx) {
+			auto [inserted, count_ptr] = ready_count.GetOrAdd(ctx);
+			if (inserted) *count_ptr = 0;
+
+			(*count_ptr)++;
+
+			// All dependencies satisfied in this context?
+			if (*count_ptr == dependency_count) {
+				callback(ast_node, ctx, this);  // Calls member function with this as first arg
+			}
+		}
+	};
+
+	// Notify all triggers waiting on a value that it's now known in a context
+	// Call this after adding an Equal relation to notify type inference triggers
+	static void NotifyValueKnown(Value v, Context* ctx) {
+		for (Trigger* t : v->waiting) {
+			t->ValueKnownInContext(v, ctx);
+		}
+	}
+
 	static Context empty_context = Context();
 
 	static Context* FindContext(Set<Context::Key> keys) {
@@ -462,6 +529,13 @@ namespace IR {
 	template <typename T>
 	static Value Constant(T value) {
 		return Constant(Array<byte>((byte*)&value, sizeof(T)));
+	}
+
+	// Helper to create a trigger (allocates from stack)
+	static Trigger* CreateTrigger(Array<Value> deps, void (*callback)(void*, Context*, Trigger*), void* node = null) {
+		Trigger* t = stack.Allocate<Trigger>();
+		*t = Trigger(deps, callback, node);
+		return t;
 	}
 
 	struct Load {

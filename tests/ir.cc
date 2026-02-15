@@ -20,13 +20,15 @@ static List<Ast::Module*> modules = null;
 #include "../ir.cc"
 #include "../alloc.cc"
 
-static IR::Context* ctx;
+using namespace IR;
+
+static Context* ctx;
 
 // Distance(a, b, 0) means equality (via Equal helper)
 // if Equal(a, b) then IsEqual(a, b) == true
 static void Test_Equal() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->Equal(a, b);
 
@@ -36,9 +38,9 @@ static void Test_Equal() {
 // Less transitivity
 // if a < b && b < c then a < c
 static void Test_LessTransitivity() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->Less(a, b);
     ctx->Less(b, c);
@@ -49,8 +51,8 @@ static void Test_LessTransitivity() {
 // Less implies LessOrEqual
 // if a < b then a <= b
 static void Test_LessImpliesLessOrEqual() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->Less(a, b);
 
@@ -61,8 +63,8 @@ static void Test_LessImpliesLessOrEqual() {
 // Less implies NotEqual
 // if a < b then a != b
 static void Test_LessImpliesNotEqual() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->Less(a, b);
 
@@ -72,8 +74,8 @@ static void Test_LessImpliesNotEqual() {
 // Duality - Less and Greater
 // if a < b then b > a
 static void Test_DualityLessGreater() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->Less(a, b);
 
@@ -84,9 +86,9 @@ static void Test_DualityLessGreater() {
 // LessOrEqual transitivity
 // if a <= b && b <= c then a <= c
 static void Test_LessOrEqualTransitivity() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->LessOrEqual(a, b);
     ctx->LessOrEqual(b, c);
@@ -97,8 +99,8 @@ static void Test_LessOrEqualTransitivity() {
 // Greater implies GreaterOrEqual
 // if a > b then a >= b
 static void Test_GreaterImpliesGreaterOrEqual() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->Greater(a, b);
 
@@ -109,8 +111,8 @@ static void Test_GreaterImpliesGreaterOrEqual() {
 // NotEqual is symmetric
 // if a != b then b != a
 static void Test_NotEqualSymmetric() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->NotEqual(a, b);
 
@@ -121,9 +123,9 @@ static void Test_NotEqualSymmetric() {
 // Greater transitivity
 // if a > b && b > c then a > c
 static void Test_GreaterTransitivity() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->Greater(a, b);
     ctx->Greater(b, c);
@@ -134,9 +136,9 @@ static void Test_GreaterTransitivity() {
 // GreaterOrEqual transitivity
 // if a >= b && b >= c then a >= c
 static void Test_GreaterOrEqualTransitivity() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->GreaterOrEqual(a, b);
     ctx->GreaterOrEqual(b, c);
@@ -147,9 +149,9 @@ static void Test_GreaterOrEqualTransitivity() {
 // Mixed transitivity (Less + LessOrEqual)
 // if a < b && b <= c then a < c
 static void Test_MixedTransitivity_Less_LessOrEqual() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->Less(a, b);
     ctx->LessOrEqual(b, c);
@@ -160,9 +162,9 @@ static void Test_MixedTransitivity_Less_LessOrEqual() {
 // Mixed transitivity (LessOrEqual + Less)
 // if a <= b && b < c then a < c
 static void Test_MixedTransitivity_LessOrEqual_Less() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->LessOrEqual(a, b);
     ctx->Less(b, c);
@@ -173,9 +175,9 @@ static void Test_MixedTransitivity_LessOrEqual_Less() {
 // Mixed transitivity (Greater + GreaterOrEqual)
 // if a > b && b >= c then a > c
 static void Test_MixedTransitivity_Greater_GreaterOrEqual() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->Greater(a, b);
     ctx->GreaterOrEqual(b, c);
@@ -186,9 +188,9 @@ static void Test_MixedTransitivity_Greater_GreaterOrEqual() {
 // Mixed transitivity (GreaterOrEqual + Greater)
 // if a >= b && b > c then a > c
 static void Test_MixedTransitivity_GreaterOrEqual_Greater() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->GreaterOrEqual(a, b);
     ctx->Greater(b, c);
@@ -199,8 +201,8 @@ static void Test_MixedTransitivity_GreaterOrEqual_Greater() {
 // Antisymmetry (LessOrEqual)
 // if a <= b && b <= a then a == b
 static void Test_AntisymmetryLessOrEqual() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->LessOrEqual(a, b);
     ctx->LessOrEqual(b, a);
@@ -211,8 +213,8 @@ static void Test_AntisymmetryLessOrEqual() {
 // Antisymmetry (GreaterOrEqual)
 // if a >= b && b >= a then a == b
 static void Test_AntisymmetryGreaterOrEqual() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->GreaterOrEqual(a, b);
     ctx->GreaterOrEqual(b, a);
@@ -223,9 +225,9 @@ static void Test_AntisymmetryGreaterOrEqual() {
 // Distance equality propagation (Less)
 // if Distance(a, b, 0) && a < c then b < c
 static void Test_DistanceEqualityPropagation_Less() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->Equal(a, b);
     ctx->Less(a, c);
@@ -236,9 +238,9 @@ static void Test_DistanceEqualityPropagation_Less() {
 // Distance equality propagation (Less, reversed input)
 // if Distance(a, b, 0) && c < a then c < b
 static void Test_DistanceEqualityPropagation_LessReversedInput() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->Equal(a, b);
     ctx->Less(c, a);
@@ -249,18 +251,18 @@ static void Test_DistanceEqualityPropagation_LessReversedInput() {
 // Remainder basic storage
 // Remainder(a, b, r) should be retrievable
 static void Test_RemainderBasicStorage() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value r = IR::Constant(3);
+    Value a = NewValue();
+    Value b = NewValue();
+    Value r = Constant(3);
 
     ctx->Remainder(a, b, r);
 
     // Check that the relation was added
-    IR::Context::RelationRange range = ctx->GetRelationRangeTo(a, b);
+    Context::RelationRange range = ctx->GetRelationRangeTo(a, b);
     bool found = false;
     for (u32 i = range.begin; i < range.end; i++) {
-        IR::Relation& rel = a->relations.elements[i];
-        if (rel.kind == IR::RelationKind::Remainder && rel.value == r && ctx->CanSee(rel)) {
+        Relation& rel = a->relations.elements[i];
+        if (rel.kind == Relation::Remainder && rel.value == r && ctx->CanSee(rel)) {
             found = true;
             break;
         }
@@ -271,19 +273,19 @@ static void Test_RemainderBasicStorage() {
 // Remainder propagation through equality (first arg)
 // if Distance(a, x, 0) && Remainder(a, b, r) then Remainder(x, b, r)
 static void Test_RemainderPropagationEquality() {
-    IR::Value a = IR::NewValue();
-    IR::Value x = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value r = IR::Constant(5);
+    Value a = NewValue();
+    Value x = NewValue();
+    Value b = NewValue();
+    Value r = Constant(5);
 
     ctx->Equal(a, x);
     ctx->Remainder(a, b, r);
 
-    IR::Context::RelationRange range = ctx->GetRelationRangeTo(x, b);
+    Context::RelationRange range = ctx->GetRelationRangeTo(x, b);
     bool found = false;
     for (u32 i = range.begin; i < range.end; i++) {
-        IR::Relation& rel = x->relations.elements[i];
-        if (rel.kind == IR::RelationKind::Remainder && rel.value == r && ctx->CanSee(rel)) {
+        Relation& rel = x->relations.elements[i];
+        if (rel.kind == Relation::Remainder && rel.value == r && ctx->CanSee(rel)) {
             found = true;
             break;
         }
@@ -293,27 +295,27 @@ static void Test_RemainderPropagationEquality() {
 
 // Context child sees parent relations
 static void Test_ContextChildSeesParent() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->Less(a, b);
 
     // Create child context
-    IR::Context* child = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    Context* child = ctx->Get(Context::Key(Relation::NotEqual, NewValue(), NewValue()));
 
     Assert(child->IsLess(a, b) == true, "Child context should see parent's Less(a, b)");
 }
 
 // Context child can add relations
 static void Test_ContextChildCanAddRelations() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->Less(a, b);
 
     // Create child context and add relation
-    IR::Context* child = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    Context* child = ctx->Get(Context::Key(Relation::NotEqual, NewValue(), NewValue()));
     child->Less(b, c);
 
     // Child should see both
@@ -326,11 +328,11 @@ static void Test_ContextChildCanAddRelations() {
 
 // Parent cannot see child relations
 static void Test_ParentCannotSeeChild() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     // Create child context and add relation
-    IR::Context* child = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    Context* child = ctx->Get(Context::Key(Relation::NotEqual, NewValue(), NewValue()));
     child->Less(a, b);
 
     // Parent should not see child's relation
@@ -339,9 +341,9 @@ static void Test_ParentCannotSeeChild() {
 
 // Constant deduplication
 static void Test_ConstantDeduplication() {
-    IR::Value c1 = IR::Constant(42);
-    IR::Value c2 = IR::Constant(42);
-    IR::Value c3 = IR::Constant(99);
+    Value c1 = Constant(42);
+    Value c2 = Constant(42);
+    Value c3 = Constant(99);
 
     Assert(c1 == c2, "Constant(42) should be deduplicated");
     Assert(c1 != c3, "Constant(42) != Constant(99)");
@@ -349,8 +351,8 @@ static void Test_ConstantDeduplication() {
 
 // NewValue creates distinct values
 static void Test_NewValueDistinct() {
-    IR::Value v1 = IR::NewValue();
-    IR::Value v2 = IR::NewValue();
+    Value v1 = NewValue();
+    Value v2 = NewValue();
 
     Assert(v1 != v2, "NewValue() should create distinct values");
 }
@@ -358,7 +360,7 @@ static void Test_NewValueDistinct() {
 // Self-relation (Less)
 // Less(a, a) is false (not unknown)
 static void Test_SelfRelation_Less() {
-    IR::Value a = IR::NewValue();
+    Value a = NewValue();
 
     ctx->Less(a, a);
 
@@ -368,7 +370,7 @@ static void Test_SelfRelation_Less() {
 // Self-relation (Equal)
 // Equal(a, a) is trivially true
 static void Test_SelfRelation_Equal() {
-    IR::Value a = IR::NewValue();
+    Value a = NewValue();
 
     Assert(ctx->IsEqual(a, a) == true, "IsEqual(a, a) should be trivially true");
 }
@@ -376,7 +378,7 @@ static void Test_SelfRelation_Equal() {
 // Self-relation (NotEqual)
 // NotEqual(a, a) is false (not unknown)
 static void Test_SelfRelation_NotEqual() {
-    IR::Value a = IR::NewValue();
+    Value a = NewValue();
 
     ctx->NotEqual(a, a);
 
@@ -386,11 +388,11 @@ static void Test_SelfRelation_NotEqual() {
 // Long transitive chain
 // a0 < a1 < a2 < a3 < a4 should infer a0 < a4
 static void Test_LongTransitiveChain() {
-    IR::Value a0 = IR::NewValue();
-    IR::Value a1 = IR::NewValue();
-    IR::Value a2 = IR::NewValue();
-    IR::Value a3 = IR::NewValue();
-    IR::Value a4 = IR::NewValue();
+    Value a0 = NewValue();
+    Value a1 = NewValue();
+    Value a2 = NewValue();
+    Value a3 = NewValue();
+    Value a4 = NewValue();
 
     ctx->Less(a0, a1);
     ctx->Less(a1, a2);
@@ -403,9 +405,9 @@ static void Test_LongTransitiveChain() {
 // Negative involution
 // Negative(Negative(a)) should equal a
 static void Test_NegativeInvolution() {
-    IR::Value a = IR::NewValue();
-    IR::Value neg_a = ctx->Negative(a);
-    IR::Value neg_neg_a = ctx->Negative(neg_a);
+    Value a = NewValue();
+    Value neg_a = ctx->Negative(a);
+    Value neg_neg_a = ctx->Negative(neg_a);
 
     Assert(ctx->IsEqual(a, neg_neg_a) == true, "Negative involution: -(-a) == a");
 }
@@ -413,8 +415,8 @@ static void Test_NegativeInvolution() {
 // Negative of constant
 // Negative(Constant(0)) should be Constant(0)
 static void Test_NegativeOfZero() {
-    IR::Value zero = IR::Constant(0);
-    IR::Value neg_zero = ctx->Negative(zero);
+    Value zero = Constant(0);
+    Value neg_zero = ctx->Negative(zero);
 
     Assert(zero == neg_zero, "Negative(0) should be 0");
 }
@@ -422,8 +424,8 @@ static void Test_NegativeOfZero() {
 // Equal via Distance establishes bidirectional equality
 // if Equal(a, b) then IsEqual(b, a)
 static void Test_EqualBidirectional() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
 
     ctx->Equal(a, b);
 
@@ -432,7 +434,7 @@ static void Test_EqualBidirectional() {
 
 // LessOrEqual with self is trivially true
 static void Test_LessOrEqualWithSelf() {
-    IR::Value a = IR::NewValue();
+    Value a = NewValue();
 
     ctx->LessOrEqual(a, a);
 
@@ -441,7 +443,7 @@ static void Test_LessOrEqualWithSelf() {
 
 // GreaterOrEqual with self is trivially true
 static void Test_GreaterOrEqualWithSelf() {
-    IR::Value a = IR::NewValue();
+    Value a = NewValue();
 
     ctx->GreaterOrEqual(a, a);
 
@@ -451,9 +453,9 @@ static void Test_GreaterOrEqualWithSelf() {
 // Equality transitivity
 // if a == b && b == c then a == c
 static void Test_EqualityTransitivity() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
+    Value a = NewValue();
+    Value b = NewValue();
+    Value c = NewValue();
 
     ctx->Equal(a, b);
     ctx->Equal(b, c);
@@ -478,17 +480,17 @@ static void Test_EqualityTransitivity() {
 //         // Context C
 //
 static void Test_ContextInference() {
-	IR::Value a = IR::NewValue();
-	IR::Value b = IR::NewValue();
-	IR::Value c = IR::NewValue();
+	Value a = NewValue();
+	Value b = NewValue();
+	Value c = NewValue();
 
-	IR::Context* context_a = IR::empty_context.Get({ .kind = IR::RelationKind::Less, .from = a, .to = b });
-	context_a->Equal(c, IR::Constant(42));
+	Context* context_a = empty_context.Get(Context::Key(Relation::Less, a, b));
+	context_a->Equal(c, Constant(42));
 
-	IR::Context* context_b = IR::empty_context.Get({ .kind = IR::RelationKind::GreaterOrEqual, .from = a, .to = b });
-	context_b->Equal(c, IR::Constant(1));
+	Context* context_b = empty_context.Get(Context::Key(Relation::GreaterOrEqual, a, b));
+	context_b->Equal(c, Constant(1));
 
-	IR::Context* context_c = IR::empty_context.Get({ .kind = IR::RelationKind::Distance, .from = c, .to = IR::Constant(42), .value = IR::Constant(0)});
+	Context* context_c = empty_context.Get(Context::Key(Relation::Distance, c, Constant(42), Constant(0)));
 	Assert(context_c->IsLess(a, b) == true);
 }
 
@@ -500,45 +502,45 @@ static void Test_StressManyValuesManyContexts() {
     constexpr u32 ALIAS_COUNT = 32;
 
     // Long root chain: v0 < v1 < ... < v127
-    IR::Value chain[CHAIN_COUNT];
+    Value chain[CHAIN_COUNT];
     for (u32 i = 0; i < CHAIN_COUNT; i++)
-        chain[i] = IR::NewValue();
+        chain[i] = NewValue();
     for (u32 i = 0; i + 1 < CHAIN_COUNT; i++)
         ctx->Less(chain[i], chain[i + 1]);
 
     // Add many different relation kinds in root context.
-    IR::Value aliases[ALIAS_COUNT];
+    Value aliases[ALIAS_COUNT];
     for (u32 i = 0; i < ALIAS_COUNT; i++) {
-        aliases[i] = IR::NewValue();
+        aliases[i] = NewValue();
         ctx->Equal(chain[i], aliases[i]); // Distance(..., 0)
     }
 
     for (u32 i = 0; i < NOISE_COUNT; i++) {
-        IR::Value a = IR::NewValue();
-        IR::Value b = IR::NewValue();
-        IR::Value c = IR::NewValue();
-        IR::Value d = IR::NewValue();
+        Value a = NewValue();
+        Value b = NewValue();
+        Value c = NewValue();
+        Value d = NewValue();
 
         ctx->LessOrEqual(a, b);
         ctx->Greater(c, d);
         ctx->NotEqual(a, d);
-        ctx->Remainder(b, c, IR::Constant(i % 11));
+        ctx->Remainder(b, c, Constant(i % 11));
     }
 
     Assert(ctx->IsLess(chain[0], chain[CHAIN_COUNT - 1]) == true, "Root should infer long-chain Less across many hops");
     Assert(ctx->IsEqual(chain[0], aliases[0]) == true, "Root should preserve equality aliases under load");
 
     // Build sibling context trees.
-    IR::Context* left = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
-    IR::Context* right = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
-    IR::Context* left_deep = left->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
-    IR::Context* left_far = left_deep->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
-    IR::Context* right_deep = right->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    Context* left = ctx->Get(Context::Key(Relation::NotEqual, NewValue(), NewValue()));
+    Context* right = ctx->Get(Context::Key(Relation::NotEqual, NewValue(), NewValue()));
+    Context* left_deep = left->Get(Context::Key(Relation::NotEqual, NewValue(), NewValue()));
+    Context* left_far = left_deep->Get(Context::Key(Relation::NotEqual, NewValue(), NewValue()));
+    Context* right_deep = right->Get(Context::Key(Relation::NotEqual, NewValue(), NewValue()));
 
     // Left branch extends the long root chain.
-    IR::Value left_tail = IR::NewValue();
-    IR::Value left_mid = IR::NewValue();
-    IR::Value left_goal = IR::NewValue();
+    Value left_tail = NewValue();
+    Value left_mid = NewValue();
+    Value left_goal = NewValue();
     left->Less(chain[CHAIN_COUNT - 1], left_tail);
     left_deep->LessOrEqual(left_tail, left_mid);
     left_far->Less(left_mid, left_goal);
@@ -547,8 +549,8 @@ static void Test_StressManyValuesManyContexts() {
     Assert(left_far->IsLess(aliases[0], left_goal) == true, "Deep context should use equality alias plus long-distance transitivity");
 
     // Right branch adds unrelated constraints that must not leak to left.
-    IR::Value right_x = IR::NewValue();
-    IR::Value right_y = IR::NewValue();
+    Value right_x = NewValue();
+    Value right_y = NewValue();
     right_deep->Greater(right_x, right_y);
 
     Assert(right_deep->IsLess(chain[0], chain[CHAIN_COUNT - 1]) == true, "Sibling branch should still inherit distant root inference");
@@ -564,9 +566,9 @@ int main() {
     InitGlobalAllocator();
     Thread::Init();
     InitTypeSystem();
-    IR::Init();
+    Init();
 
-    ctx = &IR::empty_context;
+    ctx = &empty_context;
 
     Print("Running IR tests...\n");
 

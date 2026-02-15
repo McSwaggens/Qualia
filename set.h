@@ -79,5 +79,30 @@ struct Set {
 
 		return true;
 	}
-};
 
+	Set<T> Intersect(Set<T> other) {
+		Set<T> result;
+		result.elements = AllocateList<T>(Min(Count(), other.Count()));
+
+		u32 i = 0;
+		u32 j = 0;
+
+		while (i < Count() && j < other.Count()) {
+			if (elements[i] == other.elements[j]) {
+				result.elements.Add(elements[i]);
+				i++;
+				j++;
+				continue;
+			}
+
+			if (elements[i] < other.elements[j]) {
+				i++;
+				continue;
+			}
+
+			j++;
+		}
+
+		return result;
+	}
+};

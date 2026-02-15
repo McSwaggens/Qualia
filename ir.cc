@@ -23,27 +23,27 @@ static void Write(OutputBuffer* buffer, IR::Value value) {
 	Write(buffer, value.handle);
 }
 
-static void WriteRelationSymbol(OutputBuffer* buffer, IR::RelationKind kind) {
+static void WriteRelationSymbol(OutputBuffer* buffer, IR::Relation::Kind kind) {
 	switch (kind) {
-		case IR::RelationKind::NotEqual:         buffer->Write("!="); break;
-		case IR::RelationKind::Less:             buffer->Write("<"); break;
-		case IR::RelationKind::LessOrEqual:      buffer->Write("<="); break;
-		case IR::RelationKind::Greater:          buffer->Write(">"); break;
-		case IR::RelationKind::GreaterOrEqual:   buffer->Write(">="); break;
-		case IR::RelationKind::Distance:         buffer->Write("dist"); break;
-		case IR::RelationKind::Remainder:        buffer->Write("rem"); break;
+		case IR::Relation::NotEqual:         buffer->Write("!="); break;
+		case IR::Relation::Less:             buffer->Write("<"); break;
+		case IR::Relation::LessOrEqual:      buffer->Write("<="); break;
+		case IR::Relation::Greater:          buffer->Write(">"); break;
+		case IR::Relation::GreaterOrEqual:   buffer->Write(">="); break;
+		case IR::Relation::Distance:         buffer->Write("dist"); break;
+		case IR::Relation::Remainder:        buffer->Write("rem"); break;
 	}
 }
 
-static void Write(OutputBuffer* buffer, IR::RelationKind kind) {
+static void Write(OutputBuffer* buffer, IR::Relation::Kind kind) {
 	switch (kind) {
-		case IR::RelationKind::NotEqual:         buffer->Write("NotEqual"); break;
-		case IR::RelationKind::Less:             buffer->Write("Less"); break;
-		case IR::RelationKind::LessOrEqual:      buffer->Write("LessOrEqual"); break;
-		case IR::RelationKind::Greater:          buffer->Write("Greater"); break;
-		case IR::RelationKind::GreaterOrEqual:   buffer->Write("GreaterOrEqual"); break;
-		case IR::RelationKind::Distance:         buffer->Write("Distance"); break;
-		case IR::RelationKind::Remainder:        buffer->Write("Remainder"); break;
+		case IR::Relation::NotEqual:         buffer->Write("NotEqual"); break;
+		case IR::Relation::Less:             buffer->Write("Less"); break;
+		case IR::Relation::LessOrEqual:      buffer->Write("LessOrEqual"); break;
+		case IR::Relation::Greater:          buffer->Write("Greater"); break;
+		case IR::Relation::GreaterOrEqual:   buffer->Write("GreaterOrEqual"); break;
+		case IR::Relation::Distance:         buffer->Write("Distance"); break;
+		case IR::Relation::Remainder:        buffer->Write("Remainder"); break;
 	}
 }
 

@@ -61,36 +61,6 @@ namespace IR {
 	struct ValueData;
 	struct Trigger;
 
-	enum class RelationKind {
-		// NotEqual(a, b): a != b
-		// Use for contradiction checks and strict-order implications.
-		NotEqual,
-
-		// Less(a, b): a < b
-		// Strict ordering relation.
-		Less,
-
-		// LessOrEqual(a, b): a <= b
-		// Non-strict ordering relation.
-		LessOrEqual,
-
-		// Greater(a, b): a > b
-		// Strict ordering relation.
-		Greater,
-
-		// GreaterOrEqual(a, b): a >= b
-		// Non-strict ordering relation.
-		GreaterOrEqual,
-
-		// Distance(a, b, c): b - a = c
-		// Encodes: add, subtract, equality (b - a = 0), negative (0 - a = -a)
-		Distance,
-
-		// Remainder(a, b, c): a % b = c
-		// Useful for divisibility, alignment and stride constraints.
-		Remainder,
-	};
-
 	enum ValueFlag : u16 {
 		VALUE_CONSTANT      = 0x01,
 		VALUE_LONG_CONSTANT = 0x02,
@@ -127,10 +97,92 @@ namespace IR {
 	};
 
 	struct Relation {
-		RelationKind kind;
+		enum Kind {
+			// NotEqual(a, b): a != b
+			// Use for contradiction checks and strict-order implications.
+			NotEqual,
+
+			// Less(a, b): a < b
+			// Strict ordering relation.
+			Less,
+
+			// LessOrEqual(a, b): a <= b
+			// Non-strict ordering relation.
+			LessOrEqual,
+
+			// Greater(a, b): a > b
+			// Strict ordering relation.
+			Greater,
+
+			// GreaterOrEqual(a, b): a >= b
+			// Non-strict ordering relation.
+			GreaterOrEqual,
+
+			// Distance(a, b, c): b - a = c
+			// Encodes: add, subtract, equality (b - a = 0), negative (0 - a = -a)
+			Distance,
+
+			// Remainder(a, b, c): a % b = c
+			// Useful for divisibility, alignment and stride constraints.
+			Remainder,
+		};
+
+		Kind kind;
 		Value to;            // Column
 		Value value;         // Cell
 		Context* context;    // Conditions required for this to be true.
+
+		Relation() = delete;
+
+		constexpr Relation(Kind kind, Value to, Context* context, Value value = { })
+			: kind(kind), to(to), value(value), context(context)
+		{
+			Assert(context);
+		}
+
+		static Relation CreateNotEqual(Value from, Value to, Context* context) {
+			Assert(from);
+			Assert(to);
+			return Relation(NotEqual, to, context);
+		}
+
+		static Relation CreateLess(Value from, Value to, Context* context) {
+			Assert(from);
+			Assert(to);
+			return Relation(Less, to, context);
+		}
+
+		static Relation CreateLessOrEqual(Value from, Value to, Context* context) {
+			Assert(from);
+			Assert(to);
+			return Relation(LessOrEqual, to, context);
+		}
+
+		static Relation CreateGreater(Value from, Value to, Context* context) {
+			Assert(from);
+			Assert(to);
+			return Relation(Greater, to, context);
+		}
+
+		static Relation CreateGreaterOrEqual(Value from, Value to, Context* context) {
+			Assert(from);
+			Assert(to);
+			return Relation(GreaterOrEqual, to, context);
+		}
+
+		static Relation CreateDistance(Value from, Value to, Value distance, Context* context) {
+			Assert(from);
+			Assert(to);
+			Assert(distance);
+			return Relation(Distance, to, context, distance);
+		}
+
+		static Relation CreateRemainder(Value from, Value to, Value remainder, Context* context) {
+			Assert(from);
+			Assert(to);
+			Assert(remainder);
+			return Relation(Remainder, to, context, remainder);
+		}
 
 		bool operator ==(Relation o) const {
 			return kind == o.kind && to == o.to && value == o.value && context == o.context;
@@ -204,10 +256,19 @@ namespace IR {
 	// Set of things that we know.
 	struct Context {
 		struct Key {
-			RelationKind kind;
+			Relation::Kind kind;
 			Value from;
 			Value to;
 			Value value;
+
+			Key() = delete;
+
+			constexpr Key(Relation::Kind kind, Value from, Value to, Value value = { })
+				: kind(kind), from(from), to(to), value(value)
+			{
+				Assert(from);
+				Assert(to);
+			}
 
 			bool operator ==(Key o) const {
 				return kind == o.kind && from == o.from && to == o.to && value == o.value;
@@ -245,15 +306,21 @@ namespace IR {
 			return *child;
 		}
 
+		Context* Intersect(Context* other);
+
 		bool CanSee(Relation relation) {
-			if (this < relation.context) // Fast-path: older contexts can't see newer contexts.
-				return false;
+			// A relation is visible if all context keys required to establish it
+			// are present in the current context.
+			Assert(relation.context);
 
-			Context* ctx = this;
-			while (ctx && ctx != relation.context)
-				ctx = ctx->parent;
+			if (this == relation.context)
+				return true;
 
-			return ctx != null;
+			// Root/empty-context relations have no prerequisites.
+			if (relation.context->keys.IsEmpty())
+				return true;
+
+			return keys.Contains(relation.context->keys);
 		}
 
 		struct PairFacts {
@@ -308,12 +375,12 @@ namespace IR {
 				Relation& r = a->relations.elements[i];
 				if (!CanSee(r)) continue;
 
-				if      (r.kind == RelationKind::NotEqual)                              facts.ne = true;
-				else if (r.kind == RelationKind::Less)                                  facts.lt = true;
-				else if (r.kind == RelationKind::LessOrEqual)                           facts.le = true;
-				else if (r.kind == RelationKind::Greater)                               facts.gt = true;
-				else if (r.kind == RelationKind::GreaterOrEqual)                        facts.ge = true;
-				else if (r.kind == RelationKind::Distance && r.value == zero)           facts.eq = true;
+				if      (r.kind == Relation::Kind::NotEqual)                              facts.ne = true;
+				else if (r.kind == Relation::Kind::Less)                                  facts.lt = true;
+				else if (r.kind == Relation::Kind::LessOrEqual)                           facts.le = true;
+				else if (r.kind == Relation::Kind::Greater)                               facts.gt = true;
+				else if (r.kind == Relation::Kind::GreaterOrEqual)                        facts.ge = true;
+				else if (r.kind == Relation::Kind::Distance && r.value == zero)           facts.eq = true;
 			}
 
 			range = GetRelationRangeTo(b, a);
@@ -321,12 +388,12 @@ namespace IR {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
 
-				if      (r.kind == RelationKind::NotEqual)                              facts.ne = true;
-				else if (r.kind == RelationKind::Less)                                  facts.gt = true;
-				else if (r.kind == RelationKind::LessOrEqual)                           facts.ge = true;
-				else if (r.kind == RelationKind::Greater)                               facts.lt = true;
-				else if (r.kind == RelationKind::GreaterOrEqual)                        facts.le = true;
-				else if (r.kind == RelationKind::Distance && r.value == zero)           facts.eq = true;
+				if      (r.kind == Relation::Kind::NotEqual)                              facts.ne = true;
+				else if (r.kind == Relation::Kind::Less)                                  facts.gt = true;
+				else if (r.kind == Relation::Kind::LessOrEqual)                           facts.ge = true;
+				else if (r.kind == Relation::Kind::Greater)                               facts.lt = true;
+				else if (r.kind == Relation::Kind::GreaterOrEqual)                        facts.le = true;
+				else if (r.kind == Relation::Kind::Distance && r.value == zero)           facts.eq = true;
 			}
 
 			Assert(!(facts.lt && facts.gt)); // strict ordering: a < b and a > b are mutually exclusive
@@ -421,7 +488,7 @@ namespace IR {
 			for (u32 i = range.begin; i < range.end; i++) {
 				Relation& r = value->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if (r.kind != RelationKind::Distance) continue;
+				if (r.kind != Relation::Kind::Distance) continue;
 
 				if (!result) result = r.value;
 				else Assert(result == r.value);
@@ -437,7 +504,7 @@ namespace IR {
 				for (u32 i = range.begin; i < range.end; i++) {
 					Relation& r = candidate->relations.elements[i];
 					if (!CanSee(r)) continue;
-					if (r.kind != RelationKind::Distance || r.value != value) continue;
+					if (r.kind != Relation::Kind::Distance || r.value != value) continue;
 
 					if (!result) result = candidate;
 					else Assert(result == candidate);
@@ -461,7 +528,7 @@ namespace IR {
 			if (a == b)
 				return; // Can't be not-equal to itself
 
-			if (!a->relations.Add({ .context = this, .kind = RelationKind::NotEqual, .to = b, }))
+			if (!a->relations.Add(Relation::CreateNotEqual(a, b, this)))
 				return; // Already exists
 
 			NotEqual(b, a); // Symmetry
@@ -471,7 +538,7 @@ namespace IR {
 			for (u32 i = 0; i < count; i++) {
 				Relation& r = a->relations.elements[i];
 				if (r.to == b) continue;
-				if (r.kind == RelationKind::Distance && r.value == Constant(0) && CanSee(r)) NotEqual(r.to, b);
+				if (r.kind == Relation::Kind::Distance && r.value == Constant(0) && CanSee(r)) NotEqual(r.to, b);
 			}
 
 			// if a != b && Distance(a, b, d) then d != 0
@@ -479,7 +546,7 @@ namespace IR {
 				Relation& r = a->relations.elements[i];
 				if (r.to != b) continue;
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::Distance) {
+				if (r.kind == Relation::Kind::Distance) {
 					NotEqual(r.value, Constant(0));
 				}
 			}
@@ -489,7 +556,7 @@ namespace IR {
 			if (a == b)
 				return; // Can't be less than itself
 
-			if (!a->relations.Add({ .context = this, .kind = RelationKind::Less, .to = b, }))
+			if (!a->relations.Add(Relation::CreateLess(a, b, this)))
 				return; // Already exists
 
 			Greater(b, a); // Strict-order duality: a < b <=> b > a
@@ -501,9 +568,9 @@ namespace IR {
 			for (u32 i = 0; i < count_b; i++) {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if      (r.kind == RelationKind::Less)                               Less(a, r.to); // if a < b && b < c then a < c
-				else if (r.kind == RelationKind::LessOrEqual)                        Less(a, r.to); // if a < b && b <= c then a < c
-				else if (r.kind == RelationKind::Distance && r.value == Constant(0)) Less(a, r.to); // if a < b && Distance(b, y, 0) then a < y
+				if      (r.kind == Relation::Kind::Less)                               Less(a, r.to); // if a < b && b < c then a < c
+				else if (r.kind == Relation::Kind::LessOrEqual)                        Less(a, r.to); // if a < b && b <= c then a < c
+				else if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Less(a, r.to); // if a < b && Distance(b, y, 0) then a < y
 			}
 
 			u32 count_a = a->relations.Count();
@@ -511,9 +578,9 @@ namespace IR {
 				Relation& r = a->relations.elements[i];
 				if (r.to == b) continue;
 				if (!CanSee(r)) continue;
-				if      (r.kind == RelationKind::Distance && r.value == Constant(0)) Less(r.to, b); // if Distance(x, a, 0) && a < b then x < b
-				else if (r.kind == RelationKind::Greater)                             Less(r.to, b); // if c < a && a < b then c < b
-				else if (r.kind == RelationKind::GreaterOrEqual)                      Less(r.to, b); // if c <= a && a < b then c < b
+				if      (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Less(r.to, b); // if Distance(x, a, 0) && a < b then x < b
+				else if (r.kind == Relation::Kind::Greater)                             Less(r.to, b); // if c < a && a < b then c < b
+				else if (r.kind == Relation::Kind::GreaterOrEqual)                      Less(r.to, b); // if c <= a && a < b then c < b
 			}
 		}
 
@@ -521,7 +588,7 @@ namespace IR {
 			if (a == b)
 				return; // a <= a is trivially true, skip
 
-			if (!a->relations.Add({ .context = this, .kind = RelationKind::LessOrEqual, .to = b, }))
+			if (!a->relations.Add(Relation::CreateLessOrEqual(a, b, this)))
 				return; // Already exists
 
 			GreaterOrEqual(b, a); // Non-strict duality: a <= b <=> b >= a
@@ -531,7 +598,7 @@ namespace IR {
 			for (u32 i = range_ba.begin; i < range_ba.end; i++) {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::LessOrEqual) {
+				if (r.kind == Relation::Kind::LessOrEqual) {
 					Equal(a, b); // a <= b && b <= a implies a == b
 					break;
 				}
@@ -541,9 +608,9 @@ namespace IR {
 			for (u32 i = 0; i < count_b; i++) {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if      (r.kind == RelationKind::Less)                               Less(a, r.to); // if a <= b && b < c then a < c
-				else if (r.kind == RelationKind::LessOrEqual)                        LessOrEqual(a, r.to); // if a <= b && b <= c then a <= c
-				else if (r.kind == RelationKind::Distance && r.value == Constant(0)) LessOrEqual(a, r.to); // if a <= b && Distance(b, y, 0) then a <= y
+				if      (r.kind == Relation::Kind::Less)                               Less(a, r.to); // if a <= b && b < c then a < c
+				else if (r.kind == Relation::Kind::LessOrEqual)                        LessOrEqual(a, r.to); // if a <= b && b <= c then a <= c
+				else if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) LessOrEqual(a, r.to); // if a <= b && Distance(b, y, 0) then a <= y
 			}
 
 			u32 count_a = a->relations.Count();
@@ -551,9 +618,9 @@ namespace IR {
 				Relation& r = a->relations.elements[i];
 				if (r.to == b) continue;
 				if (!CanSee(r)) continue;
-				if      (r.kind == RelationKind::Distance && r.value == Constant(0)) LessOrEqual(r.to, b); // if Distance(x, a, 0) && a <= b then x <= b
-				else if (r.kind == RelationKind::Greater)                             Less(r.to, b); // if c < a && a <= b then c < b
-				else if (r.kind == RelationKind::GreaterOrEqual)                      LessOrEqual(r.to, b); // if c <= a && a <= b then c <= b
+				if      (r.kind == Relation::Kind::Distance && r.value == Constant(0)) LessOrEqual(r.to, b); // if Distance(x, a, 0) && a <= b then x <= b
+				else if (r.kind == Relation::Kind::Greater)                             Less(r.to, b); // if c < a && a <= b then c < b
+				else if (r.kind == Relation::Kind::GreaterOrEqual)                      LessOrEqual(r.to, b); // if c <= a && a <= b then c <= b
 			}
 		}
 
@@ -561,7 +628,7 @@ namespace IR {
 			if (a == b)
 				return; // Can't be greater than itself
 
-			if (!a->relations.Add({ .context = this, .kind = RelationKind::Greater, .to = b, }))
+			if (!a->relations.Add(Relation::CreateGreater(a, b, this)))
 				return; // Already exists
 
 			Less(b, a); // Strict-order duality: a > b <=> b < a
@@ -573,9 +640,9 @@ namespace IR {
 			for (u32 i = 0; i < count_b; i++) {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if      (r.kind == RelationKind::Greater)                            Greater(a, r.to); // if a > b && b > c then a > c
-				else if (r.kind == RelationKind::GreaterOrEqual)                     Greater(a, r.to); // if a > b && b >= c then a > c
-				else if (r.kind == RelationKind::Distance && r.value == Constant(0)) Greater(a, r.to); // if a > b && Distance(b, y, 0) then a > y
+				if      (r.kind == Relation::Kind::Greater)                            Greater(a, r.to); // if a > b && b > c then a > c
+				else if (r.kind == Relation::Kind::GreaterOrEqual)                     Greater(a, r.to); // if a > b && b >= c then a > c
+				else if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Greater(a, r.to); // if a > b && Distance(b, y, 0) then a > y
 			}
 
 			u32 count_a = a->relations.Count();
@@ -583,9 +650,9 @@ namespace IR {
 				Relation& r = a->relations.elements[i];
 				if (r.to == b) continue;
 				if (!CanSee(r)) continue;
-				if      (r.kind == RelationKind::Distance && r.value == Constant(0)) Greater(r.to, b); // if Distance(x, a, 0) && a > b then x > b
-				else if (r.kind == RelationKind::Less)                               Greater(r.to, b); // if c > a && a > b then c > b
-				else if (r.kind == RelationKind::LessOrEqual)                        Greater(r.to, b); // if c >= a && a > b then c > b
+				if      (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Greater(r.to, b); // if Distance(x, a, 0) && a > b then x > b
+				else if (r.kind == Relation::Kind::Less)                               Greater(r.to, b); // if c > a && a > b then c > b
+				else if (r.kind == Relation::Kind::LessOrEqual)                        Greater(r.to, b); // if c >= a && a > b then c > b
 			}
 		}
 
@@ -593,7 +660,7 @@ namespace IR {
 			if (a == b)
 				return; // a >= a is trivially true, skip
 
-			if (!a->relations.Add({ .context = this, .kind = RelationKind::GreaterOrEqual, .to = b, }))
+			if (!a->relations.Add(Relation::CreateGreaterOrEqual(a, b, this)))
 				return; // Already exists
 
 			LessOrEqual(b, a); // Non-strict duality: a >= b <=> b <= a
@@ -603,7 +670,7 @@ namespace IR {
 			for (u32 i = range_ba.begin; i < range_ba.end; i++) {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::GreaterOrEqual) {
+				if (r.kind == Relation::Kind::GreaterOrEqual) {
 					Equal(a, b); // a >= b && b >= a implies a == b
 					break;
 				}
@@ -613,9 +680,9 @@ namespace IR {
 			for (u32 i = 0; i < count_b; i++) {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if      (r.kind == RelationKind::Greater)                            Greater(a, r.to); // if a >= b && b > c then a > c
-				else if (r.kind == RelationKind::GreaterOrEqual)                     GreaterOrEqual(a, r.to); // if a >= b && b >= c then a >= c
-				else if (r.kind == RelationKind::Distance && r.value == Constant(0)) GreaterOrEqual(a, r.to); // if a >= b && Distance(b, y, 0) then a >= y
+				if      (r.kind == Relation::Kind::Greater)                            Greater(a, r.to); // if a >= b && b > c then a > c
+				else if (r.kind == Relation::Kind::GreaterOrEqual)                     GreaterOrEqual(a, r.to); // if a >= b && b >= c then a >= c
+				else if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) GreaterOrEqual(a, r.to); // if a >= b && Distance(b, y, 0) then a >= y
 			}
 
 			u32 count_a = a->relations.Count();
@@ -623,9 +690,9 @@ namespace IR {
 				Relation& r = a->relations.elements[i];
 				if (r.to == b) continue;
 				if (!CanSee(r)) continue;
-				if      (r.kind == RelationKind::Distance && r.value == Constant(0)) GreaterOrEqual(r.to, b); // if Distance(x, a, 0) && a >= b then x >= b
-				else if (r.kind == RelationKind::Less)                               Greater(r.to, b); // if a < x && a >= b then x > b
-				else if (r.kind == RelationKind::LessOrEqual)                        GreaterOrEqual(r.to, b); // if a <= x && a >= b then x >= b
+				if      (r.kind == Relation::Kind::Distance && r.value == Constant(0)) GreaterOrEqual(r.to, b); // if Distance(x, a, 0) && a >= b then x >= b
+				else if (r.kind == Relation::Kind::Less)                               Greater(r.to, b); // if a < x && a >= b then x > b
+				else if (r.kind == Relation::Kind::LessOrEqual)                        GreaterOrEqual(r.to, b); // if a <= x && a >= b then x >= b
 			}
 		}
 
@@ -635,7 +702,7 @@ namespace IR {
 			if (a == b)
 				return; // Distance from a to itself is trivial
 
-			if (!a->relations.Add({ .context = this, .kind = RelationKind::Distance, .to = b, .value = distance, }))
+			if (!a->relations.Add(Relation::CreateDistance(a, b, distance, this)))
 				return; // Already exists
 
 			u32 count = a->relations.Count();
@@ -643,21 +710,21 @@ namespace IR {
 				Relation& r = a->relations.elements[i];
 				if (r.to == b) continue;
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::Distance && r.value == Constant(0)) Distance(r.to, b, distance); // if Distance(a, x, 0) then Distance(x, b, distance)
+				if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Distance(r.to, b, distance); // if Distance(a, x, 0) then Distance(x, b, distance)
 			}
 
 			count = b->relations.Count();
 			for (u32 i = 0; i < count; i++) {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::Distance && r.value == Constant(0)) Distance(a, r.to, distance); // if Distance(b, y, 0) then Distance(a, y, distance)
+				if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Distance(a, r.to, distance); // if Distance(b, y, 0) then Distance(a, y, distance)
 			}
 
 			count = distance->relations.Count();
 			for (u32 i = 0; i < count; i++) {
 				Relation& r = distance->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::Distance && r.value == Constant(0)) Distance(a, b, r.to); // if Distance(distance, z, 0) then Distance(a, b, z)
+				if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Distance(a, b, r.to); // if Distance(distance, z, 0) then Distance(a, b, z)
 			}
 
 			// Transitivity: if Distance(a, b, d1) && Distance(b, c, d2) then Distance(a, c, d1+d2)
@@ -665,7 +732,7 @@ namespace IR {
 			for (u32 i = 0; i < count; i++) {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::Distance) {
+				if (r.kind == Relation::Kind::Distance) {
 					// Have: Distance(a, b, distance) and Distance(b, r.to, r.value)
 					// Want: Distance(a, r.to, distance + r.value)
 					// TODO: Need arithmetic Add(distance, r.value) -> sum
@@ -679,28 +746,28 @@ namespace IR {
 		void Remainder(Value a, Value b, Value remainder) {
 			// Remainder(a, b, r) means: a % b = r
 
-			if (!a->relations.Add({ .context = this, .kind = RelationKind::Remainder, .to = b, .value = remainder, }))
+			if (!a->relations.Add(Relation::CreateRemainder(a, b, remainder, this)))
 				return; // Already exists
 
 			u32 count = a->relations.Count();
 			for (u32 i = 0; i < count; i++) {
 				Relation& r = a->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::Distance && r.value == Constant(0)) Remainder(r.to, b, remainder); // if Distance(a, x, 0) then Remainder(x, b, remainder)
+				if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Remainder(r.to, b, remainder); // if Distance(a, x, 0) then Remainder(x, b, remainder)
 			}
 
 			count = b->relations.Count();
 			for (u32 i = 0; i < count; i++) {
 				Relation& r = b->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::Distance && r.value == Constant(0)) Remainder(a, r.to, remainder); // if Distance(b, y, 0) then Remainder(a, y, remainder)
+				if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Remainder(a, r.to, remainder); // if Distance(b, y, 0) then Remainder(a, y, remainder)
 			}
 
 			count = remainder->relations.Count();
 			for (u32 i = 0; i < count; i++) {
 				Relation& r = remainder->relations.elements[i];
 				if (!CanSee(r)) continue;
-				if (r.kind == RelationKind::Distance && r.value == Constant(0)) Remainder(a, b, r.to); // if Distance(remainder, z, 0) then Remainder(a, b, z)
+				if (r.kind == Relation::Kind::Distance && r.value == Constant(0)) Remainder(a, b, r.to); // if Distance(remainder, z, 0) then Remainder(a, b, z)
 			}
 
 			// Note: Additional inferences like "if remainder == 0 then b divides a"
@@ -757,6 +824,33 @@ namespace IR {
 		return c;
 	}
 
+	inline Context* Context::Intersect(Context* other) {
+		Assert(other);
+
+		Context* c = &empty_context;
+		u32 i = 0;
+		u32 j = 0;
+
+		// Inline version of Set::Intersect. Avoids allocation.
+		while (i < keys.Count() && j < other->keys.Count()) {
+			Key& a = keys.elements[i];
+			Key& b = other->keys.elements[j];
+			if (a == b) {
+				c = c->Get(a);
+				i++;
+				j++;
+			}
+			else if (a < b) {
+				i++;
+			}
+			else {
+				j++;
+			}
+		}
+
+		return c;
+	}
+
 	// Helper to create a trigger (allocates from stack)
 	static Trigger* CreateTrigger(Array<Value> deps, void (*callback)(void*, Context*, Trigger*), void* node = null) {
 		Trigger* t = stack.New<Trigger>(deps, callback, node);
@@ -805,6 +899,6 @@ namespace IR {
 static void Write(struct OutputBuffer* buffer, IR::Value value);
 static void Write(struct OutputBuffer* buffer, IR::Relation relation);
 static void Write(struct OutputBuffer* buffer, Array<IR::Relation> relations);
-static void Write(struct OutputBuffer* buffer, IR::RelationKind kind);
+static void Write(struct OutputBuffer* buffer, IR::Relation::Kind kind);
 static void Write(struct OutputBuffer* buffer, IR::Context context);
 static void Write(struct OutputBuffer* buffer, IR::ValueFlag);

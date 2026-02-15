@@ -491,6 +491,8 @@ static void Test_ContextInference() {
 	context_b->Equal(c, Constant(1));
 
 	Context* context_c = empty_context.Get(Context::Key(Relation::Distance, c, Constant(42), Constant(0)));
+
+	IR::PrintState();
 	Assert(context_c->IsLess(a, b) == true);
 }
 

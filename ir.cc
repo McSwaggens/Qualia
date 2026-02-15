@@ -23,18 +23,6 @@ static void Write(OutputBuffer* buffer, IR::Value value) {
 	Write(buffer, value.handle);
 }
 
-static void WriteRelationSymbol(OutputBuffer* buffer, IR::Relation::Kind kind) {
-	switch (kind) {
-		case IR::Relation::NotEqual:         buffer->Write("!="); break;
-		case IR::Relation::Less:             buffer->Write("<"); break;
-		case IR::Relation::LessOrEqual:      buffer->Write("<="); break;
-		case IR::Relation::Greater:          buffer->Write(">"); break;
-		case IR::Relation::GreaterOrEqual:   buffer->Write(">="); break;
-		case IR::Relation::Distance:         buffer->Write("dist"); break;
-		case IR::Relation::Remainder:        buffer->Write("rem"); break;
-	}
-}
-
 static void Write(OutputBuffer* buffer, IR::Relation::Kind kind) {
 	switch (kind) {
 		case IR::Relation::NotEqual:         buffer->Write("NotEqual"); break;
@@ -52,32 +40,40 @@ static void Write(OutputBuffer* buffer, IR::ValueFlag flag) {
 	if (flag & IR::VALUE_LONG_CONSTANT) buffer->Write("LONG_CONSTANT");
 }
 
-static void Write(OutputBuffer* buffer, IR::Relation relation) {
-	WriteRelationSymbol(buffer, relation.kind);
-	Write(buffer, relation.to);
+static void WriteContextKey(OutputBuffer* buffer, IR::Context::Key key) {
+	Write(buffer, key.kind);
 	buffer->Write("(");
-
-	for (u32 i = 0; i < relation.context->keys.Count(); i++) {
-		if (i > 0) buffer->Write(",");
-		auto& key = relation.context->keys.elements[i];
-		WriteRelationSymbol(buffer, key.kind);
-		Write(buffer, key.from);
-		buffer->Write(":");
-		Write(buffer, key.to);
-		if (key.value) {
-			buffer->Write(":");
-			Write(buffer, key.value);
-		}
+	Write(buffer, key.from);
+	buffer->Write(", ");
+	Write(buffer, key.to);
+	if (key.value) {
+		buffer->Write(", ");
+		Write(buffer, key.value);
 	}
-
 	buffer->Write(")");
 }
 
-static void Write(OutputBuffer* buffer, Array<IR::Relation> relations) {
+static void Write(OutputBuffer* buffer, IR::Value from, IR::Relation relation) {
+	Write(buffer, relation.kind);
+	buffer->Write("(");
+	Write(buffer, relation.to);
+	if (relation.value.IsValid()) {
+		buffer->Write(", ");
+		Write(buffer, relation.value);
+	}
+	buffer->Write(")[");
+	for (u32 i = 0; i < relation.context->keys.Count(); i++) {
+		if (i > 0) buffer->Write(", ");
+		WriteContextKey(buffer, relation.context->keys.elements[i]);
+	}
+	buffer->Write("]");
+}
+
+static void Write(OutputBuffer* buffer, IR::Value from, Array<IR::Relation> relations) {
 	buffer->Write("[");
 	for (u32 i = 0; i < relations.length; i++) {
 		if (i > 0) buffer->Write(", ");
-		Write(buffer, relations[i]);
+		Write(buffer, from, relations[i]);
 	}
 	buffer->Write("]");
 }
@@ -85,35 +81,31 @@ static void Write(OutputBuffer* buffer, Array<IR::Relation> relations) {
 static void Write(OutputBuffer* buffer, IR::Context context) {
 	buffer->Write("Context@");
 	Write(buffer, (void*)&context);
-	buffer->Write(" {");
-
 	if (context.parent) {
 		buffer->Write(" parent=");
 		Write(buffer, (void*)context.parent);
 	}
-
 	buffer->Write(" keys=[");
 	for (u32 i = 0; i < context.keys.Count(); i++) {
 		if (i > 0) buffer->Write(", ");
-		auto& key = context.keys.elements[i];
-		Write(buffer, key.kind);
-		buffer->Write("(");
-		Write(buffer, key.from);
-		buffer->Write(", ");
-		Write(buffer, key.to);
-		if (key.value) {
-			buffer->Write(", ");
-			Write(buffer, key.value);
-		}
-		buffer->Write(")");
+		WriteContextKey(buffer, context.keys.elements[i]);
 	}
-	buffer->Write("] }");
+	buffer->Write("]");
+}
+
+struct ValueRelations {
+	IR::Value value;
+	Array<IR::Relation> relations;
+};
+
+static void Write(OutputBuffer* buffer, ValueRelations vr) {
+	Write(buffer, vr.value, vr.relations);
 }
 
 static void IR::PrintState() {
 	Print("IR Values:\n");
 	for (u32 i = 1; i < value_buffer.head; i++) {
 		Value value = i;
-		Print("% = %\n", value, value->relations.elements.ToArray());
+		Print("% = %\n", value, ValueRelations { value, value->relations.elements.ToArray() });
 	}
 }

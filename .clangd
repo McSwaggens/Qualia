@@ -1,0 +1,36 @@
+CompileFlags:
+  Add:
+    - -std=c++23
+    - -nostdinc++
+    - -fno-rtti
+    - -fno-exceptions
+  Remove:
+    - -std=c++*
+
+# Suppress unhelpful diagnostics
+Diagnostics:
+  UnusedIncludes: None          # Don't warn about unused includes
+  MissingIncludes: None         # Don't warn about missing std library headers
+  ClangTidy:
+    Remove:
+      - modernize-*             # Skip modernize checks
+      - readability-identifier-length  # Allow short names like 'i', 'n', 'c'
+
+# Show type information inline (helpful with auto)
+InlayHints:
+  Enabled: Yes
+  ParameterNames: Yes           # Show parameter names in function calls
+  DeducedTypes: Yes             # Show deduced types for auto
+  Designators: Yes              # Show designators in aggregate initialization
+
+# Control indexing behavior
+Index:
+  Background: Build             # Index in background, prioritize build files
+  StandardLibrary: No           # Don't index standard library
+
+# Exclude build artifacts and object files
+If:
+  PathExclude:
+    - ".*\\.o$"
+    - "qualia$"
+    - "tests/.*$"               # Exclude test binaries

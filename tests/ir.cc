@@ -459,6 +459,150 @@ static void Test_EqualityTransitivity() {
     Assert(ctx->IsEqual(a, c) == true, "Equality transitivity: a == b && b == c should infer a == c");
 }
 
+// Nested conditional contexts (realistic control flow)
+// IR equivalent of:
+//   Foo(a: int, b: int) -> int:
+//       c := 1
+//       r := 0
+//       // Context A
+//       if a < b:
+//           c = 42
+//           // Context B
+//       if c = 42:
+//           // Context C
+//           if a < b:
+//               r = 1
+//               // Context D
+//       if a < b:
+//           // Context E
+//       // Context F
+// Tests context hierarchy, inheritance, and sibling isolation
+static void Test_NestedConditionalContexts() {
+    IR::Value a = IR::NewValue();
+    IR::Value b = IR::NewValue();
+    IR::Value c = IR::NewValue();
+    IR::Value c_cond = IR::NewValue();  // Use separate value for condition to avoid conflicts
+    IR::Value r = IR::NewValue();
+    IR::Value one = IR::Constant(1);
+    IR::Value forty_two = IR::Constant(42);
+    IR::Value zero = IR::Constant(0);
+
+    // Context A: root context, nothing known about relationships
+    Assert(ctx->IsLess(a, b) == OptNone, "Context A: don't know if a < b");
+
+    // Context B: if (a < b) { c = 42; }
+    IR::Context* ctxB = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    ctxB->Less(a, b);  // Add the actual relation we're testing
+    Assert(ctxB->IsLess(a, b) == true, "Context B: knows a < b from condition");
+    // Inside B, we assign c = 42
+    ctxB->Equal(c, forty_two);
+    Assert(ctxB->IsEqual(c, forty_two) == true, "Context B: knows c == 42 after assignment");
+
+    // Back to Context A - parent shouldn't see child's assignments
+    Assert(ctx->IsEqual(c, forty_two) == OptNone, "Context A: doesn't see child B's c == 42");
+    Assert(ctx->IsLess(a, b) == OptNone, "Context A: doesn't know a < b outside branch");
+
+    // Context C: if (c == 42) at root level (sibling to B)
+    IR::Context* ctxC = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    ctxC->Equal(c, forty_two);  // Add the actual relation we're testing
+    Assert(ctxC->IsEqual(c, forty_two) == true, "Context C: knows c == 42 from condition");
+    Assert(ctxC->IsLess(a, b) == OptNone, "Context C: doesn't know a < b (that was only in sibling B)");
+
+    // Context D: nested inside C, if (a < b) { r = 1; }
+    IR::Context* ctxD = ctxC->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    ctxD->Less(a, b);  // Add the actual relation we're testing
+    Assert(ctxD->IsEqual(c, forty_two) == true, "Context D: inherits c == 42 from parent C");
+    Assert(ctxD->IsLess(a, b) == true, "Context D: knows a < b from own condition");
+    // Key test: D knows BOTH c == 42 (inherited) AND a < b (own condition)
+    // This models the case where we're inside nested ifs with different conditions
+    ctxD->Equal(r, one);
+    Assert(ctxD->IsEqual(r, one) == true, "Context D: knows r == 1 after assignment");
+
+    // Context E: back to root level, another if (a < b)
+    // This creates a sibling context (different key from B because different values)
+    IR::Context* ctxE = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    ctxE->Less(a, b);  // Add the actual relation we're testing
+    Assert(ctxE->IsLess(a, b) == true, "Context E: knows a < b from condition");
+    Assert(ctxE->IsEqual(c, forty_two) == OptNone, "Context E: doesn't know c == 42 (was in sibling branch C/D)");
+    Assert(ctxE->IsEqual(r, one) == OptNone, "Context E: doesn't know r == 1 (was in sibling branch D)");
+
+    // Context F: back to root after all branches
+    Assert(ctx->IsLess(a, b) == OptNone, "Context F (root): still doesn't know a < b");
+    Assert(ctx->IsEqual(c, forty_two) == OptNone, "Context F (root): still doesn't know c == 42");
+    Assert(ctx->IsEqual(r, one) == OptNone, "Context F (root): still doesn't know r == 1");
+
+    // Verify complete isolation: siblings don't see each other's relations
+    Assert(ctxB->IsEqual(r, one) == OptNone, "Context B: doesn't see sibling D's r == 1");
+    Assert(ctxE->IsEqual(c, forty_two) == OptNone, "Context E: doesn't see sibling B's c == 42");
+}
+
+// Stress test: many values/relations across many contexts
+// Verifies long-distance inference and strict context isolation.
+static void Test_StressManyValuesManyContexts() {
+    constexpr u32 CHAIN_COUNT = 128;
+    constexpr u32 NOISE_COUNT = 64;
+    constexpr u32 ALIAS_COUNT = 32;
+
+    // Long root chain: v0 < v1 < ... < v127
+    IR::Value chain[CHAIN_COUNT];
+    for (u32 i = 0; i < CHAIN_COUNT; i++)
+        chain[i] = IR::NewValue();
+    for (u32 i = 0; i + 1 < CHAIN_COUNT; i++)
+        ctx->Less(chain[i], chain[i + 1]);
+
+    // Add many different relation kinds in root context.
+    IR::Value aliases[ALIAS_COUNT];
+    for (u32 i = 0; i < ALIAS_COUNT; i++) {
+        aliases[i] = IR::NewValue();
+        ctx->Equal(chain[i], aliases[i]); // Distance(..., 0)
+    }
+
+    for (u32 i = 0; i < NOISE_COUNT; i++) {
+        IR::Value a = IR::NewValue();
+        IR::Value b = IR::NewValue();
+        IR::Value c = IR::NewValue();
+        IR::Value d = IR::NewValue();
+
+        ctx->LessOrEqual(a, b);
+        ctx->Greater(c, d);
+        ctx->NotEqual(a, d);
+        ctx->Remainder(b, c, IR::Constant(i % 11));
+    }
+
+    Assert(ctx->IsLess(chain[0], chain[CHAIN_COUNT - 1]) == true, "Root should infer long-chain Less across many hops");
+    Assert(ctx->IsEqual(chain[0], aliases[0]) == true, "Root should preserve equality aliases under load");
+
+    // Build sibling context trees.
+    IR::Context* left = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    IR::Context* right = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    IR::Context* left_deep = left->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    IR::Context* left_far = left_deep->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+    IR::Context* right_deep = right->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
+
+    // Left branch extends the long root chain.
+    IR::Value left_tail = IR::NewValue();
+    IR::Value left_mid = IR::NewValue();
+    IR::Value left_goal = IR::NewValue();
+    left->Less(chain[CHAIN_COUNT - 1], left_tail);
+    left_deep->LessOrEqual(left_tail, left_mid);
+    left_far->Less(left_mid, left_goal);
+
+    Assert(left_far->IsLess(chain[0], left_goal) == true, "Deep context should infer through long root chain and branch-local relations");
+    Assert(left_far->IsLess(aliases[0], left_goal) == true, "Deep context should use equality alias plus long-distance transitivity");
+
+    // Right branch adds unrelated constraints that must not leak to left.
+    IR::Value right_x = IR::NewValue();
+    IR::Value right_y = IR::NewValue();
+    right_deep->Greater(right_x, right_y);
+
+    Assert(right_deep->IsLess(chain[0], chain[CHAIN_COUNT - 1]) == true, "Sibling branch should still inherit distant root inference");
+    Assert(right_deep->IsGreater(right_x, right_y) == true, "Right branch should see its own relations");
+
+    Assert(ctx->IsLess(chain[CHAIN_COUNT - 1], left_tail) == OptNone, "Root should not see child-only relations");
+    Assert(right_deep->IsLess(chain[CHAIN_COUNT - 1], left_tail) == OptNone, "Sibling branch should not see left-branch relations");
+    Assert(left_far->IsGreater(right_x, right_y) == OptNone, "Left branch should not see right-branch relations");
+}
+
 int main() {
     InitCrashHandler();
     InitGlobalAllocator();
@@ -505,6 +649,8 @@ int main() {
     Test_LessOrEqualWithSelf();
     Test_GreaterOrEqualWithSelf();
     Test_EqualityTransitivity();
+    Test_NestedConditionalContexts();
+    Test_StressManyValuesManyContexts();
 
     Print("All IR tests passed!\n");
     output_buffer.Flush();

@@ -24,7 +24,9 @@ FLAGS += -mcmodel=medium -nostdinc++ -fno-rtti -fno-exceptions -Wno-vla-cxx-exte
 FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wshift-op-parentheses
 # FLAGS += -MJ compile_commands.json
 
-qualia_xxx: *.cc *.h $(OS_FILE).o
+all: qualia
+
+qualia: *.cc *.h $(OS_FILE).o
 	clang -lm -no-pie $(FLAGS) qualia.cc $(OS_FILE).o -o qualia
 
 $(OS_FILE).o: $(OS_FILE).cc
@@ -33,16 +35,21 @@ $(OS_FILE).o: $(OS_FILE).cc
 general.o: general.asm
 	nasm -felf64 general.asm -o general.o
 
-run: qualia_xxx
+run: qualia
 	./qualia
 
-time: qualia_xxx
+time: qualia
 	fish -c "time ./qualia"
 
-test: qualia_xxx
+tests/ir: tests/ir.cc *.h $(OS_FILE).o
+	clang -lm -no-pie $(FLAGS) tests/ir.cc $(OS_FILE).o -o tests/ir
+
+test: qualia tests/ir
 	./run_tests.sh
+
+.PHONY: all run time test clean
 
 clean:
 	rm -f qualia
+	rm -f tests/ir tests/ir_*
 	rm -f *.o
-

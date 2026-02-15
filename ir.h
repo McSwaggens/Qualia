@@ -329,16 +329,21 @@ namespace IR {
 				else if (r.kind == RelationKind::Distance && r.value == zero)           facts.eq = true;
 			}
 
-			Assert(facts.lt == facts.gt); // strict duality: (a < b) <=> (b > a)
-			Assert(facts.le == facts.ge); // non-strict duality: (a <= b) <=> (b >= a)
-			Assert(!facts.eq || !facts.ne);
+			Assert(!(facts.lt && facts.gt)); // strict ordering: a < b and a > b are mutually exclusive
+			Assert(!facts.eq || !facts.ne);  // equality: a == b and a != b are mutually exclusive
 
 			if (facts.eq) {
 				facts.le = true;
 				facts.ge = true;
 			}
-			if (facts.lt || facts.gt)
+			if (facts.lt) {
+				facts.le = true;  // a < b implies a <= b
 				facts.ne = true;
+			}
+			if (facts.gt) {
+				facts.ge = true;  // a > b implies a >= b
+				facts.ne = true;
+			}
 
 			return facts;
 		}
@@ -521,6 +526,17 @@ namespace IR {
 
 			GreaterOrEqual(b, a); // Non-strict duality: a <= b <=> b >= a
 
+			// Antisymmetry: if a <= b && b <= a then a == b
+			RelationRange range_ba = GetRelationRangeTo(b, a);
+			for (u32 i = range_ba.begin; i < range_ba.end; i++) {
+				Relation& r = b->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if (r.kind == RelationKind::LessOrEqual) {
+					Equal(a, b); // a <= b && b <= a implies a == b
+					break;
+				}
+			}
+
 			u32 count_b = b->relations.Count();
 			for (u32 i = 0; i < count_b; i++) {
 				Relation& r = b->relations.elements[i];
@@ -581,6 +597,17 @@ namespace IR {
 				return; // Already exists
 
 			LessOrEqual(b, a); // Non-strict duality: a >= b <=> b <= a
+
+			// Antisymmetry: if a >= b && b >= a then a == b
+			RelationRange range_ba = GetRelationRangeTo(b, a);
+			for (u32 i = range_ba.begin; i < range_ba.end; i++) {
+				Relation& r = b->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if (r.kind == RelationKind::GreaterOrEqual) {
+					Equal(a, b); // a >= b && b >= a implies a == b
+					break;
+				}
+			}
 
 			u32 count_b = b->relations.Count();
 			for (u32 i = 0; i < count_b; i++) {

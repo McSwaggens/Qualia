@@ -5,4 +5,7 @@ compile_commands.json
 qualia
 .cache/
 *.dSYM/
+tests/*
+!tests/*.cc
+!tests/*.q
 

@@ -137,9 +137,9 @@ namespace IR {
 		}
 		bool operator !=(Relation o) const { return !(*this == o); }
 		bool operator <(Relation o) const {
+			if (to      != o.to)      return to      < o.to;
 			if (kind    != o.kind)    return kind    < o.kind;
 			if (context != o.context) return context < o.context;
-			if (to      != o.to)      return to      < o.to;
 			return value < o.value;
 		}
 		bool operator >(Relation o) const { return o < *this; }
@@ -256,6 +256,197 @@ namespace IR {
 			return ctx != null;
 		}
 
+		struct PairFacts {
+			bool eq = false;
+			bool ne = false;
+			bool lt = false;
+			bool le = false;
+			bool gt = false;
+			bool ge = false;
+		};
+
+		struct RelationRange {
+			u32 begin = 0;
+			u32 end = 0;
+		};
+
+		RelationRange GetRelationRangeTo(Value from, Value to) {
+			u32 count = from->relations.Count();
+			auto& relations = from->relations.elements;
+
+			u32 lo = 0;
+			u32 hi = count;
+			while (lo < hi) {
+				u32 mid = lo + ((hi - lo) >> 1);
+				if (relations[mid].to < to) lo = mid + 1;
+				else                        hi = mid;
+			}
+			u32 begin = lo;
+
+			hi = count;
+			while (lo < hi) {
+				u32 mid = lo + ((hi - lo) >> 1);
+				if (relations[mid].to > to) hi = mid;
+				else                        lo = mid + 1;
+			}
+
+			return { .begin = begin, .end = lo };
+		}
+
+		PairFacts CollectPairFacts(Value a, Value b) {
+			PairFacts facts = { };
+
+			if (a == b) {
+				facts.eq = true;
+				facts.le = true;
+				facts.ge = true;
+			}
+
+			Value zero = Constant(0);
+			RelationRange range = GetRelationRangeTo(a, b);
+			for (u32 i = range.begin; i < range.end; i++) {
+				Relation& r = a->relations.elements[i];
+				if (!CanSee(r)) continue;
+
+				if      (r.kind == RelationKind::NotEqual)                              facts.ne = true;
+				else if (r.kind == RelationKind::Less)                                  facts.lt = true;
+				else if (r.kind == RelationKind::LessOrEqual)                           facts.le = true;
+				else if (r.kind == RelationKind::Greater)                               facts.gt = true;
+				else if (r.kind == RelationKind::GreaterOrEqual)                        facts.ge = true;
+				else if (r.kind == RelationKind::Distance && r.value == zero)           facts.eq = true;
+			}
+
+			range = GetRelationRangeTo(b, a);
+			for (u32 i = range.begin; i < range.end; i++) {
+				Relation& r = b->relations.elements[i];
+				if (!CanSee(r)) continue;
+
+				if      (r.kind == RelationKind::NotEqual)                              facts.ne = true;
+				else if (r.kind == RelationKind::Less)                                  facts.gt = true;
+				else if (r.kind == RelationKind::LessOrEqual)                           facts.ge = true;
+				else if (r.kind == RelationKind::Greater)                               facts.lt = true;
+				else if (r.kind == RelationKind::GreaterOrEqual)                        facts.le = true;
+				else if (r.kind == RelationKind::Distance && r.value == zero)           facts.eq = true;
+			}
+
+			Assert(facts.lt == facts.gt); // strict duality: (a < b) <=> (b > a)
+			Assert(facts.le == facts.ge); // non-strict duality: (a <= b) <=> (b >= a)
+			Assert(!facts.eq || !facts.ne);
+
+			if (facts.eq) {
+				facts.le = true;
+				facts.ge = true;
+			}
+			if (facts.lt || facts.gt)
+				facts.ne = true;
+
+			return facts;
+		}
+
+		Optional<bool> IsEqual(Value a, Value b) {
+			PairFacts facts = CollectPairFacts(a, b);
+			if (facts.eq)
+				return true;
+
+			if (facts.ne || facts.lt || facts.gt)
+				return false;
+
+			return OptNone;
+		}
+
+		Optional<bool> IsNotEqual(Value a, Value b) {
+			PairFacts facts = CollectPairFacts(a, b);
+			if (facts.ne || facts.lt || facts.gt)
+				return true;
+
+			if (facts.eq)
+				return false;
+
+			return OptNone;
+		}
+
+		Optional<bool> IsLess(Value a, Value b) {
+			PairFacts facts = CollectPairFacts(a, b);
+			if (facts.lt)
+				return true;
+
+			if (facts.gt || facts.ge || facts.eq)
+				return false;
+
+			if (facts.le && facts.ne)
+				return true;
+
+			return OptNone;
+		}
+
+		Optional<bool> IsLessOrEqual(Value a, Value b) {
+			PairFacts facts = CollectPairFacts(a, b);
+			if (facts.lt || facts.le || facts.eq)
+				return true;
+
+			if (facts.gt)
+				return false;
+
+			if (facts.ge) {
+				if (facts.ne)
+					return false;
+				if (facts.eq)
+					return true;
+			}
+
+			return OptNone;
+		}
+
+		Optional<bool> IsGreater(Value a, Value b) {
+			return IsLess(b, a);
+		}
+
+		Optional<bool> IsGreaterOrEqual(Value a, Value b) {
+			return IsLessOrEqual(b, a);
+		}
+
+		Value Negative(Value value) {
+			Value zero = Constant(0);
+			if (value == zero)
+				return value;
+
+			// Primary form: if Distance(value, 0, n) then -value = n
+			RelationRange range = GetRelationRangeTo(value, zero);
+			Value result = { };
+			for (u32 i = range.begin; i < range.end; i++) {
+				Relation& r = value->relations.elements[i];
+				if (!CanSee(r)) continue;
+				if (r.kind != RelationKind::Distance) continue;
+
+				if (!result) result = r.value;
+				else Assert(result == r.value);
+			}
+			if (result)
+				return result;
+
+			// Involution witness: if Distance(x, 0, value) then -value = x
+			for (u32 handle = 1; handle < value_buffer.head; handle++) {
+				Value candidate = handle;
+				range = GetRelationRangeTo(candidate, zero);
+
+				for (u32 i = range.begin; i < range.end; i++) {
+					Relation& r = candidate->relations.elements[i];
+					if (!CanSee(r)) continue;
+					if (r.kind != RelationKind::Distance || r.value != value) continue;
+
+					if (!result) result = candidate;
+					else Assert(result == candidate);
+				}
+			}
+			if (result)
+				return result;
+
+			// No known negation yet, create symbolic one.
+			Value negative = NewValue();
+			Distance(value, zero, negative);
+			return negative;
+		}
+
 		void Equal(Value a, Value b) {
 			// Equal(a, b) is just Distance(a, b, 0)
 			Distance(a, b, Constant(0));
@@ -296,6 +487,8 @@ namespace IR {
 			if (!a->relations.Add({ .context = this, .kind = RelationKind::Less, .to = b, }))
 				return; // Already exists
 
+			Greater(b, a); // Strict-order duality: a < b <=> b > a
+
 			// if a < b then a != b
 			NotEqual(a, b);
 
@@ -326,6 +519,8 @@ namespace IR {
 			if (!a->relations.Add({ .context = this, .kind = RelationKind::LessOrEqual, .to = b, }))
 				return; // Already exists
 
+			GreaterOrEqual(b, a); // Non-strict duality: a <= b <=> b >= a
+
 			u32 count_b = b->relations.Count();
 			for (u32 i = 0; i < count_b; i++) {
 				Relation& r = b->relations.elements[i];
@@ -352,6 +547,8 @@ namespace IR {
 
 			if (!a->relations.Add({ .context = this, .kind = RelationKind::Greater, .to = b, }))
 				return; // Already exists
+
+			Less(b, a); // Strict-order duality: a > b <=> b < a
 
 			// if a > b then a != b
 			NotEqual(a, b);
@@ -382,6 +579,8 @@ namespace IR {
 
 			if (!a->relations.Add({ .context = this, .kind = RelationKind::GreaterOrEqual, .to = b, }))
 				return; // Already exists
+
+			LessOrEqual(b, a); // Non-strict duality: a >= b <=> b <= a
 
 			u32 count_b = b->relations.Count();
 			for (u32 i = 0; i < count_b; i++) {
@@ -447,7 +646,7 @@ namespace IR {
 			}
 
 			// Symmetry: if Distance(a, b, d) then Distance(b, a, -d)
-			// TODO: Need arithmetic Negate(distance) -> neg_distance, then Distance(b, a, neg_distance)
+			Distance(b, a, Negative(distance));
 		}
 
 		void Remainder(Value a, Value b, Value remainder) {

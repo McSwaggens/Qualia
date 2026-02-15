@@ -60,24 +60,25 @@ struct Map {
 	}
 
 	bool DoesKeyExist(Key key) {
-		return GetKeyIndex(key) != count;
+		return GetKeyIndex(key) != OptNone;
 	}
 
 	void Add(Key key, Value value) {
-		u32 index = GetKeyIndex(key);
-		if (index != count && keys[index] == key)
+		u32 index = BinarySearch(Array<Key>(keys, count), key) - keys;
+		if (index < count && keys[index] == key)
 			return;
 
-		Insert(index, key, value);
+		InsertIndex(index, key, value);
 	}
 
 	void Remove(Key key) {
-		u32 index = GetKeyIndex(key);
-		if (keys[index] != key)
+		Optional<u32> index = GetKeyIndex(key);
+		if (index == OptNone)
 			return;
 
-		Move(keys   + index, keys   + index + 1, count - (index + 1));
-		Move(values + index, values + index + 1, count - (index + 1));
+		u32 i = index.Get();
+		Move(keys   + i, keys   + i + 1, count - (i + 1));
+		Move(values + i, values + i + 1, count - (i + 1));
 
 		count -= 1;
 	}
@@ -93,11 +94,11 @@ struct Map {
 	}
 
 	Optional<Value&> TryGet(Key key) {
-		u32 index = GetKeyIndex(key);
-		if (keys[index] != key)
+		Optional<u32> index = GetKeyIndex(key);
+		if (index == OptNone)
 			return OptNone;
 
-		return values[index];
+		return values[index.Get()];
 	}
 
 	struct GetOrAddResult { bool was_inserted; Value* value; };

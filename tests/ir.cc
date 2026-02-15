@@ -6,6 +6,8 @@
 namespace Ast { struct Module; }
 static List<Ast::Module*> modules = null;
 
+#include "assert.h"
+
 #include "../general.cc"
 #include "../thread.cc"
 #include "../stacktrace.cc"
@@ -459,81 +461,35 @@ static void Test_EqualityTransitivity() {
     Assert(ctx->IsEqual(a, c) == true, "Equality transitivity: a == b && b == c should infer a == c");
 }
 
-// Nested conditional contexts (realistic control flow)
-// IR equivalent of:
-//   Foo(a: int, b: int) -> int:
-//       c := 1
-//       r := 0
-//       // Context A
-//       if a < b:
-//           c = 42
-//           // Context B
-//       if c = 42:
-//           // Context C
-//           if a < b:
-//               r = 1
-//               // Context D
-//       if a < b:
-//           // Context E
-//       // Context F
-// Tests context hierarchy, inheritance, and sibling isolation
-static void Test_NestedConditionalContexts() {
-    IR::Value a = IR::NewValue();
-    IR::Value b = IR::NewValue();
-    IR::Value c = IR::NewValue();
-    IR::Value c_cond = IR::NewValue();  // Use separate value for condition to avoid conflicts
-    IR::Value r = IR::NewValue();
-    IR::Value one = IR::Constant(1);
-    IR::Value forty_two = IR::Constant(42);
-    IR::Value zero = IR::Constant(0);
+// Context inference.
+// Foo(a, b);
+//     // Empty Context
+//
+//     if a < b:
+//         // Context A [ a < b ]
+//         c = 42
+//     else:
+//         // Context B [ a >= b ]
+//         c = 1
+//
+//     // c { [= 42(A)], [= 1(B)] }
+//
+//     if c = 42:
+//         // Context C
+//
+static void Test_ContextInference() {
+	IR::Value a = IR::NewValue();
+	IR::Value b = IR::NewValue();
+	IR::Value c = IR::NewValue();
 
-    // Context A: root context, nothing known about relationships
-    Assert(ctx->IsLess(a, b) == OptNone, "Context A: don't know if a < b");
+	IR::Context* context_a = IR::empty_context.Get({ .kind = IR::RelationKind::Less, .from = a, .to = b });
+	context_a->Equal(c, IR::Constant(42));
 
-    // Context B: if (a < b) { c = 42; }
-    IR::Context* ctxB = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
-    ctxB->Less(a, b);  // Add the actual relation we're testing
-    Assert(ctxB->IsLess(a, b) == true, "Context B: knows a < b from condition");
-    // Inside B, we assign c = 42
-    ctxB->Equal(c, forty_two);
-    Assert(ctxB->IsEqual(c, forty_two) == true, "Context B: knows c == 42 after assignment");
+	IR::Context* context_b = IR::empty_context.Get({ .kind = IR::RelationKind::GreaterOrEqual, .from = a, .to = b });
+	context_b->Equal(c, IR::Constant(1));
 
-    // Back to Context A - parent shouldn't see child's assignments
-    Assert(ctx->IsEqual(c, forty_two) == OptNone, "Context A: doesn't see child B's c == 42");
-    Assert(ctx->IsLess(a, b) == OptNone, "Context A: doesn't know a < b outside branch");
-
-    // Context C: if (c == 42) at root level (sibling to B)
-    IR::Context* ctxC = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
-    ctxC->Equal(c, forty_two);  // Add the actual relation we're testing
-    Assert(ctxC->IsEqual(c, forty_two) == true, "Context C: knows c == 42 from condition");
-    Assert(ctxC->IsLess(a, b) == OptNone, "Context C: doesn't know a < b (that was only in sibling B)");
-
-    // Context D: nested inside C, if (a < b) { r = 1; }
-    IR::Context* ctxD = ctxC->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
-    ctxD->Less(a, b);  // Add the actual relation we're testing
-    Assert(ctxD->IsEqual(c, forty_two) == true, "Context D: inherits c == 42 from parent C");
-    Assert(ctxD->IsLess(a, b) == true, "Context D: knows a < b from own condition");
-    // Key test: D knows BOTH c == 42 (inherited) AND a < b (own condition)
-    // This models the case where we're inside nested ifs with different conditions
-    ctxD->Equal(r, one);
-    Assert(ctxD->IsEqual(r, one) == true, "Context D: knows r == 1 after assignment");
-
-    // Context E: back to root level, another if (a < b)
-    // This creates a sibling context (different key from B because different values)
-    IR::Context* ctxE = ctx->Get({ .kind = IR::RelationKind::NotEqual, .from = IR::NewValue(), .to = IR::NewValue() });
-    ctxE->Less(a, b);  // Add the actual relation we're testing
-    Assert(ctxE->IsLess(a, b) == true, "Context E: knows a < b from condition");
-    Assert(ctxE->IsEqual(c, forty_two) == OptNone, "Context E: doesn't know c == 42 (was in sibling branch C/D)");
-    Assert(ctxE->IsEqual(r, one) == OptNone, "Context E: doesn't know r == 1 (was in sibling branch D)");
-
-    // Context F: back to root after all branches
-    Assert(ctx->IsLess(a, b) == OptNone, "Context F (root): still doesn't know a < b");
-    Assert(ctx->IsEqual(c, forty_two) == OptNone, "Context F (root): still doesn't know c == 42");
-    Assert(ctx->IsEqual(r, one) == OptNone, "Context F (root): still doesn't know r == 1");
-
-    // Verify complete isolation: siblings don't see each other's relations
-    Assert(ctxB->IsEqual(r, one) == OptNone, "Context B: doesn't see sibling D's r == 1");
-    Assert(ctxE->IsEqual(c, forty_two) == OptNone, "Context E: doesn't see sibling B's c == 42");
+	IR::Context* context_c = IR::empty_context.Get({ .kind = IR::RelationKind::Distance, .from = c, .to = IR::Constant(42), .value = IR::Constant(0)});
+	Assert(context_c->IsLess(a, b) == true);
 }
 
 // Stress test: many values/relations across many contexts
@@ -649,7 +605,7 @@ int main() {
     Test_LessOrEqualWithSelf();
     Test_GreaterOrEqualWithSelf();
     Test_EqualityTransitivity();
-    Test_NestedConditionalContexts();
+    Test_ContextInference();
     Test_StressManyValuesManyContexts();
 
     Print("All IR tests passed!\n");

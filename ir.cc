@@ -5,8 +5,12 @@ static void IR::Init() {
 	stack = Stack::Create(1llu<<32);
 	value_buffer.AddIndex(); // Don't use index 0.
 
-	for (int i = 0; i < 256; i++)
-		Constant((s32)i);
+	for (u64 i = 0; i < 256; i++) {
+		Value value = value_buffer.AddIndex();
+		value.Get() = (ValueData){ };
+		value->flags = VALUE_CONSTANT;
+		value->constant = Binary(i);
+	}
 }
 
 static void Write(OutputBuffer* buffer, IR::Value value) {
@@ -21,7 +25,6 @@ static void Write(OutputBuffer* buffer, IR::Value value) {
 
 static void WriteRelationSymbol(OutputBuffer* buffer, IR::RelationKind kind) {
 	switch (kind) {
-		case IR::RelationKind::Equal:            buffer->Write("="); break;
 		case IR::RelationKind::NotEqual:         buffer->Write("!="); break;
 		case IR::RelationKind::Less:             buffer->Write("<"); break;
 		case IR::RelationKind::LessOrEqual:      buffer->Write("<="); break;
@@ -34,7 +37,6 @@ static void WriteRelationSymbol(OutputBuffer* buffer, IR::RelationKind kind) {
 
 static void Write(OutputBuffer* buffer, IR::RelationKind kind) {
 	switch (kind) {
-		case IR::RelationKind::Equal:            buffer->Write("Equal"); break;
 		case IR::RelationKind::NotEqual:         buffer->Write("NotEqual"); break;
 		case IR::RelationKind::Less:             buffer->Write("Less"); break;
 		case IR::RelationKind::LessOrEqual:      buffer->Write("LessOrEqual"); break;
@@ -59,9 +61,13 @@ static void Write(OutputBuffer* buffer, IR::Relation relation) {
 		if (i > 0) buffer->Write(",");
 		auto& key = relation.context->keys.elements[i];
 		WriteRelationSymbol(buffer, key.kind);
-		Write(buffer, key.pivot);
+		Write(buffer, key.from);
 		buffer->Write(":");
 		Write(buffer, key.to);
+		if (key.value) {
+			buffer->Write(":");
+			Write(buffer, key.value);
+		}
 	}
 
 	buffer->Write(")");
@@ -92,9 +98,13 @@ static void Write(OutputBuffer* buffer, IR::Context context) {
 		auto& key = context.keys.elements[i];
 		Write(buffer, key.kind);
 		buffer->Write("(");
-		Write(buffer, key.pivot);
+		Write(buffer, key.from);
 		buffer->Write(", ");
 		Write(buffer, key.to);
+		if (key.value) {
+			buffer->Write(", ");
+			Write(buffer, key.value);
+		}
 		buffer->Write(")");
 	}
 	buffer->Write("] }");

@@ -146,18 +146,15 @@ struct GlobalAllocator {
 } static global_allocator;
 
 static void* AllocMemory(u64 size) {
-	// Print("AllocMemory(size = %)\n", size);
 	return global_allocator.Allocate(size);
 }
 
 static void FreeMemory(void* p, u64 size) {
-	// Print("FreeMemory(p = %, size = %)\n", p, size);
 	if (!p) return;
 	global_allocator.Free((byte*)p, size);
 }
 
 static void* ReAllocMemory(void* p, u64 old_size, u64 new_size) {
-	// Print("ReAllocMemory(p = %, old_size = %, new_size = %)\n", p, old_size, new_size);
 	u64 old_real_size = old_size;
 
 	old_size = global_allocator.NormalizeSize(old_size);
@@ -178,8 +175,14 @@ static void* ReAllocMemory(void* p, u64 old_size, u64 new_size) {
 }
 
 static void* CopyAllocMemory(void* p, u64 size) {
-	// Print("CopyAllocMemory(p = %, size = %)\n", p, size);
 	void* result = global_allocator.Allocate(size);
+	CopyMemory((byte*)result, (byte*)p, size);
+
+	return result;
+}
+
+static void* CopyAllocMemory(void* p, u64 size, u64 new_size) {
+	void* result = global_allocator.Allocate(new_size);
 	CopyMemory((byte*)result, (byte*)p, size);
 
 	return result;

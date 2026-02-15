@@ -476,8 +476,10 @@ static void Test_EqualityTransitivity() {
 //
 //     // c { [= 42(A)], [= 1(B)] }
 //
+//     // Context C
+//
 //     if c = 42:
-//         // Context C
+//         // Context D
 //
 static void Test_ContextInference() {
 	Value a = NewValue();
@@ -490,10 +492,18 @@ static void Test_ContextInference() {
 	Context* context_b = empty_context.Get(Context::Key(Relation::GreaterOrEqual, a, b));
 	context_b->Equal(c, Constant(1));
 
-	Context* context_c = empty_context.Get(Context::Key(Relation::Distance, c, Constant(42), Constant(0)));
+	Context* context_c = context_a->Intersect(context_b);
 
-	IR::PrintState();
-	Assert(context_c->IsLess(a, b) == true);
+	Context* context_d = context_c->Get(Context::Key(Relation::Distance, c, Constant(42), Constant(0)));
+
+	Log(*context_a);
+	Log(*context_b);
+	Log(*context_c);
+	Log(*context_d);
+
+	// IR::PrintState();
+
+	Assert(context_d->IsLess(a, b) == true);
 }
 
 // Stress test: many values/relations across many contexts
@@ -574,6 +584,7 @@ int main() {
 
     Print("Running IR tests...\n");
 
+    Test_ContextInference();
     Test_Equal();
     Test_LessTransitivity();
     Test_LessImpliesLessOrEqual();
@@ -609,7 +620,6 @@ int main() {
     Test_LessOrEqualWithSelf();
     Test_GreaterOrEqualWithSelf();
     Test_EqualityTransitivity();
-    Test_ContextInference();
     Test_StressManyValuesManyContexts();
 
     Print("All IR tests passed!\n");

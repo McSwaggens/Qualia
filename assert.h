@@ -3,6 +3,7 @@
 #include "general.h"
 
 #define StaticAssert(x) static_assert(x)
+#define Log(x) Print(#x " = %\n", x);
 
 struct InternalLocation {
 	const char* file;

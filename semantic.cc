@@ -521,6 +521,380 @@ static void ScanExpressionSubscript(Ast::Expression_Subscript* subscript, Ast::S
 	}
 }
 
+static void ScanExpressionUnaryAddressOf(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(unary->subexpression, scope, module);
+
+	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	if (!IsReference(unary->subexpression->type))
+		Error(module, unary, "Cannot take address of non-lvalue (type: %).\n", unary->subexpression->type);
+
+	// Take address of ref T -> get *T (pointer to T)
+	TypeID subtype = GetSubType(unary->subexpression->type);
+	unary->type = GetPointer(subtype);
+}
+
+static void ScanExpressionUnaryReferenceOf(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(unary->subexpression, scope, module);
+
+	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	TypeID ptr_type = RemoveReference(unary->subexpression->type);
+
+	if (GetTypeKind(ptr_type) != TYPE_POINTER)
+		Error(module, unary, "Cannot dereference non-pointer type: %\n", ptr_type);
+
+	TypeID subtype = GetSubType(ptr_type);
+	unary->type = GetReference(subtype);  // Dereferencing gives lvalue
+}
+
+static void ScanExpressionUnaryBitwiseNot(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(unary->subexpression, scope, module);
+	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	if (IsInteger(GetArithmeticBackingType(unary->subexpression->type))) {
+		unary->subexpression = ImplicitCast(unary->subexpression, GetArithmeticBackingType(unary->subexpression->type), module);
+		unary->type = unary->subexpression->type;
+	}
+	else if (GetTypeKind(unary->subexpression->type) == TYPE_POINTER) {
+		unary->type = unary->subexpression->type;
+	}
+	else Error(module, unary->subexpression, "Type % is not an integer or pointer.\n", unary->subexpression->type);
+}
+
+static void ScanExpressionUnaryMinus(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(unary->subexpression, scope, module);
+	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	if (!IsInteger(GetArithmeticBackingType(unary->subexpression->type)) && GetTypeKind(unary->subexpression->type) != TYPE_POINTER && !IsFloat(unary->subexpression->type))
+		Error(module, unary->subexpression, "Unary minus does not work on type '%'.\n", unary->subexpression->type);
+
+	unary->subexpression = ImplicitCast(unary->subexpression, GetArithmeticBackingType(unary->subexpression->type), module);
+	unary->type = unary->subexpression->type;
+}
+
+static void ScanExpressionUnaryPlus(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(unary->subexpression, scope, module);
+	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	if (!IsSignedInteger(unary->subexpression->type) && !IsFloat(unary->subexpression->type))
+		Error(module, unary->subexpression, "Unary plus can only be applied to a signed integer or float.\n", unary->subexpression->type);
+
+	unary->type = unary->subexpression->type;
+}
+
+static void ScanExpressionUnaryNot(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(unary->subexpression, scope, module);
+	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	if (!CanCast(CAST_IMPLICIT, unary->subexpression->type, TYPE_BOOL))
+		Error(module, unary->subexpression, "Type % cannot be casted to bool.\n", unary->subexpression->type);
+
+	unary->subexpression = ImplicitCast(unary->subexpression, TYPE_BOOL, module);
+	unary->type = TYPE_BOOL;
+}
+
+static void ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(binary->left,  scope, module);
+
+	TypeID type = binary->left->type;
+
+	if (type == TYPE_EMPTY_TUPLE)
+		Error(module, binary->left, "Cannot dot into empty tuple.\n");
+
+	if (binary->left->kind == Ast::Expression::TERMINAL_ENUM) {
+		Ast::Enum* ast_enum = ((Ast::Expression_Enum*)binary->left)->enumeration;
+
+		if (binary->right->kind != Ast::Expression::TERMINAL_NAME)
+			Error(module, binary->right, "Expected enum member name.\n");
+
+		binary->right->kind = Ast::Expression::TERMINAL_ENUM_MEMBER;
+
+		Ast::Expression_Enum_Member* member_terminal = (Ast::Expression_Enum_Member*)binary->right;
+		String name = member_terminal->token->identifier_string;
+
+		Ast::Enum_Member* member = FindEnumMember(ast_enum, name);
+
+		if (!member)
+			Error(module, binary->right, "Enum % does not contain a member called \"%\".", ast_enum->name, name);
+
+		member_terminal->member = member;
+		member_terminal->type = type;
+		member_terminal->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
+
+		binary->type = type;
+		binary->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
+	}
+	else if (binary->right->kind == Ast::Expression::TERMINAL_NAME && ((Ast::Expression_Terminal*)binary->right)->token->kind == TOKEN_IDENTIFIER_CASUAL) {
+		Ast::Expression_Terminal* terminal = (Ast::Expression_Terminal*)binary->right;
+		String name = terminal->token->identifier_string;
+
+		// Unwrap references, then pointers
+		type = RemoveReference(type);
+		while (GetTypeKind(type) == TYPE_POINTER)
+			type = GetSubType(type);
+
+		if (GetTypeKind(type) == TYPE_STRUCT) {
+			binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+			Ast::Struct* ast_struct = GetTypeInfo(type)->struct_info.ast;
+			Ast::Struct_Member* member = FindStructMember(ast_struct, terminal->token->identifier_string);
+
+			if (!member)
+				Error(module, binary, "Struct % does not have a member named %\n", ast_struct->name, terminal->token);
+
+			TypeID member_type = member->type;
+
+			if (GetTypeKind(binary->left->type) == TYPE_POINTER) {
+				// Pointer member access gives lvalue
+				binary->type = GetReference(member_type);
+			} else if (IsReference(binary->left->type)) {
+				// Reference member access gives lvalue member
+				binary->type = GetReference(member_type);
+			} else {
+				// Value member access - preserve type
+				binary->type = member_type;
+			}
+
+			terminal->kind = Ast::Expression::TERMINAL_STRUCT_MEMBER;
+			((Ast::Expression_Struct_Member*)terminal)->member = member;
+			terminal->type = member->type;
+		}
+		else if (GetTypeKind(type) == TYPE_ARRAY || GetTypeKind(type) == TYPE_FIXED_ARRAY) {
+			bool fixed = GetTypeKind(type) == TYPE_FIXED_ARRAY;
+
+			if (name == "begin" || name == "data") {
+				binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
+				binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+				if (fixed) {
+					// Fixed array .data/.begin gives lvalue to first element
+					binary->type = GetReference(GetSubType(binary->left->type));
+				} else {
+					// Dynamic array .data/.begin is a pointer (not ref)
+					binary->type = GetPointer(GetSubType(binary->left->type));
+				}
+			}
+			else if (name == "end") {
+				binary->right->kind = Ast::Expression::TERMINAL_ARRAY_END;
+				binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+				binary->type = GetPointer(GetSubType(binary->left->type));
+			}
+			else if (name == "length" || name == "count") {
+				binary->right->kind = Ast::Expression::TERMINAL_ARRAY_LENGTH;
+				binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+				binary->type = TYPE_UINT64;
+				// Length is rvalue, not ref
+			}
+			else Error(module, binary->right, "'%' does not have a member named '%'.\n", type, name);
+		}
+		else Error(module, binary, "'%' does not have a member named '%'.\n", type, name);
+	}
+	else Error(module, binary, "Invalid dot expression.\n", binary->left->type);
+}
+
+static void ScanExpressionBinaryCompareEquality(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(binary->left,  scope, module);
+	ScanExpression(binary->right, scope, module);
+
+	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
+
+	if (!dominant)
+		Error(module, binary, "% and % are incompatible types.\n", binary->left->type, binary->right->type);
+
+	binary->left  = ImplicitCast(binary->left,  dominant, module);
+	binary->right = ImplicitCast(binary->right, dominant, module);
+
+	binary->type = TYPE_BOOL;
+}
+
+static void ScanExpressionBinaryCompareOrdered(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(binary->left,  scope, module);
+	ScanExpression(binary->right, scope, module);
+	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	TypeID dominant = GetDominantType(GetArithmeticBackingType(binary->left->type), GetArithmeticBackingType(binary->right->type));
+
+	if (!dominant)
+		Error(module, binary, "Incompatible types % and %\n", binary->left->type, binary->right->type);
+
+	if (!IsInteger(dominant) && !IsFloat(dominant) && GetTypeKind(dominant) != TYPE_POINTER)
+		Error(module, binary, "Cannot compare types '%' and '%'.\n", binary->left->type, binary->right->type);
+
+	binary->left  = ImplicitCast(binary->left,  dominant, module);
+	binary->right = ImplicitCast(binary->right, dominant, module);
+
+	binary->type = TYPE_BOOL;
+}
+
+static void ScanExpressionBinaryArithmetic(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(binary->left,  scope, module);
+	ScanExpression(binary->right, scope, module);
+	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	if (GetTypeKind(binary->left->type) == TYPE_POINTER) {
+		// ptr + int = ptr
+		// ptr - int = ptr
+		// ptr - ptr = int
+
+		if (binary->kind == Ast::Expression::BINARY_ADD) {
+			if (!CanCast(CAST_IMPLICIT, binary->right->type, TYPE_INT64))
+				Error(module, binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+
+			binary->right = ImplicitCast(binary->right, TYPE_INT64, module);
+			binary->type = binary->left->type;
+		}
+		else if (binary->kind == Ast::Expression::BINARY_SUBTRACT) {
+			if (GetTypeKind(binary->right->type) == TYPE_POINTER) {
+				TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
+
+				if (!dominant)
+					Error(module, binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+
+				binary->left = ImplicitCast(binary->left, dominant, module);
+				binary->right = ImplicitCast(binary->right, dominant, module);
+
+				binary->type = TYPE_INT64;
+			}
+			else if (CanCast(CAST_IMPLICIT, binary->right->type, TYPE_INT64)) {
+				binary->right = ImplicitCast(binary->right, TYPE_INT64, module);
+				binary->type = binary->left->type;
+			}
+			else
+				Error(module, binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+		}
+		else
+			Error(module, binary, "Binary expression '%' cannot be used on a pointer.\n", binary->op);
+	}
+	else if (IsFloat(binary->left->type) || IsFloat(binary->right->type)) {
+		// float + float = float
+		// float - float = float
+		// float * float = float
+		// float / float = float
+
+		TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
+
+		if (!dominant || !IsFloat(dominant) || binary->kind == Ast::Expression::BINARY_MODULO)
+			Error(module, binary, "Binary expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+
+		binary->left  = ImplicitCast(binary->left,  dominant, module);
+		binary->right = ImplicitCast(binary->right, dominant, module);
+
+		binary->type = dominant;
+	}
+	else {
+		// int + int
+		// int - int
+		// int * int
+		// int / int
+		// int % int
+
+		TypeID dominant = GetDominantType(GetArithmeticBackingType(binary->left->type), GetArithmeticBackingType(binary->right->type));
+
+		if (!dominant || !IsInteger(dominant))
+			Error(module, binary, "Binary expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+
+		binary->left = ImplicitCast(binary->left, dominant, module);
+		binary->right = ImplicitCast(binary->right, dominant, module);
+
+		binary->type = dominant;
+	}
+}
+
+static void ScanExpressionBinaryBitwise(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(binary->left,  scope, module);
+	ScanExpression(binary->right, scope, module);
+	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	// ptr OR  int = ptr
+	// ptr XOR int = ptr
+	// ptr AND int = int
+
+	if (!IsInteger(GetArithmeticBackingType(binary->left->type)) && GetTypeKind(binary->left->type) != TYPE_POINTER)
+		Error(module, binary, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
+
+	if (!IsInteger(GetArithmeticBackingType(binary->right->type)) && GetTypeKind(binary->right->type) != TYPE_POINTER)
+		Error(module, binary, "Cannot use bitwise % with type: %\n", binary->op, binary->right->type);
+
+	binary->type = binary->left->type;
+}
+
+static void ScanExpressionBinaryShift(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(binary->left,  scope, module);
+	ScanExpression(binary->right, scope, module);
+	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	if (!IsInteger(GetArithmeticBackingType(binary->left->type)) && GetTypeKind(binary->left->type) != TYPE_POINTER)
+		Error(module, binary, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
+
+	if (!IsInteger(GetArithmeticBackingType(binary->right->type)))
+		Error(module, binary, "Cannot use bitwise % with type: %\n", binary->op, binary->right->type);
+
+	binary->left  = ImplicitCast(binary->left,  GetArithmeticBackingType(binary->left->type),  module);
+	binary->right = ImplicitCast(binary->right, GetArithmeticBackingType(binary->right->type), module);
+
+	binary->type = binary->left->type;
+}
+
+static void ScanExpressionBinaryLogical(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(binary->left,  scope, module);
+	ScanExpression(binary->right, scope, module);
+	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	if (!CanCast(CAST_IMPLICIT, binary->left->type, TYPE_BOOL))
+		Error(module, binary, "% cannot be converted to bool.\n", binary->left->type);
+
+	if (!CanCast(CAST_IMPLICIT, binary->right->type, TYPE_BOOL))
+		Error(module, binary, "% cannot be converted to bool.\n", binary->right->type);
+
+	binary->left = ImplicitCast(binary->left, TYPE_BOOL, module);
+	binary->right = ImplicitCast(binary->right, TYPE_BOOL, module);
+
+	binary->type = TYPE_BOOL;
+}
+
+static void ScanExpressionIfElse(Ast::Expression_Ternary* ternary, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(ternary->left,   scope, module);
+	ScanExpression(ternary->middle, scope, module);
+	ScanExpression(ternary->right,  scope, module);
+	ternary->flags = (ternary->left->flags & ternary->middle->flags & ternary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	TypeID dominant = GetDominantType(ternary->left->type, ternary->right->type);
+
+	if (!dominant)
+		Error(module, ternary->left, "Types '%' and '%' are incompatible.\n", ternary->left->type, ternary->right->type);
+
+	if (!CanCast(CAST_IMPLICIT, ternary->middle->type, TYPE_BOOL))
+		Error(module, ternary->middle, "Type % not convertable to bool\n", ternary->middle->type);
+
+	ternary->middle = ImplicitCast(ternary->middle, TYPE_BOOL, module);
+	ternary->left   = ImplicitCast(ternary->left, dominant, module);
+	ternary->right  = ImplicitCast(ternary->right, dominant, module);
+
+	// If both branches produce references of the same type, result is also a reference
+	if (ternary->left->type == ternary->right->type && IsReference(ternary->left->type)) {
+		ternary->type = ternary->left->type;  // Preserve reference type
+	} else {
+		ternary->type = dominant;
+	}
+}
+
+static void ScanExpressionLambda(Ast::Expression* expression, Ast::Scope* scope, Ast::Module* module) {
+	Assert();
+}
+
+static void ScanExpressionAs(Ast::Expression_As* as, Ast::Scope* scope, Ast::Module* module) {
+	ScanExpression(as->expression, scope, module);
+	as->type = GetType(&as->ast_type, scope, module);
+
+	as->flags = as->expression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+
+	if (!CanCast(CAST_EXPLICIT, as->expression->type, as->type))
+		Error(module, as, "Type % is not convertable to %\n", as->expression->type, as->type);
+}
+
 static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::Module* module) {
 	switch (expression->kind) {
 		case Ast::Expression::TERMINAL_NAME:    ScanExpressionTerminalName((Ast::Expression_Terminal*)expression,  scope, module); break;
@@ -528,412 +902,57 @@ static void ScanExpression(Ast::Expression* expression, Ast::Scope* scope, Ast::
 		case Ast::Expression::ARRAY:            ScanExpressionArray((Ast::Expression_Array*)expression,            scope, module); break;
 		case Ast::Expression::TERMINAL_LITERAL: ScanExpressionLiteral((Ast::Expression_Literal*)expression,        scope, module); break;
 		case Ast::Expression::TUPLE:            ScanExpressionTuple((Ast::Expression_Tuple*)expression,            scope, module); break;
+		case Ast::Expression::CALL:             ScanExpressionCall((Ast::Expression_Call*)expression,              scope, module); break;
+		case Ast::Expression::SUBSCRIPT:        ScanExpressionSubscript((Ast::Expression_Subscript*)expression,    scope, module); break;
 
-		case Ast::Expression::UNARY_ADDRESS_OF: {
-			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
-			ScanExpression(unary->subexpression, scope, module);
+		case Ast::Expression::UNARY_ADDRESS_OF:   ScanExpressionUnaryAddressOf((Ast::Expression_Unary*)expression,   scope, module); break;
+		case Ast::Expression::UNARY_REFERENCE_OF: ScanExpressionUnaryReferenceOf((Ast::Expression_Unary*)expression, scope, module); break;
+		case Ast::Expression::UNARY_BITWISE_NOT:  ScanExpressionUnaryBitwiseNot((Ast::Expression_Unary*)expression,  scope, module); break;
+		case Ast::Expression::UNARY_MINUS:        ScanExpressionUnaryMinus((Ast::Expression_Unary*)expression,       scope, module); break;
+		case Ast::Expression::UNARY_PLUS:         ScanExpressionUnaryPlus((Ast::Expression_Unary*)expression,        scope, module); break;
+		case Ast::Expression::UNARY_NOT:          ScanExpressionUnaryNot((Ast::Expression_Unary*)expression,         scope, module); break;
 
-			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			if (!IsReference(unary->subexpression->type))
-				Error(module, unary, "Cannot take address of non-lvalue (type: %).\n", unary->subexpression->type);
-
-			// Take address of ref T -> get *T (pointer to T)
-			TypeID subtype = GetSubType(unary->subexpression->type);
-			unary->type = GetPointer(subtype);
-		} break;
-
-		case Ast::Expression::UNARY_REFERENCE_OF: {
-			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
-			ScanExpression(unary->subexpression, scope, module);
-
-			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			TypeID ptr_type = RemoveReference(unary->subexpression->type);
-
-			if (GetTypeKind(ptr_type) != TYPE_POINTER)
-				Error(module, unary, "Cannot dereference non-pointer type: %\n", ptr_type);
-
-			TypeID subtype = GetSubType(ptr_type);
-			unary->type = GetReference(subtype);  // Dereferencing gives lvalue
-		} break;
-
-		case Ast::Expression::UNARY_BITWISE_NOT: {
-			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
-			ScanExpression(unary->subexpression, scope, module);
-			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			if (IsInteger(GetArithmeticBackingType(unary->subexpression->type))) {
-				unary->subexpression = ImplicitCast(unary->subexpression, GetArithmeticBackingType(unary->subexpression->type), module);
-				unary->type = unary->subexpression->type;
-			}
-			else if (GetTypeKind(unary->subexpression->type) == TYPE_POINTER) {
-				unary->type = unary->subexpression->type;
-			}
-			else Error(module, unary->subexpression, "Type % is not an integer or pointer.\n", unary->subexpression->type);
-		} break;
-
-		case Ast::Expression::UNARY_MINUS: {
-			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
-			ScanExpression(unary->subexpression, scope, module);
-			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			if (!IsInteger(GetArithmeticBackingType(unary->subexpression->type)) && GetTypeKind(unary->subexpression->type) != TYPE_POINTER && !IsFloat(unary->subexpression->type))
-				Error(module, unary->subexpression, "Unary minus does not work on type '%'.\n", unary->subexpression->type);
-
-			unary->subexpression = ImplicitCast(unary->subexpression, GetArithmeticBackingType(unary->subexpression->type), module);
-			unary->type = unary->subexpression->type;
-		} break;
-
-		case Ast::Expression::UNARY_PLUS: {
-			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
-			ScanExpression(unary->subexpression, scope, module);
-			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			if (!IsSignedInteger(unary->subexpression->type) && !IsFloat(unary->subexpression->type))
-				Error(module, unary->subexpression, "Unary plus can only be applied to a signed integer or float.\n", unary->subexpression->type);
-
-			unary->type = unary->subexpression->type;
-		} break;
-
-		case Ast::Expression::UNARY_NOT: {
-			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expression;
-			ScanExpression(unary->subexpression, scope, module);
-			unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			if (!CanCast(CAST_IMPLICIT, unary->subexpression->type, TYPE_BOOL))
-				Error(module, unary->subexpression, "Type % cannot be casted to bool.\n", unary->subexpression->type);
-
-			unary->subexpression = ImplicitCast(unary->subexpression, TYPE_BOOL, module);
-			unary->type = TYPE_BOOL;
-		} break;
-
-		case Ast::Expression::BINARY_DOT: {
-			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
-			ScanExpression(binary->left,  scope, module);
-
-			TypeID type = binary->left->type;
-
-			if (type == TYPE_EMPTY_TUPLE)
-				Error(module, binary->left, "Cannot dot into empty tuple.\n");
-
-			if (binary->left->kind == Ast::Expression::TERMINAL_ENUM) {
-				Ast::Enum* ast_enum = ((Ast::Expression_Enum*)binary->left)->enumeration;
-
-				if (binary->right->kind != Ast::Expression::TERMINAL_NAME)
-					Error(module, binary->right, "Expected enum member name.\n");
-
-				binary->right->kind = Ast::Expression::TERMINAL_ENUM_MEMBER;
-
-				Ast::Expression_Enum_Member* member_terminal = (Ast::Expression_Enum_Member*)binary->right;
-				String name = member_terminal->token->identifier_string;
-
-				Ast::Enum_Member* member = FindEnumMember(ast_enum, name);
-
-				if (!member)
-					Error(module, binary->right, "Enum % does not contain a member called \"%\".", ast_enum->name, name);
-
-				member_terminal->member = member;
-				member_terminal->type = type;
-				member_terminal->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
-
-				binary->type = type;
-				binary->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
-			}
-			else if (binary->right->kind == Ast::Expression::TERMINAL_NAME && ((Ast::Expression_Terminal*)binary->right)->token->kind == TOKEN_IDENTIFIER_CASUAL) {
-				Ast::Expression_Terminal* terminal = (Ast::Expression_Terminal*)binary->right;
-				String name = terminal->token->identifier_string;
-
-				// Unwrap references, then pointers
-				type = RemoveReference(type);
-				while (GetTypeKind(type) == TYPE_POINTER)
-					type = GetSubType(type);
-
-				if (GetTypeKind(type) == TYPE_STRUCT) {
-					binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-					Ast::Struct* ast_struct = GetTypeInfo(type)->struct_info.ast;
-					Ast::Struct_Member* member = FindStructMember(ast_struct, terminal->token->identifier_string);
-
-					if (!member)
-						Error(module, binary, "Struct % does not have a member named %\n", ast_struct->name, terminal->token);
-
-					TypeID member_type = member->type;
-
-					if (GetTypeKind(binary->left->type) == TYPE_POINTER) {
-						// Pointer member access gives lvalue
-						binary->type = GetReference(member_type);
-					} else if (IsReference(binary->left->type)) {
-						// Reference member access gives lvalue member
-						binary->type = GetReference(member_type);
-					} else {
-						// Value member access - preserve type
-						binary->type = member_type;
-					}
-
-					terminal->kind = Ast::Expression::TERMINAL_STRUCT_MEMBER;
-					((Ast::Expression_Struct_Member*)terminal)->member = member;
-					terminal->type = member->type;
-				}
-				else if (GetTypeKind(type) == TYPE_ARRAY || GetTypeKind(type) == TYPE_FIXED_ARRAY) {
-					bool fixed = GetTypeKind(type) == TYPE_FIXED_ARRAY;
-
-					if (name == "begin" || name == "data") {
-						binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
-						binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-						if (fixed) {
-							// Fixed array .data/.begin gives lvalue to first element
-							binary->type = GetReference(GetSubType(binary->left->type));
-						} else {
-							// Dynamic array .data/.begin is a pointer (not ref)
-							binary->type = GetPointer(GetSubType(binary->left->type));
-						}
-					}
-					else if (name == "end") {
-						binary->right->kind = Ast::Expression::TERMINAL_ARRAY_END;
-						binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-						binary->type = GetPointer(GetSubType(binary->left->type));
-					}
-					else if (name == "length" || name == "count") {
-						binary->right->kind = Ast::Expression::TERMINAL_ARRAY_LENGTH;
-						binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-						binary->type = TYPE_UINT64;
-						// Length is rvalue, not ref
-					}
-					else Error(module, binary->right, "'%' does not have a member named '%'.\n", type, name);
-				}
-				else Error(module, binary, "'%' does not have a member named '%'.\n", type, name);
-			}
-			else Error(module, binary, "Invalid dot expression.\n", binary->left->type);
-		} break;
+		case Ast::Expression::BINARY_DOT: ScanExpressionBinaryDot((Ast::Expression_Binary*)expression, scope, module); break;
 
 		case Ast::Expression::BINARY_COMPARE_EQUAL:
-		case Ast::Expression::BINARY_COMPARE_NOT_EQUAL: {
-			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
-			ScanExpression(binary->left,  scope, module);
-			ScanExpression(binary->right, scope, module);
-
-			binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
-
-			if (!dominant)
-				Error(module, binary, "% and % are incompatible types.\n", binary->left->type, binary->right->type);
-
-			binary->left  = ImplicitCast(binary->left,  dominant, module);
-			binary->right = ImplicitCast(binary->right, dominant, module);
-
-			binary->type = TYPE_BOOL;
-		} break;
+		case Ast::Expression::BINARY_COMPARE_NOT_EQUAL:
+			ScanExpressionBinaryCompareEquality((Ast::Expression_Binary*)expression, scope, module);
+			break;
 
 		case Ast::Expression::BINARY_COMPARE_LESS:
 		case Ast::Expression::BINARY_COMPARE_LESS_OR_EQUAL:
 		case Ast::Expression::BINARY_COMPARE_GREATER:
-		case Ast::Expression::BINARY_COMPARE_GREATER_OR_EQUAL: {
-			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
-			ScanExpression(binary->left,  scope, module);
-			ScanExpression(binary->right, scope, module);
-			binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			TypeID dominant = GetDominantType(GetArithmeticBackingType(binary->left->type), GetArithmeticBackingType(binary->right->type));
-
-			if (!dominant)
-				Error(module, binary, "Incompatible types % and %\n", binary->left->type, binary->right->type);
-
-			if (!IsInteger(dominant) && !IsFloat(dominant) && GetTypeKind(dominant) != TYPE_POINTER)
-				Error(module, binary, "Cannot compare types '%' and '%'.\n", binary->left->type, binary->right->type);
-
-			binary->left  = ImplicitCast(binary->left,  dominant, module);
-			binary->right = ImplicitCast(binary->right, dominant, module);
-
-			binary->type = TYPE_BOOL;
-		} break;
+		case Ast::Expression::BINARY_COMPARE_GREATER_OR_EQUAL:
+			ScanExpressionBinaryCompareOrdered((Ast::Expression_Binary*)expression, scope, module);
+			break;
 
 		case Ast::Expression::BINARY_ADD:
 		case Ast::Expression::BINARY_SUBTRACT:
 		case Ast::Expression::BINARY_MULTIPLY:
 		case Ast::Expression::BINARY_DIVIDE:
-		case Ast::Expression::BINARY_MODULO: {
-			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
-			ScanExpression(binary->left,  scope, module);
-			ScanExpression(binary->right, scope, module);
-			binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			if (GetTypeKind(binary->left->type) == TYPE_POINTER) {
-				// ptr + int = ptr
-				// ptr - int = ptr
-				// ptr - ptr = int
-
-				if (binary->kind == Ast::Expression::BINARY_ADD) {
-					if (!CanCast(CAST_IMPLICIT, binary->right->type, TYPE_INT64))
-						Error(module, binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
-
-					binary->right = ImplicitCast(binary->right, TYPE_INT64, module);
-					binary->type = binary->left->type;
-				}
-				else if (binary->kind == Ast::Expression::BINARY_SUBTRACT) {
-					if (GetTypeKind(binary->right->type) == TYPE_POINTER) {
-						TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
-
-						if (!dominant)
-							Error(module, binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
-
-						binary->left = ImplicitCast(binary->left, dominant, module);
-						binary->right = ImplicitCast(binary->right, dominant, module);
-
-						binary->type = TYPE_INT64;
-					}
-					else if (CanCast(CAST_IMPLICIT, binary->right->type, TYPE_INT64)) {
-						binary->right = ImplicitCast(binary->right, TYPE_INT64, module);
-						binary->type = binary->left->type;
-					}
-					else
-						Error(module, binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
-				}
-				else
-					Error(module, binary, "Binary expression '%' cannot be used on a pointer.\n", binary->op);
-			}
-			else if (IsFloat(binary->left->type) || IsFloat(binary->right->type)) {
-				// float + float = float
-				// float - float = float
-				// float * float = float
-				// float / float = float
-
-				TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
-
-				if (!dominant || !IsFloat(dominant) || binary->kind == Ast::Expression::BINARY_MODULO)
-					Error(module, binary, "Binary expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
-
-				binary->left  = ImplicitCast(binary->left,  dominant, module);
-				binary->right = ImplicitCast(binary->right, dominant, module);
-
-				binary->type = dominant;
-			}
-			else {
-				// int + int
-				// int - int
-				// int * int
-				// int / int
-				// int % int
-
-				TypeID dominant = GetDominantType(GetArithmeticBackingType(binary->left->type), GetArithmeticBackingType(binary->right->type));
-
-				if (!dominant || !IsInteger(dominant))
-					Error(module, binary, "Binary expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
-
-				binary->left = ImplicitCast(binary->left, dominant, module);
-				binary->right = ImplicitCast(binary->right, dominant, module);
-
-				binary->type = dominant;
-			}
-		} break;
+		case Ast::Expression::BINARY_MODULO:
+			ScanExpressionBinaryArithmetic((Ast::Expression_Binary*)expression, scope, module);
+			break;
 
 		case Ast::Expression::BINARY_BITWISE_OR:
 		case Ast::Expression::BINARY_BITWISE_XOR:
-		case Ast::Expression::BINARY_BITWISE_AND: {
-			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
-			ScanExpression(binary->left,  scope, module);
-			ScanExpression(binary->right, scope, module);
-			binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			// ptr OR  int = ptr
-			// ptr XOR int = ptr
-			// ptr AND int = int
-
-			if (!IsInteger(GetArithmeticBackingType(binary->left->type)) && GetTypeKind(binary->left->type) != TYPE_POINTER)
-				Error(module, binary, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
-
-			if (!IsInteger(GetArithmeticBackingType(binary->right->type)) && GetTypeKind(binary->right->type) != TYPE_POINTER)
-				Error(module, binary, "Cannot use bitwise % with type: %\n", binary->op, binary->right->type);
-
-			binary->type = binary->left->type;
-		} break;
+		case Ast::Expression::BINARY_BITWISE_AND:
+			ScanExpressionBinaryBitwise((Ast::Expression_Binary*)expression, scope, module);
+			break;
 
 		case Ast::Expression::BINARY_LEFT_SHIFT:
-		case Ast::Expression::BINARY_RIGHT_SHIFT: {
-			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
-			ScanExpression(binary->left,  scope, module);
-			ScanExpression(binary->right, scope, module);
-			binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			if (!IsInteger(GetArithmeticBackingType(binary->left->type)) && GetTypeKind(binary->left->type) != TYPE_POINTER)
-				Error(module, binary, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
-
-			if (!IsInteger(GetArithmeticBackingType(binary->right->type)))
-				Error(module, binary, "Cannot use bitwise % with type: %\n", binary->op, binary->right->type);
-
-			binary->left  = ImplicitCast(binary->left,  GetArithmeticBackingType(binary->left->type),  module);
-			binary->right = ImplicitCast(binary->right, GetArithmeticBackingType(binary->right->type), module);
-
-			binary->type = binary->left->type;
-		} break;
-
+		case Ast::Expression::BINARY_RIGHT_SHIFT:
+			ScanExpressionBinaryShift((Ast::Expression_Binary*)expression, scope, module);
+			break;
 
 		case Ast::Expression::BINARY_AND:
-		case Ast::Expression::BINARY_OR: {
-			Ast::Expression_Binary* binary = (Ast::Expression_Binary*)expression;
-			ScanExpression(binary->left,  scope, module);
-			ScanExpression(binary->right, scope, module);
-			binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
+		case Ast::Expression::BINARY_OR:
+			ScanExpressionBinaryLogical((Ast::Expression_Binary*)expression, scope, module);
+			break;
 
-			if (!CanCast(CAST_IMPLICIT, binary->left->type, TYPE_BOOL))
-				Error(module, binary, "% cannot be converted to bool.\n", binary->left->type);
-
-			if (!CanCast(CAST_IMPLICIT, binary->right->type, TYPE_BOOL))
-				Error(module, binary, "% cannot be converted to bool.\n", binary->right->type);
-
-			binary->left = ImplicitCast(binary->left, TYPE_BOOL, module);
-			binary->right = ImplicitCast(binary->right, TYPE_BOOL, module);
-
-			binary->type = TYPE_BOOL;
-		} break;
-
-		case Ast::Expression::IF_ELSE: {
-			Ast::Expression_Ternary* ternary = (Ast::Expression_Ternary*)expression;
-			ScanExpression(ternary->left,   scope, module);
-			ScanExpression(ternary->middle, scope, module);
-			ScanExpression(ternary->right,  scope, module);
-			ternary->flags = (ternary->left->flags & ternary->middle->flags & ternary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			TypeID dominant = GetDominantType(ternary->left->type, ternary->right->type);
-
-			if (!dominant)
-				Error(module, ternary->left, "Types '%' and '%' are incompatible.\n", ternary->left->type, ternary->right->type);
-
-			if (!CanCast(CAST_IMPLICIT, ternary->middle->type, TYPE_BOOL))
-				Error(module, ternary->middle, "Type % not convertable to bool\n", ternary->middle->type);
-
-			ternary->middle = ImplicitCast(ternary->middle, TYPE_BOOL, module);
-			ternary->left   = ImplicitCast(ternary->left, dominant, module);
-			ternary->right  = ImplicitCast(ternary->right, dominant, module);
-
-			// If both branches produce references of the same type, result is also a reference
-			if (ternary->left->type == ternary->right->type && IsReference(ternary->left->type)) {
-				ternary->type = ternary->left->type;  // Preserve reference type
-			} else {
-				ternary->type = dominant;
-			}
-		} break;
-
-		case Ast::Expression::CALL: ScanExpressionCall((Ast::Expression_Call*)expression, scope, module); break;
-		
-		case Ast::Expression::LAMBDA: {
-			Assert();
-		} break;
-
-		case Ast::Expression::SUBSCRIPT: ScanExpressionSubscript((Ast::Expression_Subscript*)expression, scope, module); break;
-
-		case Ast::Expression::AS: {
-			Ast::Expression_As* as = (Ast::Expression_As*)expression;
-			ScanExpression(as->expression, scope, module);
-			as->type = GetType(&as->ast_type, scope, module);
-
-			as->flags = as->expression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
-
-			if (!CanCast(CAST_EXPLICIT, as->expression->type, as->type))
-				Error(module, as, "Type % is not convertable to %\n", as->expression->type, as->type);
-		} break;
+		case Ast::Expression::IF_ELSE: ScanExpressionIfElse((Ast::Expression_Ternary*)expression, scope, module); break;
+		case Ast::Expression::LAMBDA:  ScanExpressionLambda(expression, scope, module); break;
+		case Ast::Expression::AS:      ScanExpressionAs((Ast::Expression_As*)expression, scope, module); break;
 
 		default:
 			AssertUnreachable();
@@ -1387,7 +1406,7 @@ static void ScanAssignment(Ast::Statement* statement, Ast::Code* code, Ast::Func
 	assignment->right = ImplicitCast(assignment->right, target_type, module);
 }
 
-static void ScanBinAssignment(Ast::Statement* statement, Ast::Code* code, Ast::Function* function, Ast::Module* module) {
+static void ScanBinaryAssignment(Ast::Statement* statement, Ast::Code* code, Ast::Function* function, Ast::Module* module) {
 	Ast::Assignment* assignment = &statement->assignment;
 
 	ScanExpression(assignment->right, &code->scope, module);
@@ -1451,7 +1470,7 @@ static void ScanStatement(Ast::Statement* statement, Ast::Code* code, Ast::Funct
 		case Ast::STATEMENT_ASSIGNMENT_SUBTRACT:
 		case Ast::STATEMENT_ASSIGNMENT_MULTIPLY:
 		case Ast::STATEMENT_ASSIGNMENT_DIVIDE:
-		case Ast::STATEMENT_ASSIGNMENT_XOR: ScanBinAssignment(statement, code, function, module); break;
+		case Ast::STATEMENT_ASSIGNMENT_XOR: ScanBinaryAssignment(statement, code, function, module); break;
 	}
 }
 

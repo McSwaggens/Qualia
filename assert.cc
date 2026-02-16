@@ -8,10 +8,10 @@ static void Assert(bool b, const char* desc, InternalLocation loc) {
 	if (!IsDebug() || b) HOT
 		return;
 
-	Print("%:%: error: Assertion failed in %\n", ToString(loc.file), loc.line, ToString(loc.function));
+	Print("%:%: error: Assertion failed in %\n", CString(loc.file), loc.line, CString(loc.function));
 
 	if (desc)
-		Print("%:%: error: %\n", ToString(loc.file), loc.line, ToString(desc));
+		Print("%:%: error: %\n", CString(loc.file), loc.line, CString(desc));
 
 	PrintStackTrace();
 	DebugBreak();

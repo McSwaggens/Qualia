@@ -3,6 +3,7 @@
 #include "int.h"
 #include "array.h"
 #include "assert.h"
+#include "initlist.h"
 
 template<typename T, u64 N>
 struct FixedArray {
@@ -11,10 +12,20 @@ struct FixedArray {
 	T data[COUNT] = { };
 
 	constexpr FixedArray() = default;
-	constexpr FixedArray(T (&a)[COUNT]) : data(a) { }
+
+	constexpr FixedArray(T (&a)[COUNT]) {
+		Copy(data, a, COUNT);
+	}
 
 	template<typename U>
-	constexpr FixedArray(FixedArray<U, COUNT> o) : data(o.data) { }
+	constexpr FixedArray(FixedArray<U, COUNT> o) {
+		Copy(data, o.data, COUNT);
+	}
+
+	constexpr FixedArray(InitList<T> list) {
+		Assert(list.size() == COUNT);
+		Copy(data, (T*)list.begin(), COUNT);
+	}
 
 	constexpr auto& operator[](this auto& self, u64 n) { Assert(n < COUNT); return self.data[n]; }
 
@@ -27,6 +38,13 @@ struct FixedArray {
 	constexpr          Array<T> ToArray() { return { data, COUNT }; }
 	constexpr operator Array<T>() { return ToArray(); }
 
+	constexpr bool Contains(T value) {
+		for (u64 i = 0; i < COUNT; i++)
+			if (data[i] == value)
+				return true;
+		return false;
+	}
+
 	constexpr bool operator ==(FixedArray<T, COUNT> o) {
 		for (u64 i = 0; i < COUNT; i++)
 			if (data[i] != o.data[i])
@@ -37,9 +55,4 @@ struct FixedArray {
 
 	constexpr bool operator !=(FixedArray<T, COUNT> o) { return !(*this == o); }
 };
-
-template<typename U, u64 N, typename V, u64 M>
-static constexpr int Compare(FixedArray<U, N> a, FixedArray<V, M> b) {
-	return Compare(a.ToArray(), b.ToArray());
-}
 

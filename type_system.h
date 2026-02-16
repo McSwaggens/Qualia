@@ -4,6 +4,7 @@
 #include "general.h"
 #include "assert.h"
 #include "array.h"
+#include "initlist.h"
 
 namespace Ast { struct Struct; struct Enum; }
 

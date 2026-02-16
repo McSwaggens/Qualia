@@ -153,7 +153,7 @@ struct String {
 	}
 };
 
-static inline String AllocateString(u64 length, u64 extra_capacity) {
+static inline String AllocateStringExCap(u64 length, u64 extra_capacity) {
 	return String(Alloc<char>(length+extra_capacity), length, length+extra_capacity);
 }
 
@@ -168,7 +168,7 @@ static constexpr u64 CStringLength(const char* s) {
 	return s - start;
 }
 
-static constexpr String ToString(const char* cstr) {
+static constexpr String CString(const char* cstr) {
 	return String(cstr, CStringLength(cstr));
 }
 

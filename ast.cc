@@ -69,7 +69,7 @@ static void PrintExpression(Ast::Expression* expr, u32 indent) {
 	}
 
 	PrintIndent(indent);
-	Print("%: value=v%, type=%\n", ToString(GetExpressionKindName(expr->kind)), expr->value.handle, expr->type);
+	Print("%: value=v%, type=%\n", CString(GetExpressionKindName(expr->kind)), expr->value.handle, expr->type);
 
 	switch (expr->kind) {
 		case Ast::Expression::TERMINAL_LITERAL: {

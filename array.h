@@ -4,6 +4,7 @@
 #include "general.h"
 #include "math.h"
 #include "assert.h"
+#include "initlist.h"
 
 template<typename T>
 struct Array {
@@ -16,6 +17,7 @@ struct Array {
 	constexpr Array(Null) : data(null), length(0) { }
 	template<u64 N>
 	constexpr Array(const T (&a)[N]) : data((T*)a), length(N) { }
+	constexpr Array(InitList<T> list) : data((T*)list.begin()), length(list.size()) { }
 
 	constexpr operator bool() const { return static_cast<bool>(data); }
 

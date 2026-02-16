@@ -634,7 +634,7 @@ void Lexer::Parse() {
 
 				if (escapes) {
 					u64 length = end - start - escapes;
-					current_token->literal_string = AllocateString(length, 0);
+					current_token->literal_string = AllocatePaddedString(length, 0);
 
 					char* c = start;
 					char* s = current_token->literal_string.data;

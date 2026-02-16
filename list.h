@@ -13,6 +13,12 @@ struct List {
 
 	constexpr List() = default;
 	constexpr List(Null) : data(null), count(0), capacity(0) { }
+	List(InitList<T> list) {
+		count = list.size();
+		capacity = NextCapacity(count);
+		data = (T*)AllocMemory(capacity * sizeof(T));
+		Copy(data, (T*)list.begin(), count);
+	}
 
 	constexpr auto& operator[](this auto& self, u32 n) { return self.data[n]; }
 

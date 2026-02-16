@@ -15,6 +15,14 @@ enum IntrinsicID : u32 {
 	INTRINSIC_INVALID = INTRINSIC_COUNT
 };
 
+typedef void (*IntrinsicFunc)(void*,void*);
+
+struct Intrinsic {
+	String name;
+	TypeID type;
+	IntrinsicFunc func;
+};
+
 struct Line {
 	Indent16 indent;
 	String   string;

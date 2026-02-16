@@ -126,42 +126,24 @@ static TypeID GetType(Ast::Type* ast_type, Ast::Scope* scope, Ast::Module* modul
 	return result;
 }
 
-static void Intrinsic_SystemCall(s64* input, s64* output) {
-	*output = SystemCall(input[0], input[1], input[2], input[3], input[4], input[5], input[6]);
-}
-
-typedef void (*InternalIntrinsicFunctionType)(void*,void*);
-
-static InternalIntrinsicFunctionType intrinsic_function_implementation_lut[INTRINSIC_COUNT] = {
-	[INTRINSIC_SYSTEM_CALL] = (InternalIntrinsicFunctionType)&Intrinsic_SystemCall,
-};
-
-static TypeID intrinsic_type_lut[INTRINSIC_COUNT];
-
-static const String intrinsic_name_lut[INTRINSIC_COUNT] = {
-	[INTRINSIC_SYSTEM_CALL] = "SystemCall",
-};
+static Intrinsic intrinsics[INTRINSIC_COUNT];
 
 static void InitIntrinsics() {
-	intrinsic_type_lut[INTRINSIC_SYSTEM_CALL] = GetFunctionType(
-		GetTuple((TypeID[]){
-			TYPE_INT64, // rax
-			TYPE_INT64, // rdi
-			TYPE_INT64, // rsi
-			TYPE_INT64, // rdx
-			TYPE_INT64, // r10
-			TYPE_INT64, // r8
-			TYPE_INT64, // r9
-		}, 7),
-		TYPE_INT64
-	);
+	intrinsics[INTRINSIC_SYSTEM_CALL] = {
+		"SystemCall",
+		GetFunctionType(
+			GetTuple({ TYPE_INT64, TYPE_INT64, TYPE_INT64, TYPE_INT64, TYPE_INT64, TYPE_INT64, TYPE_INT64 }),
+			TYPE_INT64
+		),
+		[](void* input, void* output) { *(s64*)output = 0; },
+	};
 }
 
 static IntrinsicID FindIntrinsic(String name, TypeID input_type) {
 	for (u64 id = 0; id < INTRINSIC_COUNT; id++) {
-		TypeInfo* info = GetTypeInfo(intrinsic_type_lut[id]);
+		TypeInfo* info = GetTypeInfo(intrinsics[id].type);
 
-		if (name == intrinsic_name_lut[id] && CanCast(CAST_IMPLICIT, input_type, info->function_info.input))
+		if (name == intrinsics[id].name && CanCast(CAST_IMPLICIT, input_type, info->function_info.input))
 			return (IntrinsicID)id;
 	}
 
@@ -409,7 +391,7 @@ static void ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope, As
 		}
 
 		if (IntrinsicID intrinsic_id = FindIntrinsic(terminal->token->identifier_string, call->parameters->type); intrinsic_id != INTRINSIC_INVALID) {
-			TypeID type = intrinsic_type_lut[intrinsic_id];
+			TypeID type = intrinsics[intrinsic_id].type;
 			TypeInfo* type_info = GetTypeInfo(type);
 
 			Ast::Expression_Intrinsic* intrinsic_expression = (Ast::Expression_Intrinsic*)call->function;

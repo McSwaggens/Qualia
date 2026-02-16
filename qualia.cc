@@ -80,7 +80,7 @@ int main(int argc, char** args) {
 	}
 
 	for (int i = 1; i < argc; i++) {
-		String file = ToString(args[i]);
+		String file = CString(args[i]);
 		Print("Compiling: %\n", file);
 		CompileFile(file);
 	}

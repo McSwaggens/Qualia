@@ -470,39 +470,7 @@ static inline u64 DecodeDigit(char c, Base base) {
 	}
 }
 
-static inline u64 DecodeDigit_Known(char c) {
-	switch (c) {
-		case '0': return 0x00;
-		case '1': return 0x01;
-
-		case '2': return 0x02;
-		case '3': return 0x03;
-		case '4': return 0x04;
-		case '5': return 0x05;
-		case '6': return 0x06;
-		case '7': return 0x07;
-		case '8': return 0x08;
-		case '9': return 0x09;
-
-		case 'A': return 0x0A;
-		case 'B': return 0x0B;
-		case 'C': return 0x0C;
-		case 'D': return 0x0D;
-		case 'E': return 0x0E;
-		case 'F': return 0x0F;
-
-		case 'a': return 0x0A;
-		case 'b': return 0x0B;
-		case 'c': return 0x0C;
-		case 'd': return 0x0D;
-		case 'e': return 0x0E;
-		case 'f': return 0x0F;
-
-		default: Unreachable();
-	}
-}
-
-static inline char GetEscapeCharacter(char c) {
+static inline char DecodeEscapeChar(char c) {
 	switch (c) {
 		case '0': return '\0';
 		case 'a': return '\a';
@@ -519,7 +487,7 @@ static inline char GetEscapeCharacter(char c) {
 	}
 }
 
-static inline bool IsEscapeCharacter(char c) {
+static inline bool IsEscapeChar(char c) {
 	switch (c) {
 		case '0':  return true;
 		case 'a':  return true;

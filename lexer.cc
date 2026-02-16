@@ -391,7 +391,6 @@ bool Lexer::TestKeyword(TokenKind keyword) {
 	if (post == '_')
 		return false;
 
-
 	current_token->kind = keyword;
 	cursor += keyword_string.length;
 
@@ -621,7 +620,7 @@ void Lexer::Parse() {
 					if (*cursor == '\n')
 						Error("String literal not completed before end of the line.\n");
 
-					if (*cursor == '\\' && IsEscapeCharacter(cursor[1])) {
+					if (*cursor == '\\' && IsEscapeChar(cursor[1])) {
 						escapes++;
 						cursor++;
 					}
@@ -646,26 +645,14 @@ void Lexer::Parse() {
 						}
 
 						c++; // skip backslash
-						switch (*(c++)) {
-							case '0':  *(s++) = '\0'; break;
-							case 'a':  *(s++) = '\a'; break;
-							case 'b':  *(s++) = '\b'; break;
-							case 't':  *(s++) = '\t'; break;
-							case 'n':  *(s++) = '\n'; break;
-							case 'v':  *(s++) = '\v'; break;
-							case 'f':  *(s++) = '\f'; break;
-							case 'r':  *(s++) = '\r'; break;
-							case '\\': *(s++) = '\\'; break;
-							case '\"': *(s++) = '\"'; break;
-
-							default:
-								Error("Invalid escape character: \\%\n", *(c-1));
-						}
+						char escape_char = *(c++);
+						if (!IsEscapeChar(escape_char))
+							Error("Invalid escape character: \\%\n", escape_char);
+						*(s++) = DecodeEscapeChar(escape_char);
 					}
 				}
 				else current_token->literal_string = String(start, end - start);
 			} break;
-
 
 			case '(': current_token->kind = TOKEN_OPEN_PAREN;   goto PARSE_OPEN;
 			case '{': current_token->kind = TOKEN_OPEN_BRACE;   goto PARSE_OPEN;
@@ -729,7 +716,6 @@ void Lexer::Parse() {
 				if      (*cursor == '>') cursor++, current_token->kind = TOKEN_ARROW;
 				else if (*cursor == '=') cursor++, current_token->kind = TOKEN_MINUS_EQUAL;
 				break;
-
 
 			case '<':
 				cursor++, current_token->kind = TOKEN_LESS;

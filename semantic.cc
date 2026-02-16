@@ -105,8 +105,6 @@ static TypeID GetType(Ast::Type* ast_type, Ast::Scope* scope, Ast::Module* modul
 			case Ast::SPECIFIER_FIXED_ARRAY: {
 				ScanExpression(specifier->size_expression, scope, module);
 
-				if (!(specifier->size_expression->flags & Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE))
-					Error(module, specifier->size_expression, "Fixed array size must be a constant.\n");
 
 				if (!CanCast(CAST_IMPLICIT, specifier->size_expression->type, TYPE_INT64))
 					Error(module, specifier->size_expression, "Fixed array size must be an integer.\n");
@@ -226,7 +224,6 @@ static Ast::Expression* ImplicitCast(Ast::Expression* expression, TypeID type, A
 
 	Ast::Expression_Implicit_Cast* cast = Alloc<Ast::Expression_Implicit_Cast>(); // @fixme using general allocator and not the stack. Proper Ast stack is in the parser. Which we don't have access to here.
 	new (cast) Ast::Expression_Implicit_Cast(expression, type);
-	cast->flags = expression->flags & (Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE | Ast::EXPRESSION_FLAG_PURE);
 
 	return cast;
 }
@@ -245,7 +242,6 @@ static void ScanExpressionTerminalName(Ast::Expression_Terminal* terminal, Ast::
 		variable_expression->type = variable->type;
 
 		if (variable->flags & Ast::VARIABLE_FLAG_CONSTANT) {
-			variable_expression->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 			// Constants are not lvalues - type stays as-is
 		}
 		else {
@@ -253,9 +249,7 @@ static void ScanExpressionTerminalName(Ast::Expression_Terminal* terminal, Ast::
 			variable_expression->type = GetReference(variable_expression->type);
 			if (variable->flags & Ast::VARIABLE_FLAG_GLOBAL) {
 				// Global, not pure
-				variable_expression->flags = 0;
 			} else {
-				variable_expression->flags = Ast::EXPRESSION_FLAG_PURE;
 			}
 		}
 	}
@@ -290,13 +284,9 @@ static void ScanExpressionTerminalName(Ast::Expression_Terminal* terminal, Ast::
 static void ScanExpressionFixedArray(Ast::Expression_Fixed_Array* fixed_array, Ast::Scope* scope, Ast::Module* module) {
 	TypeID subtype = TYPE_NULL;
 
-	Ast::Expression_Flags flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
-
 	for (u32 i = 0; i < fixed_array->elements.length; i++) {
 		Ast::Expression* element = fixed_array->elements[i];
 		ScanExpression(element, scope, module);
-
-		flags &= element->flags;
 
 		if (i) {
 			if (!CanCast(CAST_IMPLICIT, element->type, subtype))
@@ -310,14 +300,12 @@ static void ScanExpressionFixedArray(Ast::Expression_Fixed_Array* fixed_array, A
 		}
 	}
 
-	fixed_array->flags = flags;
 }
 
 static void ScanExpressionArray(Ast::Expression_Array* array, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(array->left, scope, module);
 	ScanExpression(array->right, scope, module);
 
-	array->flags = (array->left->flags & array->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	TypeID left_type = RemoveReference(array->left->type);
 	TypeID right_type = RemoveReference(array->right->type);
@@ -349,43 +337,17 @@ static void ScanExpressionTuple(Ast::Expression_Tuple* tuple, Ast::Scope* scope,
 
 	TypeID types[tuple->elements.length];
 
-	Ast::Expression_Flags element_flags =
-		Ast::EXPRESSION_FLAG_PURE |
-		Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
-
-	Ast::Expression_Flags tuple_flags =
-		Ast::EXPRESSION_FLAG_INTERNALLY_REFERENTIAL |
-		Ast::EXPRESSION_FLAG_PURE |
-		Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
-
-	bool has_references = false;
-
 	for (u32 i = 0; i < tuple->elements.length; i++) {
 		Ast::Expression* element = tuple->elements[i];
 		ScanExpression(element, scope, module);
 		types[i] = element->type;
 
-		// Check if any element is a reference type
-		if (IsReference(element->type)) {
-			has_references = true;
-		}
-
 		if (element->kind == Ast::Expression::TUPLE) {
 			tuple->recursive_count += ((Ast::Expression_Tuple*)element)->recursive_count-1;
-			tuple_flags &= element->flags;
-		}
-		else {
-			element_flags &= element->flags;
 		}
 
 		if (element->type == TYPE_EMPTY_TUPLE && (element->kind != Ast::Expression::TUPLE || tuple->elements.length > 1))
 			Error(module, element, "Tuple elements aren't allowed to be of type %.\n", element->type);
-	}
-
-	tuple->flags = element_flags & tuple_flags;
-
-	if (has_references) {
-		tuple->flags |= (tuple_flags & Ast::EXPRESSION_FLAG_INTERNALLY_REFERENTIAL);
 	}
 
 	tuple->type = GetTuple({ types, tuple->elements.length });
@@ -420,7 +382,6 @@ static void ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope, As
 		function_expression->type = function->type;
 
 		dcall->type = function->return_type;
-		dcall->flags = 0;
 
 		Assert(dcall->parameters->elements.length == function->parameters.length-1);
 
@@ -440,7 +401,6 @@ static void ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope, As
 			function_expression->type = function->type;
 
 			call->type = function->return_type;
-			call->flags = 0;
 
 			TypeInfo* info = GetTypeInfo(function->type);
 
@@ -458,7 +418,6 @@ static void ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope, As
 
 			call->function->kind = Ast::Expression::TERMINAL_INTRINSIC;
 			call->type = type_info->function_info.output;
-			call->flags = 0;
 
 			call->parameters = (Ast::Expression_Tuple*)ImplicitCast(call->parameters, type_info->function_info.input, module);
 			return;
@@ -475,7 +434,6 @@ static void ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope, As
 
 	TypeID function_type = GetSubType(call->function->type);
 	TypeInfo* function_type_info = GetTypeInfo(function_type);
-	call->flags = 0;
 	call->type = function_type_info->function_info.output;
 
 	if (!CanCast(CAST_IMPLICIT, call->parameters->type, GetFunctionInputType(function_type)))
@@ -508,7 +466,6 @@ static void ScanExpressionSubscript(Ast::Expression_Subscript* subscript, Ast::S
 		Error(module, subscript->index, "Subscript index must be an integer, not: %\n", subscript->index->type);
 
 	subscript->index = ImplicitCast(subscript->index, TYPE_INT64, module);
-	subscript->flags = subscript->array->flags & subscript->index->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	TypeID element_type = GetSubType(array_type);
 
@@ -524,7 +481,6 @@ static void ScanExpressionSubscript(Ast::Expression_Subscript* subscript, Ast::S
 static void ScanExpressionUnaryAddressOf(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(unary->subexpression, scope, module);
 
-	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	if (!IsReference(unary->subexpression->type))
 		Error(module, unary, "Cannot take address of non-lvalue (type: %).\n", unary->subexpression->type);
@@ -537,7 +493,6 @@ static void ScanExpressionUnaryAddressOf(Ast::Expression_Unary* unary, Ast::Scop
 static void ScanExpressionUnaryReferenceOf(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(unary->subexpression, scope, module);
 
-	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	TypeID ptr_type = RemoveReference(unary->subexpression->type);
 
@@ -550,7 +505,6 @@ static void ScanExpressionUnaryReferenceOf(Ast::Expression_Unary* unary, Ast::Sc
 
 static void ScanExpressionUnaryBitwiseNot(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(unary->subexpression, scope, module);
-	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	if (IsInteger(GetArithmeticBackingType(unary->subexpression->type))) {
 		unary->subexpression = ImplicitCast(unary->subexpression, GetArithmeticBackingType(unary->subexpression->type), module);
@@ -564,7 +518,6 @@ static void ScanExpressionUnaryBitwiseNot(Ast::Expression_Unary* unary, Ast::Sco
 
 static void ScanExpressionUnaryMinus(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(unary->subexpression, scope, module);
-	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	if (!IsInteger(GetArithmeticBackingType(unary->subexpression->type)) && GetTypeKind(unary->subexpression->type) != TYPE_POINTER && !IsFloat(unary->subexpression->type))
 		Error(module, unary->subexpression, "Unary minus does not work on type '%'.\n", unary->subexpression->type);
@@ -575,7 +528,6 @@ static void ScanExpressionUnaryMinus(Ast::Expression_Unary* unary, Ast::Scope* s
 
 static void ScanExpressionUnaryPlus(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(unary->subexpression, scope, module);
-	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	if (!IsSignedInteger(unary->subexpression->type) && !IsFloat(unary->subexpression->type))
 		Error(module, unary->subexpression, "Unary plus can only be applied to a signed integer or float.\n", unary->subexpression->type);
@@ -585,7 +537,6 @@ static void ScanExpressionUnaryPlus(Ast::Expression_Unary* unary, Ast::Scope* sc
 
 static void ScanExpressionUnaryNot(Ast::Expression_Unary* unary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(unary->subexpression, scope, module);
-	unary->flags = unary->subexpression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	if (!CanCast(CAST_IMPLICIT, unary->subexpression->type, TYPE_BOOL))
 		Error(module, unary->subexpression, "Type % cannot be casted to bool.\n", unary->subexpression->type);
@@ -620,10 +571,8 @@ static void ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope* 
 
 		member_terminal->member = member;
 		member_terminal->type = type;
-		member_terminal->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 
 		binary->type = type;
-		binary->flags = Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE;
 	}
 	else if (binary->right->kind == Ast::Expression::TERMINAL_NAME && ((Ast::Expression_Terminal*)binary->right)->token->kind == TOKEN_IDENTIFIER_CASUAL) {
 		Ast::Expression_Terminal* terminal = (Ast::Expression_Terminal*)binary->right;
@@ -635,7 +584,6 @@ static void ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope* 
 			type = GetSubType(type);
 
 		if (GetTypeKind(type) == TYPE_STRUCT) {
-			binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 			Ast::Struct* ast_struct = GetTypeInfo(type)->struct_info.ast;
 			Ast::Struct_Member* member = FindStructMember(ast_struct, terminal->token->identifier_string);
@@ -665,7 +613,6 @@ static void ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope* 
 
 			if (name == "begin" || name == "data") {
 				binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
-				binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 				if (fixed) {
 					// Fixed array .data/.begin gives lvalue to first element
@@ -677,12 +624,10 @@ static void ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope* 
 			}
 			else if (name == "end") {
 				binary->right->kind = Ast::Expression::TERMINAL_ARRAY_END;
-				binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 				binary->type = GetPointer(GetSubType(binary->left->type));
 			}
 			else if (name == "length" || name == "count") {
 				binary->right->kind = Ast::Expression::TERMINAL_ARRAY_LENGTH;
-				binary->flags = binary->left->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 				binary->type = TYPE_UINT64;
 				// Length is rvalue, not ref
 			}
@@ -697,7 +642,6 @@ static void ScanExpressionBinaryCompareEquality(Ast::Expression_Binary* binary, 
 	ScanExpression(binary->left,  scope, module);
 	ScanExpression(binary->right, scope, module);
 
-	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
 
@@ -713,7 +657,6 @@ static void ScanExpressionBinaryCompareEquality(Ast::Expression_Binary* binary, 
 static void ScanExpressionBinaryCompareOrdered(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(binary->left,  scope, module);
 	ScanExpression(binary->right, scope, module);
-	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	TypeID dominant = GetDominantType(GetArithmeticBackingType(binary->left->type), GetArithmeticBackingType(binary->right->type));
 
@@ -732,7 +675,6 @@ static void ScanExpressionBinaryCompareOrdered(Ast::Expression_Binary* binary, A
 static void ScanExpressionBinaryArithmetic(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(binary->left,  scope, module);
 	ScanExpression(binary->right, scope, module);
-	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	if (GetTypeKind(binary->left->type) == TYPE_POINTER) {
 		// ptr + int = ptr
@@ -806,7 +748,6 @@ static void ScanExpressionBinaryArithmetic(Ast::Expression_Binary* binary, Ast::
 static void ScanExpressionBinaryBitwise(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(binary->left,  scope, module);
 	ScanExpression(binary->right, scope, module);
-	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	// ptr OR  int = ptr
 	// ptr XOR int = ptr
@@ -824,7 +765,6 @@ static void ScanExpressionBinaryBitwise(Ast::Expression_Binary* binary, Ast::Sco
 static void ScanExpressionBinaryShift(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(binary->left,  scope, module);
 	ScanExpression(binary->right, scope, module);
-	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	if (!IsInteger(GetArithmeticBackingType(binary->left->type)) && GetTypeKind(binary->left->type) != TYPE_POINTER)
 		Error(module, binary, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
@@ -841,7 +781,6 @@ static void ScanExpressionBinaryShift(Ast::Expression_Binary* binary, Ast::Scope
 static void ScanExpressionBinaryLogical(Ast::Expression_Binary* binary, Ast::Scope* scope, Ast::Module* module) {
 	ScanExpression(binary->left,  scope, module);
 	ScanExpression(binary->right, scope, module);
-	binary->flags = (binary->left->flags & binary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	if (!CanCast(CAST_IMPLICIT, binary->left->type, TYPE_BOOL))
 		Error(module, binary, "% cannot be converted to bool.\n", binary->left->type);
@@ -859,7 +798,6 @@ static void ScanExpressionIfElse(Ast::Expression_Ternary* ternary, Ast::Scope* s
 	ScanExpression(ternary->left,   scope, module);
 	ScanExpression(ternary->middle, scope, module);
 	ScanExpression(ternary->right,  scope, module);
-	ternary->flags = (ternary->left->flags & ternary->middle->flags & ternary->right->flags) & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	TypeID dominant = GetDominantType(ternary->left->type, ternary->right->type);
 
@@ -889,7 +827,6 @@ static void ScanExpressionAs(Ast::Expression_As* as, Ast::Scope* scope, Ast::Mod
 	ScanExpression(as->expression, scope, module);
 	as->type = GetType(&as->ast_type, scope, module);
 
-	as->flags = as->expression->flags & (Ast::EXPRESSION_FLAG_PURE | Ast::EXPRESSION_FLAG_CONSTANTLY_EVALUATABLE);
 
 	if (!CanCast(CAST_EXPLICIT, as->expression->type, as->type))
 		Error(module, as, "Type % is not convertable to %\n", as->expression->type, as->type);

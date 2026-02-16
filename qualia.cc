@@ -31,7 +31,8 @@ static List<Ast::Module*> modules;
 static void ParseModule(Ast::Module* module) {
 	Parser parser = Parser(module);
 	parser.ParseGlobalScope();
-	SemanticParse(module);
+	Scanner scanner = Scanner(module);
+	scanner.SemanticParse();
 }
 
 static Ast::Module* CompileString(String code_string) {

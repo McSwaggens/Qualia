@@ -14,13 +14,52 @@ struct Lexer {
 	Array<Token> tokens;
 	Token* current_token;
 	List<Line> lines;
-	Array<char> code;
+	String code;
 	SourceLocation location;
 	char* cursor;
 	char* end;
 	char* line_begin;
 	u32 indent;
 	s64 line_number;
+
+	Lexer(Ast::Module* module, String file_path) {
+		Array<byte> buffer = File::Load(file_path, 16, 64);
+		String code = String((char*)buffer.data, buffer.length, buffer.length);
+		List<Token> tokens = AllocateList<Token>(code.length + 1);
+		List<Line> lines = AllocateList<Line>(code.length / 4);
+
+		this->module = module;
+		this->file_path = file_path;
+		this->tokens = tokens.ToArray();
+		this->current_token = tokens.ToArray();
+		this->lines = lines;
+		this->code = code;
+		this->location = {};
+		this->cursor = code;
+		this->end = code.End();
+		this->line_begin = code;
+		this->indent = 0;
+		this->line_number = 0;
+	}
+
+	Lexer(Ast::Module* module, String code_string, String file_path) {
+		String code = code_string.CopyPadded(16, 64);
+		List<Token> tokens = AllocateList<Token>(code.length + 1);
+		List<Line> lines = AllocateList<Line>(code.length / 4);
+
+		this->module = module;
+		this->file_path = file_path;
+		this->tokens = tokens.ToArray();
+		this->current_token = tokens.ToArray();
+		this->lines = lines;
+		this->code = code;
+		this->location = {};
+		this->cursor = code;
+		this->end = code.End();
+		this->line_begin = code;
+		this->indent = 0;
+		this->line_number = 0;
+	}
 
 	void Parse();
 	void ParseLiteral();
@@ -34,24 +73,4 @@ struct Lexer {
 		LexerError(module, location, format, args...);
 	}
 };
-
-static Lexer CreateLexer(Ast::Module* module, String file_path) {
-	Array<char>  code   = File::Load(file_path, 16, 64);
-	List<Token> tokens  = AllocateList<Token>(code.length + 1);
-	List<Line>   lines  = AllocateList<Line>(code.length / 4);
-
-	return (Lexer){
-		.module = module,
-		.file_path = file_path,
-		.tokens = tokens.ToArray(),
-		.current_token = tokens.ToArray(),
-		.lines = lines,
-		.code = code,
-		.cursor = code,
-		.end = code.End(),
-		.line_begin = code,
-		.indent = 0,
-		.line_number = 0,
-	};
-}
 

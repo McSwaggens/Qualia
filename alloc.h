@@ -14,4 +14,8 @@ template<typename T> static T*   ReAlloc(T* p, u64 old_size, u64 new_size) { ret
 template<typename T> static T*   CopyAlloc(T* p, u64 count = 1)            { return (T*)CopyAllocMemory(p, sizeof(T) * count); }
 template<typename T> static void Free(T* p, u64 count = 1)                 { FreeMemory(p, sizeof(T) * count); }
 
+// Global operator new/delete overloads
+void* operator new(__SIZE_TYPE__ size)                        { return AllocMemory(size); }
+void operator delete(void* ptr, __SIZE_TYPE__ size) noexcept  { FreeMemory(ptr, size); }
+
 #endif // ALLOC_H

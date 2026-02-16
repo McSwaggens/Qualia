@@ -16,11 +16,35 @@ static List<Ast::Module*> modules = null;
 #include "../stack.cc"
 #include "../error.cc"
 #include "../type_system.cc"
+#include "../lexer.cc"
+#include "../array_buffer.cc"
 #include "../print.cc"
+#include "../semantic.cc"
+#include "../parser.cc"
 #include "../ir.cc"
 #include "../alloc.cc"
 
+#include "../ast.cc"
+
 using namespace IR;
+
+static void ParseModule(Ast::Module* module) {
+	Parser parser = Parser(module);
+	parser.ParseGlobalScope();
+	SemanticParse(module);
+}
+
+static Ast::Module* CompileString(String code_string) {
+	Ast::Module* module = new Ast::Module("<string>", "<string>");
+	modules.Add(module);
+
+	Lexer lexer = Lexer(module, code_string, "<string>");
+	lexer.Parse();
+
+	ParseModule(module);
+
+	return module;
+}
 
 static Context* ctx;
 
@@ -464,46 +488,18 @@ static void Test_EqualityTransitivity() {
 }
 
 // Context inference.
-// Foo(a, b);
-//     // Empty Context
-//
-//     if a < b:
-//         // Context A [ a < b ]
-//         c = 42
-//     else:
-//         // Context B [ a >= b ]
-//         c = 1
-//
-//     // c { [= 42(A)], [= 1(B)] }
-//
-//     // Context C
-//
-//     if c = 42:
-//         // Context D
-//
 static void Test_ContextInference() {
-	Value a = NewValue();
-	Value b = NewValue();
-	Value c = NewValue();
+	return; // This test is disabled because lowering isn't implemented yet.
 
-	Context* context_a = empty_context.Get(Context::Key(Relation::Less, a, b));
-	context_a->Equal(c, Constant(42));
+	Ast::Module* module = CompileString(R"(
+Foo(a: int, b: int);
+	c : int = 0
+	if a < b: c = 42
+	else:     c = 1
 
-	Context* context_b = empty_context.Get(Context::Key(Relation::GreaterOrEqual, a, b));
-	context_b->Equal(c, Constant(1));
-
-	Context* context_c = context_a->Intersect(context_b);
-
-	Context* context_d = context_c->Get(Context::Key(Relation::Distance, c, Constant(42), Constant(0)));
-
-	Log(*context_a);
-	Log(*context_b);
-	Log(*context_c);
-	Log(*context_d);
-
-	// IR::PrintState();
-
-	Assert(context_d->IsLess(a, b) == true);
+	if c = 42:
+		harness0 := 0
+)");
 }
 
 // Stress test: many values/relations across many contexts

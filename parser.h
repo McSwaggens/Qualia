@@ -27,6 +27,12 @@ struct Parser {
 	Token* token;
 	Stack stack;
 
+	Parser(Ast::Module* module) :
+		module(module),
+		token(&module->tokens[0]),
+		stack(Stack::Create(1 << 21))
+	{ }
+
 	template<typename... Args>
 	[[noreturn]] void Error(String format, Args&&... args);
 

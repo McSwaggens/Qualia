@@ -569,7 +569,7 @@ struct Enum {
 struct Module {
 	Scope scope;
 
-	Array<char> code;
+	String code;
 	String file_path;
 	String name;
 
@@ -578,6 +578,17 @@ struct Module {
 
 	Array<Module*> users;
 	Array<Import> imports;
+
+	Module(String file_path, String name) :
+		scope{},
+		code{},
+		file_path(file_path),
+		name(name),
+		tokens{},
+		lines{},
+		users{},
+		imports{}
+	{ }
 };
 
 void PrintAST(Module* module);

@@ -126,6 +126,23 @@ struct String {
 		CopyMemory(out, data, length);
 	}
 
+	String CopyPadded(u64 left_pad, u64 right_pad) {
+		if (!length)
+			return null;
+
+		byte* buffer = (byte*)AllocMemory(left_pad + length + right_pad);
+
+		// Copy string content into padded buffer
+		for (u64 i = 0; i < length; i++)
+			buffer[left_pad + i] = data[i];
+
+		// Zero out padding regions
+		ZeroMemory(buffer, left_pad);
+		ZeroMemory(buffer + left_pad + length, right_pad);
+
+		return String((char*)(buffer + left_pad), length, left_pad + length + right_pad);
+	}
+
 	void Free() {
 		::Free(data, capacity);
 

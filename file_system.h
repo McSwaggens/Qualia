@@ -53,5 +53,13 @@ enum FileMode {
 	FILE_MODE_CREATE_OR_TRUNCATE, // Truncate an existing file, otherwise create one.
 };
 
+static String GetFileName(String path) {
+	for (s64 i = path.length - 1; i >= 0; i--) {
+		if (path[i] == '/' || path[i] == '\\')
+			return String(path.data + i + 1, path.length - i - 1);
+	}
+	return path;
+}
+
 
 

@@ -16,6 +16,7 @@ struct String {
 	constexpr String(char* begin, char* end) : data(begin), length(end-begin), capacity(0) { }
 	constexpr String(const char* data, u32 length, u32 cap = 0) : data(const_cast<char*>(data)), length(length), capacity(cap) { }
 
+	constexpr String(const char (&s)[1]) : data(null), length(0), capacity(0) { }
 	template<u64 N>
 	constexpr String(const char (&s)[N]) : data(const_cast<char*>(s)), length(N-1), capacity(0) { }
 

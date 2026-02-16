@@ -27,10 +27,3 @@ InlayHints:
 Index:
   Background: Build             # Index in background, prioritize build files
   StandardLibrary: No           # Don't index standard library
-
-# Exclude build artifacts and object files
-If:
-  PathExclude:
-    - ".*\\.o$"
-    - "qualia$"
-    - "tests/.*$"               # Exclude test binaries

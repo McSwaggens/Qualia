@@ -622,8 +622,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		token = closure + 1;
 		left = fixed_array;
 	}
-	else
-	{
+	else {
 		if (token->indent != indent) {
 			CheckScope(token, indent, module);
 		}
@@ -702,8 +701,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 			left = subscript;
 		}
-		else
-		{
+		else {
 			// @Indent I think the CheckScope needs to be here instead of at the start of ParseExpression (where we consume the term).
 			Ast::Expression::Kind kind;
 			switch (token->kind) {
@@ -850,8 +848,7 @@ Ast::Type Parser::ParseType(u32 indent) {
 		if (params.count == 0) {
 			type.basetype.function.input = null;
 		}
-		else
-		{
+		else {
 			type.basetype.function.input = stack.Allocate<Ast::Type>();
 			*type.basetype.function.input = {
 				.basetype = { .kind = Ast::BASETYPE_TUPLE, .tuple = params.ToArray() },
@@ -863,8 +860,7 @@ Ast::Type Parser::ParseType(u32 indent) {
 			type.basetype.function.output = null;
 			token = token->closure+1;
 		}
-		else
-		{
+		else {
 			type.basetype.function.output = stack.Allocate<Ast::Type>();
 			*type.basetype.function.output = ParseType(indent);
 		}
@@ -1280,8 +1276,7 @@ Ast::Code Parser::ParseCode(u32 indent) {
 			function.is_global = false;
 			functions.Add(function);
 		}
-		else
-		{
+		else {
 			Ast::Statement statement = ParseStatement(indent);
 			statements.Add(statement);
 

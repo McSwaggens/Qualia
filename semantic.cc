@@ -26,7 +26,7 @@ static TypeID FindUserType(String name, Ast::Scope* scope) {
 static Ast::Function* FindFunction(Ast::Scope* scope, String name, TypeID input_type) {
 	while (scope) {
 		for (Ast::Function* function = scope->functions; function < scope->functions.End(); function++) {
-			TypeInfo* info = function->type.GetTypeInfo();
+			TypeInfo* info = function->type.GetInfo();
 
 			if (name == function->name && input_type.CanCast(CAST_IMPLICIT, info->function_info.input))
 				return function;
@@ -105,11 +105,11 @@ static void GenerateClosure(Ast::Struct* target, Array<TypeID> tuple);
 static void GenerateClosure(Ast::Struct* target, Array<TypeID> tuple) {
 	for (u32 i = 0; i < tuple.length; i++) {
 		TypeID type = tuple[i];
-		TypeInfo* type_info = type.GetTypeInfo();
+		TypeInfo* type_info = type.GetInfo();
 
 		if (type.GetTypeKind() == TYPE_STRUCT) {
-			if (target->closure.AddIfUnique(type.GetTypeInfo()->struct_info.ast)) {
-				GenerateClosure(target, type.GetTypeInfo()->struct_info.ast);
+			if (target->closure.AddIfUnique(type.GetInfo()->struct_info.ast)) {
+				GenerateClosure(target, type.GetInfo()->struct_info.ast);
 			}
 		}
 		else if (type.GetTypeKind() == TYPE_TUPLE) {
@@ -121,11 +121,11 @@ static void GenerateClosure(Ast::Struct* target, Array<TypeID> tuple) {
 static void GenerateClosure(Ast::Struct* target, Ast::Struct* ast_struct) {
 	for (Ast::Struct_Member* member = ast_struct->members; member < ast_struct->members.End(); member++) {
 		TypeID type = member->type;
-		TypeInfo* type_info = type.GetTypeInfo();
+		TypeInfo* type_info = type.GetInfo();
 
 		if (type.GetTypeKind() == TYPE_STRUCT) {
-			if (target->closure.AddIfUnique(type.GetTypeInfo()->struct_info.ast)) {
-				GenerateClosure(target, type.GetTypeInfo()->struct_info.ast);
+			if (target->closure.AddIfUnique(type.GetInfo()->struct_info.ast)) {
+				GenerateClosure(target, type.GetInfo()->struct_info.ast);
 			}
 		}
 		else if (type.GetTypeKind() == TYPE_TUPLE) {
@@ -145,7 +145,7 @@ static void CalculateStructSize(Ast::Struct* ast_struct);
 static void CalculateTupleSize(TypeID tuple);
 
 static void CalculateTupleSize(TypeID tuple) {
-	TypeInfo* info = tuple.GetTypeInfo();
+	TypeInfo* info = tuple.GetInfo();
 
 	if (info->size) return;
 
@@ -155,7 +155,7 @@ static void CalculateTupleSize(TypeID tuple) {
 	for (TypeID element_type : info->tuple_info.elements) {
 
 		if (element_type.GetTypeKind() == TYPE_STRUCT) {
-			CalculateStructSize(element_type.GetTypeInfo()->struct_info.ast);
+			CalculateStructSize(element_type.GetInfo()->struct_info.ast);
 		}
 		else if (element_type.GetTypeKind() == TYPE_TUPLE) {
 			CalculateTupleSize(element_type);
@@ -169,7 +169,7 @@ static void CalculateTupleSize(TypeID tuple) {
 
 static void CalculateStructSize(Ast::Struct* ast_struct) {
 	if (ast_struct->type.GetSize()) return;
-	TypeInfo* info = ast_struct->type.GetTypeInfo();
+	TypeInfo* info = ast_struct->type.GetInfo();
 
 	u64 size = 0;
 
@@ -177,7 +177,7 @@ static void CalculateStructSize(Ast::Struct* ast_struct) {
 		TypeID type = member->type;
 
 		if (type.GetTypeKind() == TYPE_STRUCT) {
-			CalculateStructSize(type.GetTypeInfo()->struct_info.ast);
+			CalculateStructSize(type.GetInfo()->struct_info.ast);
 		}
 		else if (type.GetTypeKind() == TYPE_TUPLE) {
 			CalculateTupleSize(type);
@@ -223,7 +223,7 @@ static void InitIntrinsics() {
 
 static IntrinsicID FindIntrinsic(String name, TypeID input_type) {
 	for (u64 id = 0; id < INTRINSIC_COUNT; id++) {
-		TypeInfo* info = intrinsics[id].type.GetTypeInfo();
+		TypeInfo* info = intrinsics[id].type.GetInfo();
 
 		if (name == intrinsics[id].name && input_type.CanCast(CAST_IMPLICIT, info->function_info.input))
 			return (IntrinsicID)id;
@@ -364,12 +364,12 @@ void Scanner::ScanExpressionTerminalName(Ast::Expression_Terminal* terminal, Ast
 		if (type.GetTypeKind() == TYPE_STRUCT) {
 			terminal->kind = Ast::Expression::TERMINAL_STRUCT; // @FixMe
 			Ast::Expression_Struct* struct_terminal = (Ast::Expression_Struct*)terminal;
-			struct_terminal->structure = type.GetTypeInfo()->struct_info.ast;
+			struct_terminal->structure = type.GetInfo()->struct_info.ast;
 		}
 		else if (type.GetTypeKind() == TYPE_ENUM) {
 			terminal->kind = Ast::Expression::TERMINAL_ENUM;
 			Ast::Expression_Enum* enum_terminal = (Ast::Expression_Enum*)terminal;
-			enum_terminal->enumeration = type.GetTypeInfo()->enum_info.ast;
+			enum_terminal->enumeration = type.GetInfo()->enum_info.ast;
 		}
 		else if (type.GetTypeKind() == TYPE_PRIMITIVE) {
 			terminal->kind = Ast::Expression::TERMINAL_PRIMITIVE; // @FixMe
@@ -500,7 +500,7 @@ void Scanner::ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope) 
 
 			call->type = function->return_type;
 
-			TypeInfo* info = function->type.GetTypeInfo();
+			TypeInfo* info = function->type.GetInfo();
 
 			call->parameters = (Ast::Expression_Tuple*)ImplicitCast(call->parameters, info->function_info.input, module);
 			return;
@@ -508,7 +508,7 @@ void Scanner::ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope) 
 
 		if (IntrinsicID intrinsic_id = FindIntrinsic(terminal->token->identifier_string, call->parameters->type); intrinsic_id != INTRINSIC_INVALID) {
 			TypeID type = intrinsics[intrinsic_id].type;
-			TypeInfo* type_info = type.GetTypeInfo();
+			TypeInfo* type_info = type.GetInfo();
 
 			Ast::Expression_Intrinsic* intrinsic_expression = (Ast::Expression_Intrinsic*)call->function;
 			intrinsic_expression->intrinsic = intrinsic_id;
@@ -531,7 +531,7 @@ void Scanner::ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope) 
 		Error(call->function, "Expression of type % cannot be called like a function.\n", call->function->type);
 
 	TypeID function_type = call->function->type.GetSubType();
-	TypeInfo* function_type_info = function_type.GetTypeInfo();
+	TypeInfo* function_type_info = function_type.GetInfo();
 	call->type = function_type_info->function_info.output;
 
 	if (!call->parameters->type.CanCast(CAST_IMPLICIT, function_type.GetFunctionInputType()))
@@ -679,7 +679,7 @@ void Scanner::ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope
 
 		if (type.GetTypeKind() == TYPE_STRUCT) {
 
-			Ast::Struct* ast_struct = type.GetTypeInfo()->struct_info.ast;
+			Ast::Struct* ast_struct = type.GetInfo()->struct_info.ast;
 			Ast::Struct_Member* member = FindStructMember(ast_struct, terminal->token->identifier_string);
 
 			if (!member)

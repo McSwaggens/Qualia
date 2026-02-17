@@ -92,8 +92,7 @@ void OutputBuffer::Write(char c) {
 void OutputBuffer::Write(const char* src, u64 size) {
 	Assert(file.IsValid());
 
-	if (head + size <= OUTPUT_BUFFER_SIZE) HOT
-	{
+	if (head + size <= OUTPUT_BUFFER_SIZE) HOT {
 		CopyMemory(data + head, src, size);
 		head += size;
 		return;
@@ -101,8 +100,7 @@ void OutputBuffer::Write(const char* src, u64 size) {
 
 	Flush();
 
-	if (size >= OUTPUT_BUFFER_SIZE) COLD
-	{
+	if (size >= OUTPUT_BUFFER_SIZE) COLD {
 		Write(src, size);
 		return;
 	}

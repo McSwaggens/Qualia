@@ -135,8 +135,7 @@ namespace IR {
 		Relation() = delete;
 
 		constexpr Relation(Kind kind, Value to, Context* context, Value value = { })
-			: kind(kind), to(to), value(value), context(context)
-		{
+			: kind(kind), to(to), value(value), context(context) {
 			Assert(context);
 		}
 
@@ -264,8 +263,7 @@ namespace IR {
 			Key() = delete;
 
 			constexpr Key(Relation::Kind kind, Value from, Value to, Value value = { })
-				: kind(kind), from(from), to(to), value(value)
-			{
+				: kind(kind), from(from), to(to), value(value) {
 				Assert(from);
 				Assert(to);
 			}

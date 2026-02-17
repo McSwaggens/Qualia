@@ -60,8 +60,7 @@ struct BaseType {
 	BaseType_Kind kind;
 	Token* token;
 
-	union
-	{
+	union {
 		Array<Type> tuple;
 		BaseType_Function function;
 	};

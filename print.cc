@@ -298,8 +298,7 @@ static void Write(OutputBuffer* buffer, Ast::Type* type) {
 			case Ast::SPECIFIER_POINTER:   buffer->Write("*"); break;
 			case Ast::SPECIFIER_OPTIONAL:  buffer->Write("?"); break;
 			case Ast::SPECIFIER_ARRAY:     buffer->Write("[]");
-			case Ast::SPECIFIER_FIXED_ARRAY:
-			{
+			case Ast::SPECIFIER_FIXED_ARRAY: {
 				buffer->Write("[");
 				Write(buffer, specifier->size_expression);
 				buffer->Write("]");
@@ -480,8 +479,7 @@ static void Write(OutputBuffer* buffer, Ast::Expression* expression) {
 				Write(buffer, call->parameters);
 				buffer->Write(")");
 			}
-			else
-			{
+			else {
 				Write(buffer, call->parameters);
 			}
 		} break;

@@ -86,7 +86,7 @@ int main(int argc, char** args) {
 		CompileFile(file);
 	}
 
-	IR::PrintState();
+	// IR::PrintState();
 
 	Print("Compiler finished.\n");
 

@@ -1389,7 +1389,7 @@ TypeID Scanner::GetTypeFromParams(Array<Ast::Variable> params) {
 	for (u32 i = 0; i < params.length; i++)
 		types[i] = params[i].type;
 
-	return GetTuple(types, params.length);
+	return GetTuple({ types, params.length });
 }
 
 void Scanner::ScanFunction(Ast::Function* function, Ast::Scope* scope) {

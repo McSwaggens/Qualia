@@ -241,13 +241,13 @@ TypeID Scanner::GetBaseType(Ast::BaseType basetype, Ast::Scope* scope) {
 				case TOKEN_BOOL:    result = TYPE_BOOL;    break;
 				case TOKEN_BYTE:    result = TYPE_BYTE;    break;
 
-				case TOKEN_INT:     result = type_int;     break;
+				case TOKEN_INT:     result = TYPE_INT64;   break;
 				case TOKEN_INT8:    result = TYPE_INT8;    break;
 				case TOKEN_INT16:   result = TYPE_INT16;   break;
 				case TOKEN_INT32:   result = TYPE_INT32;   break;
 				case TOKEN_INT64:   result = TYPE_INT64;   break;
 
-				case TOKEN_UINT:    result = type_uint;    break;
+				case TOKEN_UINT:    result = TYPE_UINT64;  break;
 				case TOKEN_UINT8:   result = TYPE_UINT8;   break;
 				case TOKEN_UINT16:  result = TYPE_UINT16;  break;
 				case TOKEN_UINT32:  result = TYPE_UINT32;  break;

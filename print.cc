@@ -192,7 +192,7 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 		return;
 	}
 
-	switch (type.GetTypeKind()) {
+	switch (type.GetKind()) {
 		case TYPE_PRIMITIVE: {
 			switch (type) {
 				case TYPE_BYTE:    buffer->Write("byte");    break;
@@ -226,7 +226,7 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 		case TYPE_FUNCTION: {
 			TypeInfo::Function function_info = info->function_info;
 
-			bool is_input_type_tuple = function_info.input.GetTypeKind() == TYPE_TUPLE;
+			bool is_input_type_tuple = function_info.input.GetKind() == TYPE_TUPLE;
 
 			if (!is_input_type_tuple)
 				buffer->Write('(');

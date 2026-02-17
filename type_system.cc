@@ -3,14 +3,79 @@
 #include "general.h"
 #include "assert.h"
 
-static TypeID GetArithmeticBackingType(TypeID type) {
-	type = RemoveReference(type);
+static TypeID CreateTypeID(TypeKind kind, u32 index) {
+	Assume(index < (1<<TYPE_INDEX_BITCOUNT));
+	return TypeID((kind << TYPE_INDEX_BITCOUNT) | index);
+}
+
+inline TypeID TypeID::GetSubType() const {
+	TypeInfo* info = GetTypeInfo();
+	switch (GetTypeKind()) {
+		case TYPE_POINTER:     return info->pointer_info.subtype;
+		case TYPE_OPTIONAL:    return info->optional_info.subtype;
+		case TYPE_ARRAY:       return info->array_info.subtype;
+		case TYPE_FIXED_ARRAY: return info->fixed_info.subtype;
+		case TYPE_REFERENCE:   return info->reference_info.subtype;
+		default: return *this;
+	}
+}
+
+inline u64 TypeID::GetSize() const {
+	static constexpr u8 PRIMITIVE_SIZE_LUT[PRIMITIVE_COUNT+1] = {
+		0,  // 0: unused
+		1,  // TYPE_BYTE (1)
+		1,  // TYPE_BOOL (2)
+		1,  // TYPE_UINT8 (3)
+		2,  // TYPE_UINT16 (4)
+		4,  // TYPE_UINT32 (5)
+		8,  // TYPE_UINT64 (6)
+		1,  // TYPE_INT8 (7)
+		2,  // TYPE_INT16 (8)
+		4,  // TYPE_INT32 (9)
+		8,  // TYPE_INT64 (10)
+		4,  // TYPE_FLOAT32 (11)
+		8,  // TYPE_FLOAT64 (12)
+	};
+
+	switch (GetTypeKind()) {
+		case TYPE_PRIMITIVE:   return PRIMITIVE_SIZE_LUT[id];
+		case TYPE_TUPLE:       return GetTypeInfo()->size;
+		case TYPE_FUNCTION:    return 0;
+		case TYPE_STRUCT:      return GetTypeInfo()->size;
+		case TYPE_ENUM:        return GetTypeInfo()->size;
+		case TYPE_POINTER:     return 8;
+		case TYPE_OPTIONAL:    return GetTypeInfo()->size;
+		case TYPE_ARRAY:       return 16;
+		case TYPE_FIXED_ARRAY: return GetTypeInfo()->size;
+		case TYPE_REFERENCE:   return 8;
+		default: AssertUnreachable();
+	}
+}
+
+inline TypeID TypeID::GetFunctionInputType()  const { return GetTypeInfo()->function_info.input; }
+inline TypeID TypeID::GetFunctionOutputType() const { return GetTypeInfo()->function_info.output; }
+
+inline TypeInfo& TypeID::Get() const {
+	return type_infos[GetIndex()];
+}
+
+inline TypeInfo* TypeID::operator ->() const {
+	return &type_infos[GetIndex()];
+}
+
+inline TypeInfo* TypeID::GetTypeInfo() const {
+	Assert(GetIndex() < (s32)type_infos.head);
+	return &type_infos[GetIndex()];
+}
+
+TypeID TypeID::GetArithmeticBackingType() const {
+	TypeID type = RemoveReference();
 
 	if (type == TYPE_BOOL)
 		return TYPE_INT8;
 
-	TypeKind kind = GetTypeKind(type);
-	TypeInfo* info = GetTypeInfo(type);
+	TypeKind kind = type.GetTypeKind();
+	TypeInfo* info = type.GetTypeInfo();
 
 	if (kind == TYPE_ENUM)
 		return info->enum_info.backing_type;
@@ -40,8 +105,8 @@ static TypeID GetDominantType(TypeID a, TypeID b) {
 		return a;
 
 	// Unwrap references and find dominant type of subtypes
-	a = RemoveReference(a);
-	b = RemoveReference(b);
+	a = a.RemoveReference();
+	b = b.RemoveReference();
 
 	// Check again after unwrapping - (ref)T and T should be compatible
 	if (a == b)
@@ -50,33 +115,34 @@ static TypeID GetDominantType(TypeID a, TypeID b) {
 	if (a < b)
 		Swap(a, b);
 
-	if (IsInteger(a) && IsInteger(b)) {
-		bool sign = IsSignedInteger(a) && IsSignedInteger(b);
+	if (a.IsInteger() && b.IsInteger()) {
+		bool sign = a.IsSignedInteger() && b.IsSignedInteger();
 		return GetIntegerWithSign(a, sign);
 	}
 
-	if (GetTypeKind(a) == TYPE_PRIMITIVE && GetTypeKind(b) == TYPE_PRIMITIVE) {
+	if (a.GetTypeKind() == TYPE_PRIMITIVE && b.GetTypeKind() == TYPE_PRIMITIVE) {
 	}
 
 	Assert("Invalid dominator combo");
 	return TYPE_NULL;
 }
 
-static bool CanCast(CastKind cast, TypeID from, TypeID to) {
-	TypeKind from_kind = GetTypeKind(from);
-	TypeKind to_kind   = GetTypeKind(to);
+bool TypeID::CanCast(CastKind cast, TypeID to) const {
+	TypeID from = *this;
+	TypeKind from_kind = from.GetTypeKind();
+	TypeKind to_kind   = to.GetTypeKind();
 
-	TypeInfo* from_info = GetTypeInfo(from);
-	TypeInfo* to_info   = GetTypeInfo(to);
+	TypeInfo* from_info = from.GetTypeInfo();
+	TypeInfo* to_info   = to.GetTypeInfo();
 
 	if (from == to)
 		return true;
 
 	if (from == TYPE_BYTE)
-		return GetTypeSize(to) == 1;
+		return to.GetSize() == 1;
 
 	if (to == TYPE_BYTE)
-		return GetTypeSize(from) == 1;
+		return from.GetSize() == 1;
 
 	switch (from_kind) {
 		case TYPE_PRIMITIVE:
@@ -94,7 +160,7 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to) {
 		{
 			if (to_kind == TYPE_TUPLE && cast >= CAST_COERCIVE && from_info->tuple_info.elements.length == to_info->tuple_info.elements.length) {
 				for (u64 i = 0; i < from_info->tuple_info.elements.length; i++) {
-					if (!CanCast(cast, from_info->tuple_info.elements[i], to_info->tuple_info.elements[i]))
+					if (!from_info->tuple_info.elements[i].CanCast(cast, to_info->tuple_info.elements[i]))
 						return false;
 				}
 
@@ -165,7 +231,7 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to) {
 			if (to == TYPE_BOOL)
 				return cast >= CAST_COERCIVE;
 
-			TypeID subtype = GetSubType(from);
+			TypeID subtype = from.GetSubType();
 
 			if (to == subtype)
 				return cast >= CAST_EXPLICIT;
@@ -178,11 +244,11 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to) {
 
 		case TYPE_FIXED_ARRAY:
 		{
-			if (from_info->fixed_info.length == 1 && to == GetSubType(from))
+			if (from_info->fixed_info.length == 1 && to == from.GetSubType())
 				return true;
 
 			if (to_kind == TYPE_FIXED_ARRAY && from_info->fixed_info.length == to_info->fixed_info.length)
-				return CanCast(cast, GetSubType(from), GetSubType(to));
+				return from.GetSubType().CanCast(cast, to.GetSubType());
 
 			return false;
 		}
@@ -190,8 +256,8 @@ static bool CanCast(CastKind cast, TypeID from, TypeID to) {
 		case TYPE_REFERENCE:
 		{
 			// References implicitly dereference to their subtype
-			TypeID subtype = GetSubType(from);
-			return CanCast(cast, subtype, to);
+			TypeID subtype = from.GetSubType();
+			return subtype.CanCast(cast, to);
 		}
 	}
 
@@ -211,26 +277,23 @@ static void AddExtensionEntry(ExtensionTable* table, ExtensionEntry entry) {
 }
 
 static void InitTypeSystem(void) {
-	Zero(&type_system);
-	type_system.info_count = CORE_TYPES_COUNT;
-	type_system.info_capacity = 1<<20;
-	type_system.infos = (TypeInfo*)AllocMemory(type_system.info_capacity*sizeof(TypeInfo));
+	type_infos.head = CORE_TYPES_COUNT;
 
 	for (s32 prim = PRIMITIVE_BEGIN; prim < PRIMITIVE_END; prim++) {
-		TypeInfo* info = &type_system.infos[prim];
+		TypeInfo* info = &type_infos[prim];
 		Zero(info);
 
-		info->size = PRIMITIVE_SIZE_LUT[prim];
+		info->size = TypeID(prim).GetSize();
 
-		info->pointer  = CreateTypeID(TYPE_POINTER,  TYPE_POINTER_TO_PRIMITIVE_OFFSET  + prim);
-		info->optional = CreateTypeID(TYPE_OPTIONAL, TYPE_OPTIONAL_TO_PRIMITIVE_OFFSET + prim);
-		info->array    = CreateTypeID(TYPE_ARRAY,    TYPE_ARRAY_TO_PRIMITIVE_OFFSET    + prim);
+		info->pointer   = CreateTypeID(TYPE_POINTER,  TYPE_POINTER_TO_PRIMITIVE_OFFSET  + prim);
+		info->optional  = CreateTypeID(TYPE_OPTIONAL, TYPE_OPTIONAL_TO_PRIMITIVE_OFFSET + prim);
+		info->array     = CreateTypeID(TYPE_ARRAY,    TYPE_ARRAY_TO_PRIMITIVE_OFFSET    + prim);
 		info->reference = CreateTypeID(TYPE_REFERENCE, TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + prim);
 
-		TypeInfo* pointer  = GetTypeInfo(info->pointer);
-		TypeInfo* optional = GetTypeInfo(info->optional);
-		TypeInfo* array    = GetTypeInfo(info->array);
-		TypeInfo* reference = GetTypeInfo(info->reference);
+		TypeInfo* pointer  = info->pointer.GetTypeInfo();
+		TypeInfo* optional = info->optional.GetTypeInfo();
+		TypeInfo* array    = info->array.GetTypeInfo();
+		TypeInfo* reference = info->reference.GetTypeInfo();
 
 		Zero(pointer);
 		Zero(optional);
@@ -242,13 +305,13 @@ static void InitTypeSystem(void) {
 		array->size    = 16;
 		reference->size = 8;
 
-		pointer->pointer_info.subtype   = (TypeID)prim;
-		optional->optional_info.subtype = (TypeID)prim;
-		array->array_info.subtype       = (TypeID)prim;
-		reference->reference_info.subtype = (TypeID)prim;
+		pointer->pointer_info.subtype   = TypeID(prim);
+		optional->optional_info.subtype = TypeID(prim);
+		array->array_info.subtype       = TypeID(prim);
+		reference->reference_info.subtype = TypeID(prim);
 	}
 
-	*GetTypeInfo(TYPE_BARE_FUNCTION) = {
+	*TYPE_BARE_FUNCTION.GetTypeInfo() = {
 		.size = 0,
 		.function_info = {
 			.input  = TYPE_EMPTY_TUPLE,
@@ -256,7 +319,7 @@ static void InitTypeSystem(void) {
 		}
 	};
 
-	TypeInfo* empty = GetTypeInfo(TYPE_EMPTY_TUPLE);
+	TypeInfo* empty = TYPE_EMPTY_TUPLE.GetTypeInfo();
 	*empty = {
 		.size = 0,
 		.tuple_info = {
@@ -274,116 +337,98 @@ static void InitTypeSystem(void) {
 }
 
 static TypeID CreateType(TypeKind kind, TypeInfo info) {
-	if (type_system.info_count == type_system.info_capacity) COLD
-	{
-		type_system.info_capacity <<= 4;
-		type_system.infos = (TypeInfo*)ReAllocMemory(
-			type_system.infos,
-			sizeof(TypeInfo) * type_system.info_count,
-			sizeof(TypeInfo) * (type_system.info_capacity)
-		);
-	}
-
-	TypeID result = CreateTypeID(kind, type_system.info_count);
-	type_system.infos[type_system.info_count++] = info;
-
-	return result;
+	return CreateTypeID(kind, (u32)type_infos.AddIndex(info));
 }
 
-static TypeID GetPointer(TypeID subtype) {
-	Assert(subtype);
+TypeID TypeID::GetPointer() const {
+	Assert(*this);
 
-	TypeInfo* info = GetTypeInfo(subtype);
+	TypeInfo* info = GetTypeInfo();
 
 	if (info->pointer) HOT
 		return info->pointer;
 
 	TypeID ptr = CreateType(TYPE_POINTER, {
 		.size = 8,
-		.pointer_info.subtype = subtype,
+		.pointer_info.subtype = *this,
 	});
 
-	GetTypeInfo(subtype)->pointer = ptr;
+	GetTypeInfo()->pointer = ptr;
 
 	return ptr;
 }
 
-static TypeID GetOptional(TypeID subtype) {
-	Assert(subtype);
+TypeID TypeID::GetOptional() const {
+	Assert(*this);
 
-	TypeInfo* info = GetTypeInfo(subtype);
+	TypeInfo* info = GetTypeInfo();
 
 	if (info->optional)
 		return info->optional;
 
 	TypeID result = CreateType(TYPE_OPTIONAL, {
-		.size = GetTypeSize(subtype) + 1,
-		.optional_info.subtype = subtype,
+		.size = GetSize() + 1,
+		.optional_info.subtype = *this,
 	});
 
-	GetTypeInfo(subtype)->optional = result;
+	GetTypeInfo()->optional = result;
 
 	return result;
 }
 
-static TypeID GetArray(TypeID subtype) {
-	Assert(subtype);
+TypeID TypeID::GetArray() const {
+	Assert(*this);
 
-	TypeInfo* info = GetTypeInfo(subtype);
+	TypeInfo* info = GetTypeInfo();
 
 	if (info->array)
 		return info->array;
 
 	TypeID result = CreateType(TYPE_ARRAY, {
 		.size = 16,
-		.array_info.subtype = subtype,
+		.array_info.subtype = *this,
 	});
 
-	GetTypeInfo(subtype)->array = result;
+	GetTypeInfo()->array = result;
 
 	return result;
 }
 
-static TypeID GetReference(TypeID subtype) {
-	Assert(subtype);
+TypeID TypeID::GetReference() const {
+	Assert(*this);
+	Assert(!IsReference());
 
-	Assert(!IsReference(subtype));
-
-	TypeInfo* info = GetTypeInfo(subtype);
+	TypeInfo* info = GetTypeInfo();
 
 	if (info->reference)
 		return info->reference;
 
 	TypeID result = CreateType(TYPE_REFERENCE, {
 		.size = 8,
-		.reference_info.subtype = subtype,
+		.reference_info.subtype = *this,
 	});
 
-	GetTypeInfo(subtype)->reference = result;
+	GetTypeInfo()->reference = result;
 
 	return result;
 }
 
-static bool IsReference(TypeID type) {
-	return GetTypeKind(type) == TYPE_REFERENCE;
-}
+TypeID TypeID::GetFixedArray(u64 length) const {
+	Assert(*this);
 
-static TypeID GetFixedArray(TypeID subtype, u64 length) {
-	Assert(subtype);
-
-	TypeInfo* info = GetTypeInfo(subtype);
+	TypeInfo* info = GetTypeInfo();
 
 	for (u32 i = 0; i < info->extensions.count; i++) {
 		ExtensionEntry* entry = &info->extensions.entries[i];
 
-		if (entry->length == length && GetTypeKind(entry->type) == TYPE_FIXED_ARRAY)
+		if (entry->length == length && entry->type.GetTypeKind() == TYPE_FIXED_ARRAY)
 			return entry->type;
 	}
 
 	TypeID result = CreateType(TYPE_FIXED_ARRAY, {
-		.size = length * GetTypeSize(subtype),
+		.size = length * GetSize(),
 		.fixed_info = {
-			.subtype = subtype,
+			.subtype = *this,
 			.length = length,
 		}
 	});
@@ -403,12 +448,12 @@ static TypeID GetFunctionType(TypeID input, TypeID output) {
 	Assert(input);
 	Assert(output);
 
-	TypeInfo* input_info = GetTypeInfo(input);
+	TypeInfo* input_info = input.GetTypeInfo();
 
 	for (u32 i = 0; i < input_info->extensions.count; i++) {
 		ExtensionEntry* entry = &input_info->extensions.entries[i];
 
-		if (entry->output == output && GetTypeKind(entry->type) == TYPE_FUNCTION)
+		if (entry->output == output && entry->type.GetTypeKind() == TYPE_FUNCTION)
 			return entry->type;
 	}
 
@@ -438,7 +483,7 @@ static TypeID GetTuple(Array<TypeID> elements) {
 	if (elements.length == 1)
 		return elements[0];
 
-	TypeInfo* header_info = GetTypeInfo(elements[0]);
+	TypeInfo* header_info = elements[0].GetTypeInfo();
 	ExtensionTable* table = &header_info->extensions;
 
 	for (s32 i = 0; i < table->count; i++) {
@@ -447,17 +492,17 @@ static TypeID GetTuple(Array<TypeID> elements) {
 		if (entry->length != elements.length)
 			continue;
 
-		if (GetTypeKind(entry->type) != TYPE_TUPLE)
+		if (entry->type.GetTypeKind() != TYPE_TUPLE)
 			continue;
 
-		TypeInfo* ext_info = GetTypeInfo(entry->type);
+		TypeInfo* ext_info = entry->type.GetTypeInfo();
 		if (elements == ext_info->tuple_info.elements)
 			return entry->type;
 	}
 
 	u64 size = 0;
 	for (s32 i = 0; i < elements.length; i++)
-		size += GetTypeSize(elements[i]);
+		size += elements[i].GetSize();
 
 	TypeID* new_elements = CopyAlloc(elements.data, elements.length);
 
@@ -474,10 +519,6 @@ static TypeID GetTuple(Array<TypeID> elements) {
 	return result;
 }
 
-static TypeID GetTuple(TypeID* elements, u64 count) {
-	return GetTuple({ elements, count });
-}
-
 static TypeID CreateStructType(Ast::Struct* ast, u64 size) {
 	TypeID result = CreateType(TYPE_STRUCT, {
 		.size = size,
@@ -489,7 +530,7 @@ static TypeID CreateStructType(Ast::Struct* ast, u64 size) {
 
 static TypeID CreateEnumType(Ast::Enum* ast, TypeID backing_type) {
 	TypeID result = CreateType(TYPE_ENUM, {
-		.size = GetTypeSize(backing_type),
+		.size = backing_type.GetSize(),
 		.enum_info.ast = ast,
 		.enum_info.backing_type = backing_type,
 	});
@@ -510,12 +551,12 @@ static TypeID MergeTypeRight(TypeID a, TypeID b) {
 	if (b == TYPE_EMPTY_TUPLE)
 		return a;
 
-	if (GetTypeKind(b) != TYPE_TUPLE) {
+	if (b.GetTypeKind() != TYPE_TUPLE) {
 		TypeID types[2] = { a, b };
 		return GetTuple(Array<TypeID>(types, 2));
 	}
 
-	TypeInfo* b_info = GetTypeInfo(b);
+	TypeInfo* b_info = b.GetTypeInfo();
 	u64 count = b_info->tuple_info.elements.length+1;
 
 	TypeID elements[count];
@@ -525,3 +566,6 @@ static TypeID MergeTypeRight(TypeID a, TypeID b) {
 	return GetTuple(Array<TypeID>(elements, count));
 }
 
+static TypeID GetTuple(TypeID* elements, u64 count) {
+	return GetTuple(Array<TypeID>(elements, count));
+}

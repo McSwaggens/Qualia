@@ -509,11 +509,11 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 			case TOKEN_TRUE:  literal->type = TYPE_BOOL; literal->value = IR::Constant(1); break;
 			case TOKEN_FALSE: literal->type = TYPE_BOOL; literal->value = IR::Constant(0); break;
-			case TOKEN_NULL:  literal->type = GetPointer(TYPE_BYTE); literal->value = IR::Constant(0); break;
+			case TOKEN_NULL:  literal->type = TYPE_BYTE.GetPointer(); literal->value = IR::Constant(0); break;
 
 			case TOKEN_LITERAL_STRING: {
-				literal->type = GetFixedArray(TYPE_UINT8, literal->token->literal_string.length);
-				literal->type = GetReference(literal->type);  // String literals are lvalues
+				literal->type = TYPE_UINT8.GetFixedArray(literal->token->literal_string.length);
+				literal->type = literal->type.GetReference();  // String literals are lvalues
 				literal->value = IR::Constant(literal->token->literal_string.ToArray());
 			} break;
 

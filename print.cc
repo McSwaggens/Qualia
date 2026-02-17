@@ -185,14 +185,14 @@ static void Write(OutputBuffer* buffer, Token token) {
 }
 
 static void Write(OutputBuffer* buffer, TypeID type) {
-	TypeInfo* info = GetTypeInfo(type);
+	TypeInfo* info = type.GetTypeInfo();
 
 	if (!type) {
 		buffer->Write("TYPE_NULL");
 		return;
 	}
 
-	switch (GetTypeKind(type)) {
+	switch (type.GetTypeKind()) {
 		case TYPE_PRIMITIVE: {
 			switch (type) {
 				case TYPE_BYTE:    buffer->Write("byte");    break;
@@ -212,7 +212,7 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 		} return;
 
 		case TYPE_TUPLE: {
-			TupleTypeInfo tuple_info = info->tuple_info;
+			TypeInfo::Tuple tuple_info = info->tuple_info;
 			buffer->Write('(');
 
 			for (s32 i = 0; i < tuple_info.elements.length; i++) {
@@ -224,9 +224,9 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 		} return;
 
 		case TYPE_FUNCTION: {
-			FunctionTypeInfo function_info = info->function_info;
+			TypeInfo::Function function_info = info->function_info;
 
-			bool is_input_type_tuple = GetTypeKind(function_info.input) == TYPE_TUPLE;
+			bool is_input_type_tuple = function_info.input.GetTypeKind() == TYPE_TUPLE;
 
 			if (!is_input_type_tuple)
 				buffer->Write('(');
@@ -242,19 +242,19 @@ static void Write(OutputBuffer* buffer, TypeID type) {
 		} return;
 
 		case TYPE_STRUCT: {
-			StructTypeInfo struct_info = info->struct_info;
+			TypeInfo::Struct struct_info = info->struct_info;
 			Ast::Struct* ast = struct_info.ast;
 			buffer->Write(ast->name);
 		} return;
 
 		case TYPE_ENUM: {
-			EnumTypeInfo enum_info = info->enum_info;
+			TypeInfo::Enum enum_info = info->enum_info;
 			Ast::Enum* ast = enum_info.ast;
 			buffer->Write(ast->name);
 		} return;
 
 		case TYPE_POINTER: {
-			PointerTypeInfo* ptr_info = &info->pointer_info;
+			TypeInfo::Pointer* ptr_info = &info->pointer_info;
 			buffer->Write('*');
 			Write(buffer, ptr_info->subtype);
 		} return;

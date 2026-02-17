@@ -185,7 +185,7 @@ static void Write(OutputBuffer* buffer, Token token) {
 }
 
 static void Write(OutputBuffer* buffer, TypeID type) {
-	TypeInfo* info = type.GetTypeInfo();
+	TypeInfo* info = type.GetInfo();
 
 	if (!type) {
 		buffer->Write("TYPE_NULL");
@@ -458,7 +458,7 @@ static void Write(OutputBuffer* buffer, Ast::Expression* expression) {
 			buffer->Write("(");
 			Write(buffer, unary->op);
 			buffer->Write(" ");
-			Write(buffer, unary->subexpression);
+			Write(buffer, unary->subexpr);
 			buffer->Write(")");
 		} break;
 
@@ -474,13 +474,13 @@ static void Write(OutputBuffer* buffer, Ast::Expression* expression) {
 		case Ast::Expression::CALL: {
 			Ast::Expression_Call* call = (Ast::Expression_Call*)expression;
 			Write(buffer, call->function);
-			if (call->parameters->kind != Ast::Expression::TUPLE) {
+			if (call->params->kind != Ast::Expression::TUPLE) {
 				buffer->Write("(");
-				Write(buffer, call->parameters);
+				Write(buffer, call->params);
 				buffer->Write(")");
 			}
 			else {
-				Write(buffer, call->parameters);
+				Write(buffer, call->params);
 			}
 		} break;
 

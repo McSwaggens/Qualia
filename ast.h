@@ -147,12 +147,12 @@ struct Expression_Implicit_Cast : Expression {
 };
 
 struct Expression_Unary : Expression {
-	Expression* subexpression;
+	Expression* subexpr;
 	Token* op;
 
 	Expression_Unary(Kind k, Token* op_token) :
 		Expression(k, IR::NewValue(), TYPE_NULL, null, null),
-		subexpression(null),
+		subexpr(null),
 		op(op_token) { }
 };
 
@@ -184,22 +184,22 @@ struct Expression_Ternary : Expression {
 
 struct Expression_Call : Expression {
 	Expression* function;
-	Expression_Tuple* parameters;
+	Expression_Tuple* params;
 
 	Expression_Call() :
 		Expression(CALL, IR::NewValue(), TYPE_NULL, null, null),
 		function(null),
-		parameters(null) { }
+		params(null) { }
 };
 
 struct Expression_Dot_Call : Expression {
 	Expression_Binary* dot;
-	Expression_Tuple* parameters;
+	Expression_Tuple* params;
 
 	Expression_Dot_Call() :
 		Expression(DOT_CALL, IR::NewValue(), TYPE_NULL, null, null),
 		dot(null),
-		parameters(null) { }
+		params(null) { }
 };
 
 struct Expression_Array : Expression {
@@ -347,6 +347,8 @@ struct Scope {
 	Array<Struct> structs;
 	Array<Enum> enums;
 	List<Variable*> variables;
+
+	Function* FindFunction(String name, TypeID input_type);
 };
 
 struct Code {
@@ -516,7 +518,7 @@ struct Statement {
 struct Function {
 	String name;
 	Token* name_token;
-	Array<Variable> parameters; // @Todo: Give parameters their own struct? Parameter?
+	Array<Variable> params; // @Todo: Give parameters their own struct? Parameter?
 	Code code;
 	TypeID type;
 	TypeID return_type;

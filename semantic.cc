@@ -23,21 +23,6 @@ static TypeID FindUserType(String name, Ast::Scope* scope) {
 	return TYPE_NULL;
 }
 
-static Ast::Function* FindFunction(Ast::Scope* scope, String name, TypeID input_type) {
-	while (scope) {
-		for (Ast::Function* function = scope->functions; function < scope->functions.End(); function++) {
-			TypeInfo* info = function->type.GetInfo();
-
-			if (name == function->name && input_type.CanCast(CAST_IMPLICIT, info->function_info.input))
-				return function;
-		}
-
-		scope = scope->parent;
-	}
-
-	return null;
-}
-
 static Ast::Variable* FindVariable(Ast::Scope* scope, String name) {
 	while (scope) {
 		for (u32 i = 0; i < scope->variables.count; i++) {
@@ -332,53 +317,49 @@ TypeID Scanner::GetType(Ast::Type* ast_type, Ast::Scope* scope) {
 	return result;
 }
 
-void Scanner::ScanExpressionTerminalName(Ast::Expression_Terminal* terminal, Ast::Scope* scope) {
-	if (terminal->token->kind == TOKEN_IDENTIFIER_CASUAL) {
-		Ast::Variable* variable = FindVariable(scope, terminal->token->identifier_string);
+void Scanner::ScanExpressionTerminalName(Ast::Expression_Terminal* term, Ast::Scope* scope) {
+	if (term->token->kind == TOKEN_IDENTIFIER_CASUAL) {
+		Ast::Variable* var = FindVariable(scope, term->token->identifier_string);
+		if (!var) Error(term->token->location, "Variable with name '%' does not exist.\n", term->token);
 
-		if (!variable)
-			Error(terminal->token->location, "Variable with name '%' does not exist.\n", terminal->token);
+		Ast::Expression_Variable* varexpr = (Ast::Expression_Variable*)term;
+		varexpr->variable = var;
+		varexpr->kind = Ast::Expression::TERMINAL_VARIABLE;
+		varexpr->type = var->type;
 
-		Ast::Expression_Variable* variable_expression = (Ast::Expression_Variable*)terminal;
-		variable_expression->variable = variable;
-
-		variable_expression->kind = Ast::Expression::TERMINAL_VARIABLE;
-		variable_expression->type = variable->type;
-
-		if (variable->flags & Ast::VARIABLE_FLAG_CONSTANT) {
-			// Constants are not lvalues - type stays as-is
-		}
-		else {
-			// Variables are lvalues - wrap type in reference
-			variable_expression->type = variable_expression->type.GetReference();
-		}
+		// Variables are lvalues - wrap type in reference
+		if (!(var->flags & Ast::VARIABLE_FLAG_CONSTANT))
+			varexpr->type = varexpr->type.GetReference();
+		return;
 	}
-	else if (terminal->token->kind == TOKEN_IDENTIFIER_FORMAL) {
-		TypeID type = FindUserType(terminal->token->identifier_string, scope);
 
-		if (!type)
-			Error(terminal->token->location, "User type with name '%' does not exist.\n", terminal->token);
+	if (term->token->kind == TOKEN_IDENTIFIER_FORMAL) {
+		TypeID type = FindUserType(term->token->identifier_string, scope);
+		if (!type) Error(term->token->location, "User type with name '%' does not exist.\n", term->token);
 
-		terminal->type = type;
-
+		term->type = type;
 		if (type.GetTypeKind() == TYPE_STRUCT) {
-			terminal->kind = Ast::Expression::TERMINAL_STRUCT; // @FixMe
-			Ast::Expression_Struct* struct_terminal = (Ast::Expression_Struct*)terminal;
-			struct_terminal->structure = type.GetInfo()->struct_info.ast;
+			term->kind = Ast::Expression::TERMINAL_STRUCT; // @FixMe
+			Ast::Expression_Struct* struct_term = (Ast::Expression_Struct*)term;
+			struct_term->structure = type.GetInfo()->struct_info.ast;
+			return;
 		}
-		else if (type.GetTypeKind() == TYPE_ENUM) {
-			terminal->kind = Ast::Expression::TERMINAL_ENUM;
-			Ast::Expression_Enum* enum_terminal = (Ast::Expression_Enum*)terminal;
-			enum_terminal->enumeration = type.GetInfo()->enum_info.ast;
+
+		if (type.GetTypeKind() == TYPE_ENUM) {
+			term->kind = Ast::Expression::TERMINAL_ENUM;
+			Ast::Expression_Enum* enum_term = (Ast::Expression_Enum*)term;
+			enum_term->enumeration = type.GetInfo()->enum_info.ast;
+			return;
 		}
-		else if (type.GetTypeKind() == TYPE_PRIMITIVE) {
-			terminal->kind = Ast::Expression::TERMINAL_PRIMITIVE; // @FixMe
+
+		if (type.GetTypeKind() == TYPE_PRIMITIVE) {
+			term->kind = Ast::Expression::TERMINAL_PRIMITIVE; // @FixMe
+			return;
 		}
 	}
-	else {
-		Assert();
-		Error(terminal->token->location, "Unknown variable '%'\n", terminal->token);
-	}
+
+	Assert();
+	Error(term->token->location, "Unknown variable '%'\n", term->token);
 }
 
 void Scanner::ScanExpressionFixedArray(Ast::Expression_Fixed_Array* fixed_array, Ast::Scope* scope) {
@@ -388,16 +369,16 @@ void Scanner::ScanExpressionFixedArray(Ast::Expression_Fixed_Array* fixed_array,
 		Ast::Expression* element = fixed_array->elements[i];
 		ScanExpression(element, scope);
 
-		if (i) {
-			if (!element->type.CanCast(CAST_IMPLICIT, subtype))
-				Error(element, "Cannot implicitly cast type '%' to '%'\n", element->type, subtype);
-
-			fixed_array->elements[i] = ImplicitCast(element, subtype, module);
-		}
-		else {
+		if (!i) {
 			subtype = element->type;
 			fixed_array->type = subtype.GetFixedArray(fixed_array->elements.length);
+			continue;
 		}
+
+		if (!element->type.CanCast(CAST_IMPLICIT, subtype))
+			Error(element, "Cannot implicitly cast type '%' to '%'\n", element->type, subtype);
+
+		fixed_array->elements[i] = ImplicitCast(element, subtype, module);
 	}
 
 }
@@ -406,7 +387,7 @@ void Scanner::ScanExpressionArray(Ast::Expression_Array* array, Ast::Scope* scop
 	ScanExpression(array->left, scope);
 	ScanExpression(array->right, scope);
 
-	TypeID left_type = array->left->type.RemoveReference();
+	TypeID left_type  = array->left->type.RemoveReference();
 	TypeID right_type = array->right->type.RemoveReference();
 
 	if (left_type.GetTypeKind() != TYPE_POINTER)
@@ -421,9 +402,7 @@ void Scanner::ScanExpressionArray(Ast::Expression_Array* array, Ast::Scope* scop
 	else if (right_type.CanCast(CAST_IMPLICIT, TYPE_UINT64)) {
 		array->right = ImplicitCast(array->right, TYPE_UINT64, module);
 	}
-	else {
-		Error(array->right, "Array end must be a % or an uint, not: %\n", left_type, right_type);
-	}
+	else Error(array->right, "Array end must be a % or an uint, not: %\n", left_type, right_type);
 
 	array->type = left_type.GetSubType().GetArray();
 }
@@ -441,9 +420,8 @@ void Scanner::ScanExpressionTuple(Ast::Expression_Tuple* tuple, Ast::Scope* scop
 		ScanExpression(element, scope);
 		types[i] = element->type;
 
-		if (element->kind == Ast::Expression::TUPLE) {
+		if (element->kind == Ast::Expression::TUPLE)
 			tuple->recursive_count += ((Ast::Expression_Tuple*)element)->recursive_count-1;
-		}
 
 		if (element->type == TYPE_EMPTY_TUPLE && (element->kind != Ast::Expression::TUPLE || tuple->elements.length > 1))
 			Error(element, "Tuple elements aren't allowed to be of type %.\n", element->type);
@@ -456,43 +434,43 @@ void Scanner::ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope) 
 	Ast::Expression_Terminal* terminal = (Ast::Expression_Terminal*)call->function;
 	Ast::Expression_Binary* dot = (Ast::Expression_Binary*)call->function;
 
-	ScanExpression(call->parameters, scope);
+	ScanExpression(call->params, scope);
 
 	if (dot->kind == Ast::Expression::BINARY_DOT && dot->right->kind == Ast::Expression::TERMINAL_NAME && ((Ast::Expression_Terminal*)dot->right)->token->kind == TOKEN_IDENTIFIER_FORMAL) {
 		Ast::Expression_Dot_Call* dcall = (Ast::Expression_Dot_Call*)call;
 		dcall->kind = Ast::Expression::DOT_CALL;
 
-		Ast::Expression_Function* function_expression = (Ast::Expression_Function*)dot->right;
+		Ast::Expression_Function* funcexpr = (Ast::Expression_Function*)dot->right;
 
 		ScanExpression(dot->left, scope);
 
 		if (dot->left->type == TYPE_EMPTY_TUPLE)
 			Error(dot->left, "Cannot call into an empty tuple.\n");
 
-		TypeID full_param_type = MergeTypeRight(dot->left->type, dcall->parameters->type);
-		Ast::Function* function = FindFunction(scope, function_expression->token->identifier_string, full_param_type);
+		TypeID full_param_type = MergeTypeRight(dot->left->type, dcall->params->type);
+		Ast::Function* function = scope->FindFunction(funcexpr->token->identifier_string, full_param_type);
 
 		if (!function)
-			Error(dcall, "No function exists called % with input type: %.\n", function_expression->token->identifier_string, full_param_type);
+			Error(dcall, "No function exists called % with input type: %.\n", funcexpr->token->identifier_string, full_param_type);
 
-		function_expression->kind = Ast::Expression::TERMINAL_FUNCTION;
-		function_expression->function = function;
-		function_expression->type = function->type;
+		funcexpr->kind = Ast::Expression::TERMINAL_FUNCTION;
+		funcexpr->function = function;
+		funcexpr->type = function->type;
 
 		dcall->type = function->return_type;
 
-		Assert(dcall->parameters->elements.length == function->parameters.length-1);
+		Assert(dcall->params->elements.length == function->params.length-1);
 
-		dot->left = ImplicitCast(dot->left, function->parameters[0].type, module);
+		dot->left = ImplicitCast(dot->left, function->params[0].type, module);
 
-		for (u32 i = 0; i < dcall->parameters->elements.length; i++)
-			call->parameters->elements[i] = ImplicitCast(call->parameters->elements[i], function->parameters[i+1].type, module);
+		for (u32 i = 0; i < dcall->params->elements.length; i++)
+			call->params->elements[i] = ImplicitCast(call->params->elements[i], function->params[i+1].type, module);
 
 		return;
 	}
 
 	if (call->function->kind == Ast::Expression::TERMINAL_NAME && terminal->token->kind == TOKEN_IDENTIFIER_FORMAL) {
-		if (Ast::Function* function = FindFunction(scope, terminal->token->identifier_string, call->parameters->type); function) {
+		if (Ast::Function* function = scope->FindFunction(terminal->token->identifier_string, call->params->type); function) {
 			Ast::Expression_Function* function_expression = (Ast::Expression_Function*)call->function;
 			call->function->kind = Ast::Expression::TERMINAL_FUNCTION;
 			function_expression->function = function;
@@ -502,11 +480,11 @@ void Scanner::ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope) 
 
 			TypeInfo* info = function->type.GetInfo();
 
-			call->parameters = (Ast::Expression_Tuple*)ImplicitCast(call->parameters, info->function_info.input, module);
+			call->params = (Ast::Expression_Tuple*)ImplicitCast(call->params, info->function_info.input, module);
 			return;
 		}
 
-		if (IntrinsicID intrinsic_id = FindIntrinsic(terminal->token->identifier_string, call->parameters->type); intrinsic_id != INTRINSIC_INVALID) {
+		if (IntrinsicID intrinsic_id = FindIntrinsic(terminal->token->identifier_string, call->params->type); intrinsic_id != INTRINSIC_INVALID) {
 			TypeID type = intrinsics[intrinsic_id].type;
 			TypeInfo* type_info = type.GetInfo();
 
@@ -517,11 +495,11 @@ void Scanner::ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope) 
 			call->function->kind = Ast::Expression::TERMINAL_INTRINSIC;
 			call->type = type_info->function_info.output;
 
-			call->parameters = (Ast::Expression_Tuple*)ImplicitCast(call->parameters, type_info->function_info.input, module);
+			call->params = (Ast::Expression_Tuple*)ImplicitCast(call->params, type_info->function_info.input, module);
 			return;
 		}
 
-		Error(terminal->token->location, "No function exists called % with input type: %.\n", terminal->token->identifier_string, call->parameters->type);
+		Error(terminal->token->location, "No function exists called % with input type: %.\n", terminal->token->identifier_string, call->params->type);
 		return;
 	}
 
@@ -534,10 +512,10 @@ void Scanner::ScanExpressionCall(Ast::Expression_Call* call, Ast::Scope* scope) 
 	TypeInfo* function_type_info = function_type.GetInfo();
 	call->type = function_type_info->function_info.output;
 
-	if (!call->parameters->type.CanCast(CAST_IMPLICIT, function_type.GetFunctionInputType()))
-		Error(call->function, "Function of type % called with invalid arguments: %.\n", call->function->type, call->parameters->type);
+	if (!call->params->type.CanCast(CAST_IMPLICIT, function_type.GetFunctionInputType()))
+		Error(call->function, "Function of type % called with invalid arguments: %.\n", call->function->type, call->params->type);
 
-	call->parameters = (Ast::Expression_Tuple*)ImplicitCast(call->parameters, function_type_info->function_info.input, module);
+	call->params = (Ast::Expression_Tuple*)ImplicitCast(call->params, function_type_info->function_info.input, module);
 }
 
 void Scanner::ScanExpressionSubscript(Ast::Expression_Subscript* subscript, Ast::Scope* scope) {
@@ -564,31 +542,25 @@ void Scanner::ScanExpressionSubscript(Ast::Expression_Subscript* subscript, Ast:
 	subscript->index = ImplicitCast(subscript->index, TYPE_INT64, module);
 
 	TypeID element_type = array_type.GetSubType();
-
-	if (!fixed || is_lvalue) {
-		// Subscripting an array or lvalue gives lvalue element
-		subscript->type = element_type.GetReference();
-	} else {
-		// Fixed array rvalue gives rvalue element
-		subscript->type = element_type;
-	}
+	if (!fixed || is_lvalue) subscript->type = element_type.GetReference(); // Subscripting an array or lvalue gives lvalue element
+	else                     subscript->type = element_type;                // Fixed array rvalue gives rvalue element
 }
 
 void Scanner::ScanExpressionUnaryAddressOf(Ast::Expression_Unary* unary, Ast::Scope* scope) {
-	ScanExpression(unary->subexpression, scope);
+	ScanExpression(unary->subexpr, scope);
 
-	if (!unary->subexpression->type.IsReference())
-		Error(unary, "Cannot take address of non-lvalue (type: %).\n", unary->subexpression->type);
+	if (!unary->subexpr->type.IsReference())
+		Error(unary, "Cannot take address of non-lvalue (type: %).\n", unary->subexpr->type);
 
 	// Take address of ref T -> get *T (pointer to T)
-	TypeID subtype = unary->subexpression->type.GetSubType();
+	TypeID subtype = unary->subexpr->type.GetSubType();
 	unary->type = subtype.GetPointer();
 }
 
 void Scanner::ScanExpressionUnaryReferenceOf(Ast::Expression_Unary* unary, Ast::Scope* scope) {
-	ScanExpression(unary->subexpression, scope);
+	ScanExpression(unary->subexpr, scope);
 
-	TypeID ptr_type = unary->subexpression->type.RemoveReference();
+	TypeID ptr_type = unary->subexpr->type.RemoveReference();
 
 	if (ptr_type.GetTypeKind() != TYPE_POINTER)
 		Error(unary, "Cannot dereference non-pointer type: %\n", ptr_type);
@@ -598,44 +570,48 @@ void Scanner::ScanExpressionUnaryReferenceOf(Ast::Expression_Unary* unary, Ast::
 }
 
 void Scanner::ScanExpressionUnaryBitwiseNot(Ast::Expression_Unary* unary, Ast::Scope* scope) {
-	ScanExpression(unary->subexpression, scope);
+	ScanExpression(unary->subexpr, scope);
 
-	if (unary->subexpression->type.GetArithmeticBackingType().IsInteger()) {
-		unary->subexpression = ImplicitCast(unary->subexpression, unary->subexpression->type.GetArithmeticBackingType(), module);
-		unary->type = unary->subexpression->type;
+	if (unary->subexpr->type.GetArithmeticBackingType().IsInteger()) {
+		unary->subexpr = ImplicitCast(unary->subexpr, unary->subexpr->type.GetArithmeticBackingType(), module);
+		unary->type = unary->subexpr->type;
+		return;
 	}
-	else if (unary->subexpression->type.GetTypeKind() == TYPE_POINTER) {
-		unary->type = unary->subexpression->type;
+
+	if (unary->subexpr->type.GetTypeKind() == TYPE_POINTER) {
+		unary->type = unary->subexpr->type;
+		return;
 	}
-	else Error(unary->subexpression, "Type % is not an integer or pointer.\n", unary->subexpression->type);
+
+	Error(unary->subexpr, "Type % is not an integer or pointer.\n", unary->subexpr->type);
 }
 
 void Scanner::ScanExpressionUnaryMinus(Ast::Expression_Unary* unary, Ast::Scope* scope) {
-	ScanExpression(unary->subexpression, scope);
+	ScanExpression(unary->subexpr, scope);
 
-	if (!unary->subexpression->type.GetArithmeticBackingType().IsInteger() && unary->subexpression->type.GetTypeKind() != TYPE_POINTER && !unary->subexpression->type.IsFloat())
-		Error(unary->subexpression, "Unary minus does not work on type '%'.\n", unary->subexpression->type);
+	if (!unary->subexpr->type.GetArithmeticBackingType().IsInteger() && unary->subexpr->type.GetTypeKind() != TYPE_POINTER && !unary->subexpr->type.IsFloat())
+		Error(unary->subexpr, "Unary minus does not work on type '%'.\n", unary->subexpr->type);
 
-	unary->subexpression = ImplicitCast(unary->subexpression, unary->subexpression->type.GetArithmeticBackingType(), module);
-	unary->type = unary->subexpression->type;
+	unary->subexpr = ImplicitCast(unary->subexpr, unary->subexpr->type.GetArithmeticBackingType(), module);
+	unary->type = unary->subexpr->type;
 }
 
 void Scanner::ScanExpressionUnaryPlus(Ast::Expression_Unary* unary, Ast::Scope* scope) {
-	ScanExpression(unary->subexpression, scope);
+	ScanExpression(unary->subexpr, scope);
 
-	if (!unary->subexpression->type.IsSignedInteger() && !unary->subexpression->type.IsFloat())
-		Error(unary->subexpression, "Unary plus can only be applied to a signed integer or float.\n", unary->subexpression->type);
+	if (!unary->subexpr->type.IsSignedInteger() && !unary->subexpr->type.IsFloat())
+		Error(unary->subexpr, "Unary plus can only be applied to a signed integer or float.\n", unary->subexpr->type);
 
-	unary->type = unary->subexpression->type;
+	unary->type = unary->subexpr->type;
 }
 
 void Scanner::ScanExpressionUnaryNot(Ast::Expression_Unary* unary, Ast::Scope* scope) {
-	ScanExpression(unary->subexpression, scope);
+	ScanExpression(unary->subexpr, scope);
 
-	if (!unary->subexpression->type.CanCast(CAST_IMPLICIT, TYPE_BOOL))
-		Error(unary->subexpression, "Type % cannot be casted to bool.\n", unary->subexpression->type);
+	if (!unary->subexpr->type.CanCast(CAST_IMPLICIT, TYPE_BOOL))
+		Error(unary->subexpr, "Type % cannot be casted to bool.\n", unary->subexpr->type);
 
-	unary->subexpression = ImplicitCast(unary->subexpression, TYPE_BOOL, module);
+	unary->subexpr = ImplicitCast(unary->subexpr, TYPE_BOOL, module);
 	unary->type = TYPE_BOOL;
 }
 
@@ -659,77 +635,70 @@ void Scanner::ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope
 		String name = member_terminal->token->identifier_string;
 
 		Ast::Enum_Member* member = FindEnumMember(ast_enum, name);
-
 		if (!member)
 			Error(binary->right, "Enum % does not contain a member called \"%\".", ast_enum->name, name);
 
 		member_terminal->member = member;
 		member_terminal->type = type;
-
 		binary->type = type;
+		return;
 	}
-	else if (binary->right->kind == Ast::Expression::TERMINAL_NAME && ((Ast::Expression_Terminal*)binary->right)->token->kind == TOKEN_IDENTIFIER_CASUAL) {
-		Ast::Expression_Terminal* terminal = (Ast::Expression_Terminal*)binary->right;
-		String name = terminal->token->identifier_string;
 
-		// Unwrap references, then pointers
-		type = type.RemoveReference();
-		while (type.GetTypeKind() == TYPE_POINTER)
-			type = type.GetSubType();
+	if (binary->right->kind != Ast::Expression::TERMINAL_NAME || ((Ast::Expression_Terminal*)binary->right)->token->kind != TOKEN_IDENTIFIER_CASUAL)
+		Error(binary, "Invalid dot expression.\n", binary->left->type);
 
-		if (type.GetTypeKind() == TYPE_STRUCT) {
+	Ast::Expression_Terminal* terminal = (Ast::Expression_Terminal*)binary->right;
+	String name = terminal->token->identifier_string;
 
-			Ast::Struct* ast_struct = type.GetInfo()->struct_info.ast;
-			Ast::Struct_Member* member = FindStructMember(ast_struct, terminal->token->identifier_string);
+	// Unwrap references, then pointers
+	type = type.RemoveReference();
+	while (type.GetTypeKind() == TYPE_POINTER)
+		type = type.GetSubType();
 
-			if (!member)
-				Error(binary, "Struct % does not have a member named %\n", ast_struct->name, terminal->token);
+	if (type.GetTypeKind() == TYPE_STRUCT) {
+		Ast::Struct* ast_struct = type.GetInfo()->struct_info.ast;
+		Ast::Struct_Member* member = FindStructMember(ast_struct, terminal->token->identifier_string);
 
-			TypeID member_type = member->type;
+		if (!member) Error(binary, "Struct % does not have a member named %\n", ast_struct->name, terminal->token);
 
-			if (binary->left->type.GetTypeKind() == TYPE_POINTER) {
-				// Pointer member access gives lvalue
-				binary->type = member_type.GetReference();
-			} else if (binary->left->type.IsReference()) {
-				// Reference member access gives lvalue member
-				binary->type = member_type.GetReference();
-			} else {
-				// Value member access - preserve type
-				binary->type = member_type;
-			}
+		TypeID member_type = member->type;
 
-			terminal->kind = Ast::Expression::TERMINAL_STRUCT_MEMBER;
-			((Ast::Expression_Struct_Member*)terminal)->member = member;
-			terminal->type = member->type;
-		}
-		else if (type.GetTypeKind() == TYPE_ARRAY || type.GetTypeKind() == TYPE_FIXED_ARRAY) {
-			bool fixed = type.GetTypeKind() == TYPE_FIXED_ARRAY;
+		if (binary->left->type.IsPointer())        binary->type = member_type.GetReference(); // Pointer member access gives lvalue
+		else if (binary->left->type.IsReference()) binary->type = member_type.GetReference(); // Reference member access gives lvalue member
+		else                                       binary->type = member_type;                // Value member access - preserve type
 
-			if (name == "begin" || name == "data") {
-				binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
-
-				if (fixed) {
-					// Fixed array .data/.begin gives lvalue to first element
-					binary->type = binary->left->type.GetSubType().GetReference();
-				} else {
-					// Dynamic array .data/.begin is a pointer (not ref)
-					binary->type = binary->left->type.GetSubType().GetPointer();
-				}
-			}
-			else if (name == "end") {
-				binary->right->kind = Ast::Expression::TERMINAL_ARRAY_END;
-				binary->type = binary->left->type.GetSubType().GetPointer();
-			}
-			else if (name == "length" || name == "count") {
-				binary->right->kind = Ast::Expression::TERMINAL_ARRAY_LENGTH;
-				binary->type = TYPE_UINT64;
-				// Length is rvalue, not ref
-			}
-			else Error(binary->right, "'%' does not have a member named '%'.\n", type, name);
-		}
-		else Error(binary, "'%' does not have a member named '%'.\n", type, name);
+		terminal->kind = Ast::Expression::TERMINAL_STRUCT_MEMBER;
+		((Ast::Expression_Struct_Member*)terminal)->member = member;
+		terminal->type = member->type;
+		return;
 	}
-	else Error(binary, "Invalid dot expression.\n", binary->left->type);
+
+	if (type.GetTypeKind() == TYPE_ARRAY || type.GetTypeKind() == TYPE_FIXED_ARRAY) {
+		bool fixed = type.GetTypeKind() == TYPE_FIXED_ARRAY;
+
+		if (name == "begin" || name == "data") {
+			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
+			if (fixed) binary->type = binary->left->type.GetSubType().GetReference(); // Fixed array .data/.begin gives lvalue to first element
+			else       binary->type = binary->left->type.GetSubType().GetPointer();   // Dynamic array .data/.begin is a pointer (not ref)
+			return;
+		}
+
+		if (name == "end") {
+			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_END;
+			binary->type = binary->left->type.GetSubType().GetPointer();
+			return;
+		}
+
+		if (name == "length" || name == "count") {
+			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_LENGTH;
+			binary->type = TYPE_UINT64; // Length is rvalue, not ref
+			return;
+		}
+
+		Error(binary->right, "'%' does not have a member named '%'.\n", type, name);
+	}
+
+	Error(binary, "'%' does not have a member named '%'.\n", type, name);
 }
 
 void Scanner::ScanExpressionBinaryCompareEquality(Ast::Expression_Binary* binary, Ast::Scope* scope) {
@@ -780,30 +749,32 @@ void Scanner::ScanExpressionBinaryArithmetic(Ast::Expression_Binary* binary, Ast
 
 			binary->right = ImplicitCast(binary->right, TYPE_INT64, module);
 			binary->type = binary->left->type;
+			return;
 		}
-		else if (binary->kind == Ast::Expression::BINARY_SUBTRACT) {
+
+		if (binary->kind == Ast::Expression::BINARY_SUBTRACT) {
 			if (binary->right->type.GetTypeKind() == TYPE_POINTER) {
 				TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
-
-				if (!dominant)
-					Error(binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
-
-				binary->left = ImplicitCast(binary->left, dominant, module);
+				if (!dominant) Error(binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+				binary->left  = ImplicitCast(binary->left, dominant, module);
 				binary->right = ImplicitCast(binary->right, dominant, module);
-
 				binary->type = TYPE_INT64;
+				return;
 			}
-			else if (binary->right->type.CanCast(CAST_IMPLICIT, TYPE_INT64)) {
+
+			if (binary->right->type.CanCast(CAST_IMPLICIT, TYPE_INT64)) {
 				binary->right = ImplicitCast(binary->right, TYPE_INT64, module);
 				binary->type = binary->left->type;
+				return;
 			}
-			else
-				Error(binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+
+			Error(binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
 		}
-		else
-			Error(binary, "Binary expression '%' cannot be used on a pointer.\n", binary->op);
+
+		Error(binary, "Binary expression '%' cannot be used on a pointer.\n", binary->op);
 	}
-	else if (binary->left->type.IsFloat() || binary->right->type.IsFloat()) {
+
+	if (binary->left->type.IsFloat() || binary->right->type.IsFloat()) {
 		// float + float = float
 		// float - float = float
 		// float * float = float
@@ -816,26 +787,23 @@ void Scanner::ScanExpressionBinaryArithmetic(Ast::Expression_Binary* binary, Ast
 
 		binary->left  = ImplicitCast(binary->left,  dominant, module);
 		binary->right = ImplicitCast(binary->right, dominant, module);
-
 		binary->type = dominant;
+		return;
 	}
-	else {
-		// int + int
-		// int - int
-		// int * int
-		// int / int
-		// int % int
 
-		TypeID dominant = GetDominantType(binary->left->type.GetArithmeticBackingType(), binary->right->type.GetArithmeticBackingType());
+	// int + int
+	// int - int
+	// int * int
+	// int / int
+	// int % int
 
-		if (!dominant || !dominant.IsInteger())
-			Error(binary, "Binary expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
+	TypeID dominant = GetDominantType(binary->left->type.GetArithmeticBackingType(), binary->right->type.GetArithmeticBackingType());
+	if (!dominant || !dominant.IsInteger())
+		Error(binary, "Binary expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
 
-		binary->left = ImplicitCast(binary->left, dominant, module);
-		binary->right = ImplicitCast(binary->right, dominant, module);
-
-		binary->type = dominant;
-	}
+	binary->left  = ImplicitCast(binary->left, dominant, module);
+	binary->right = ImplicitCast(binary->right, dominant, module);
+	binary->type = dominant;
 }
 
 void Scanner::ScanExpressionBinaryBitwise(Ast::Expression_Binary* binary, Ast::Scope* scope) {
@@ -905,11 +873,9 @@ void Scanner::ScanExpressionIfElse(Ast::Expression_Ternary* ternary, Ast::Scope*
 	ternary->right  = ImplicitCast(ternary->right, dominant, module);
 
 	// If both branches produce references of the same type, result is also a reference
-	if (ternary->left->type == ternary->right->type && ternary->left->type.IsReference()) {
+	ternary->type = dominant;
+	if (ternary->left->type == ternary->right->type && ternary->left->type.IsReference())
 		ternary->type = ternary->left->type;  // Preserve reference type
-	} else {
-		ternary->type = dominant;
-	}
 }
 
 void Scanner::ScanExpressionLambda(Ast::Expression* expression, Ast::Scope* scope) {
@@ -998,14 +964,10 @@ void Scanner::ScanScope(Ast::Scope* scope) {
 		}
 
 		for (Ast::Enum* ast_enum = scope->enums; ast_enum < scope->enums.End(); ast_enum++) {
-			if (ast_struct->name == ast_enum->name) {
-				Token* name_token = ast_struct->name_token;
-
-				if (ast_struct->name_token->location.line < ast_enum->name_token->location.line)
-					name_token = ast_enum->name_token;
-
-				Error(name_token->location, "Duplicate type called '%'\n", name_token);
-			}
+			if (ast_struct->name != ast_enum->name) continue;
+			bool enum_is_later = ast_struct->name_token->location.line < ast_enum->name_token->location.line;
+			Token* name_token = enum_is_later ? ast_enum->name_token : ast_struct->name_token;
+			Error(name_token->location, "Duplicate type called '%'\n", name_token);
 		}
 
 		CheckForStructMemberDuplicates(module, ast_struct);
@@ -1042,11 +1004,9 @@ void Scanner::ScanScope(Ast::Scope* scope) {
 		// Print("Struct % has size = %\n", ast_struct->name, ast_struct->type.size);
 	}
 
-	for (Ast::Enum* ast_enum = scope->enums; ast_enum < scope->enums.End(); ast_enum++) {
-		for (Ast::Enum_Member* member = ast_enum->members; member < ast_enum->members.End(); member++) {
+	for (Ast::Enum* ast_enum = scope->enums; ast_enum < scope->enums.End(); ast_enum++)
+		for (Ast::Enum_Member* member = ast_enum->members; member < ast_enum->members.End(); member++)
 			ScanExpression(member->expression, scope);
-		}
-	}
 
 	for (Ast::Function* function = scope->functions; function < scope->functions.End(); function++) {
 		ScanFunction(function, scope);
@@ -1060,12 +1020,13 @@ void Scanner::ScanScope(Ast::Scope* scope) {
 	for (Ast::Function* function = scope->functions; function < scope->functions.End(); function++) {
 		ScanCode(&function->code, scope, function);
 
-		if (function->return_type != TYPE_EMPTY_TUPLE && !function->code.all_paths_return) {
-			if (function->code.contains_return)
-				Error(function->name_token->location, "Not all paths return a value.\n");
-			else
-				Error(function->name_token->location, "Function does not return a value.\n");
-		}
+		if (function->return_type == TYPE_EMPTY_TUPLE) continue;
+		if (function->code.all_paths_return)           continue;
+
+		if (function->code.contains_return)
+			Error(function->name_token->location, "Not all paths return a value.\n");
+		else
+			Error(function->name_token->location, "Function does not return a value.\n");
 	}
 }
 
@@ -1088,7 +1049,6 @@ void Scanner::ScanWhile(Ast::Function* function, Ast::Code* code, Ast::Branch* b
 		Error(branch->while_condition, "Cannot implicitly cast condition with type % to bool\n", branch->while_condition->type);
 
 	branch->while_condition = ImplicitCast(branch->while_condition, TYPE_BOOL, module);
-
 	branch->code.is_inside_loop = true;
 }
 
@@ -1190,10 +1150,9 @@ void Scanner::ScanDefer(Ast::Statement* statement, Ast::Code* code, Ast::Functio
 
 	ScanCode(&statement->defer.code, &code->scope, function);
 
-	if (statement->defer.code.all_paths_return) {
-		code->has_defer_that_returns = true;
-		code->all_paths_return = true;
-	}
+	if (!statement->defer.code.all_paths_return) return;
+	code->has_defer_that_returns = true;
+	code->all_paths_return = true;
 }
 
 void Scanner::ScanClaim(Ast::Statement* statement, Ast::Code* code, Ast::Function* function) {
@@ -1230,17 +1189,19 @@ void Scanner::ScanReturn(Ast::Statement* statement, Ast::Code* code, Ast::Functi
 	if (code->has_defer_that_returns)
 		Error(statement->ret.token->location, "A defer in this scope already has a return statement. This isn't allowed.\n");
 
-	if (statement->ret.expression) {
-		ScanExpression(statement->ret.expression, &code->scope);
-
-		if (!function->return_type)
-			Error(statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
-
-		if (!statement->ret.expression->type.CanCast(CAST_IMPLICIT, function->return_type))
-			Error(statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
+	if (!statement->ret.expression) {
+		if (function->ast_return_type)
+			Error(statement->ret.token->location, "Expected return value with type: %\n", function->return_type);
+		return;
 	}
-	else if (function->ast_return_type)
-		Error(statement->ret.token->location, "Expected return value with type: %\n", function->return_type);
+
+	ScanExpression(statement->ret.expression, &code->scope);
+
+	if (!function->return_type)
+		Error(statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
+
+	if (!statement->ret.expression->type.CanCast(CAST_IMPLICIT, function->return_type))
+		Error(statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
 }
 
 void Scanner::ScanBreak(Ast::Statement* statement, Ast::Code* code, Ast::Function* function) {
@@ -1291,7 +1252,6 @@ void Scanner::ScanVarDecl(Ast::Statement* statement, Ast::Code* code, Ast::Funct
 
 void Scanner::ScanAssignment(Ast::Statement* statement, Ast::Code* code, Ast::Function* function) {
 	Ast::Assignment* assignment = &statement->assignment;
-
 	ScanExpression(assignment->right, &code->scope);
 	ScanExpression(assignment->left, &code->scope);
 
@@ -1309,7 +1269,6 @@ void Scanner::ScanAssignment(Ast::Statement* statement, Ast::Code* code, Ast::Fu
 
 void Scanner::ScanBinaryAssignment(Ast::Statement* statement, Ast::Code* code, Ast::Function* function) {
 	Ast::Assignment* assignment = &statement->assignment;
-
 	ScanExpression(assignment->right, &code->scope);
 	ScanExpression(assignment->left, &code->scope);
 
@@ -1344,13 +1303,13 @@ void Scanner::ScanBinaryAssignment(Ast::Statement* statement, Ast::Code* code, A
 			Error(assignment->right, "Expression type must be an integer.\n");
 
 		assignment->right = ImplicitCast(assignment->right, TYPE_INT64, module);
+		return;
 	}
-	else {
-		if (!assignment->right->type.CanCast(CAST_IMPLICIT, target_type))
-			Error(assignment->right, "Cannot implicitly cast '%' to '%'.\n", assignment->right->type, target_type);
 
-		assignment->right = ImplicitCast(assignment->right, target_type, module);
-	}
+	if (!assignment->right->type.CanCast(CAST_IMPLICIT, target_type))
+		Error(assignment->right, "Cannot implicitly cast '%' to '%'.\n", assignment->right->type, target_type);
+
+	assignment->right = ImplicitCast(assignment->right, target_type, module);
 }
 
 void Scanner::ScanStatement(Ast::Statement* statement, Ast::Code* code, Ast::Function* function) {
@@ -1393,30 +1352,28 @@ TypeID Scanner::GetTypeFromParams(Array<Ast::Variable> params) {
 }
 
 void Scanner::ScanFunction(Ast::Function* function, Ast::Scope* scope) {
-	for (Ast::Variable* param = function->parameters; param < function->parameters.End(); param++) {
+	for (Ast::Variable* param = function->params; param < function->params.End(); param++) {
 		param->type = GetType(param->ast_type, scope);
 		function->code.scope.variables.Add(param);
 
 		if (!param->type)
 			Error(param->ast_type->basetype.token->location, "Unknown type '%'\n", param->ast_type->basetype.token);
 
-		for (Ast::Variable* param_other = function->parameters; param_other < param; param_other++) {
+		for (Ast::Variable* param_other = function->params; param_other < param; param_other++) {
 			if (param_other->name == param->name)
 				Error(param->name_token->location, "Duplicate parameter called '%'\n", param->name);
 		}
 	}
 
+	function->return_type = TYPE_EMPTY_TUPLE;
 	if (function->ast_return_type) {
 		function->return_type = GetType(function->ast_return_type, scope);
 
 		if (!function->return_type)
 			Error(function->ast_return_type->basetype.token->location, "Unknown type: %\n", function->ast_return_type);
 	}
-	else {
-		function->return_type = TYPE_EMPTY_TUPLE;
-	}
 
-	TypeID param_type = GetTypeFromParams(function->parameters);
+	TypeID param_type = GetTypeFromParams(function->params);
 	function->type = GetFunctionType(param_type, function->return_type);
 }
 

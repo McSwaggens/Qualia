@@ -1,6 +1,19 @@
 #include "ast.h"
 #include "print.h"
 
+Ast::Function* Ast::Scope::FindFunction(String name, TypeID input_type) {
+	for (Ast::Scope* scope = this; scope; scope = scope->parent) {
+		for (Ast::Function* function = scope->functions; function < scope->functions.End(); function++) {
+			TypeInfo* info = function->type.GetInfo();
+
+			if (name == function->name && input_type.CanCast(CAST_IMPLICIT, info->function_info.input))
+				return function;
+		}
+	}
+
+	return null;
+}
+
 static const char* GetExpressionKindName(Ast::Expression::Kind kind) {
 	switch (kind) {
 		case Ast::Expression::TERMINAL_NAME:                   return "TERMINAL_NAME";
@@ -100,7 +113,7 @@ static void PrintExpression(Ast::Expression* expr, u32 indent) {
 			Ast::Expression_Unary* unary = (Ast::Expression_Unary*)expr;
 			PrintIndent(indent + 1);
 			Print("subexpression:\n");
-			PrintExpression(unary->subexpression, indent + 2);
+			PrintExpression(unary->subexpr, indent + 2);
 		} break;
 
 		case Ast::Expression::BINARY_COMPARE_EQUAL:
@@ -151,7 +164,7 @@ static void PrintExpression(Ast::Expression* expr, u32 indent) {
 			PrintExpression(call->function, indent + 2);
 			PrintIndent(indent + 1);
 			Print("parameters:\n");
-			PrintExpression((Ast::Expression*)call->parameters, indent + 2);
+			PrintExpression((Ast::Expression*)call->params, indent + 2);
 		} break;
 
 		case Ast::Expression::TUPLE: {
@@ -232,7 +245,7 @@ static void PrintExpression(Ast::Expression* expr, u32 indent) {
 			PrintExpression((Ast::Expression*)call->dot, indent + 2);
 			PrintIndent(indent + 1);
 			Print("parameters:\n");
-			PrintExpression((Ast::Expression*)call->parameters, indent + 2);
+			PrintExpression((Ast::Expression*)call->params, indent + 2);
 		} break;
 
 		case Ast::Expression::ARRAY: {
@@ -428,10 +441,10 @@ void Ast::PrintAST(Ast::Module* module) {
 
 	for (u32 i = 0; i < module->scope.functions.length; i++) {
 		Ast::Function* func = &module->scope.functions[i];
-		Print("Function: % (% parameters) -> %\n", func->name, func->parameters.length, func->return_type);
+		Print("Function: % (% parameters) -> %\n", func->name, func->params.length, func->return_type);
 
-		for (u32 p = 0; p < func->parameters.length; p++) {
-			Ast::Variable* param = &func->parameters[p];
+		for (u32 p = 0; p < func->params.length; p++) {
+			Ast::Variable* param = &func->params[p];
 			Print("  Parameter: % : %\n", param->name, param->type);
 		}
 

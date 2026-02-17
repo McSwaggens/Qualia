@@ -478,7 +478,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		Ast::Expression_Unary* unary = stack.New<Ast::Expression_Unary>(kind, token);
 		token += 1;
 		CheckScope(token, indent, module);
-		unary->subexpression = ParseExpression(indent, assignment_break, GetUnaryPrecedence(unary->op->kind, unary->op->IsRightTight()));
+		unary->subexpr = ParseExpression(indent, assignment_break, GetUnaryPrecedence(unary->op->kind, unary->op->IsRightTight()));
 		left = unary;
 	}
 	else if (IsLiteral(token->kind)) {
@@ -675,7 +675,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			Token* closure = open->closure;
 
 			CheckScope(token, indent, module);
-			call->parameters = (Ast::Expression_Tuple*)ParseExpression(indent, false, GetPostfixPrecedence(token->kind, token->IsLeftTight()));
+			call->paramsAst::Expression_Tuple*)ParseExpression(indent, false, GetPostfixPrecedence(token->kind, token->IsLeftTight()));
 
 			token = closure + 1;
 			left = call;
@@ -948,7 +948,7 @@ void Parser::ParseParameters(Ast::Function* function, Token* open_paren, u32 ind
 		}
 	}
 
-	function->parameters = params.Lock();
+	function->params = params.Lock();
 }
 
 Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {

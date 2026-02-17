@@ -6,6 +6,7 @@
 #include "array.h"
 #include "initlist.h"
 #include "fixed_buffer.h"
+#include "list.h"
 
 namespace Ast { struct Struct; struct Enum; }
 
@@ -59,19 +60,19 @@ struct TypeID {
 	constexpr TypeID() = default;
 	constexpr TypeID(u32 value) : id(value) { }
 
-	constexpr operator u32() const { return id; }
-	bool IsValid()     const { return id != 0; }
+	constexpr operator u32()  const { return id; }
+	constexpr explicit operator bool() const { return id != 0; }
+	constexpr bool IsValid()  const { return id != 0; }
 
 	TypeKind GetTypeKind()  const { return (TypeKind)(id >> TYPE_INDEX_BITCOUNT); }
-	s32      GetIndex() const { return (s32)(id & (-1u >> TYPE_KIND_BITCOUNT)); }
-
-	bool IsReference() const { return GetTypeKind() == TYPE_REFERENCE; }
+	s32      GetIndex()     const { return (s32)(id & (-1u >> TYPE_KIND_BITCOUNT)); }
 
 	bool IsInteger()         const { TypeID t = RemoveReference(); return t.GetTypeKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_UINT_FIRST  && t.GetIndex() < PRIMITIVE_FLOAT_FIRST; }
 	bool IsSignedInteger()   const { TypeID t = RemoveReference(); return t.GetTypeKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_INT_FIRST   && t.GetIndex() < PRIMITIVE_FLOAT_FIRST; }
 	bool IsUnsignedInteger() const { TypeID t = RemoveReference(); return t.GetTypeKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_UINT_FIRST  && t.GetIndex() < PRIMITIVE_INT_FIRST;   }
 	bool IsFloat()           const { TypeID t = RemoveReference(); return t.GetTypeKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_FLOAT_FIRST && t.GetIndex() < PRIMITIVE_END;         }
 
+	bool IsReference()  const { return GetTypeKind() == TYPE_REFERENCE; }
 	bool IsPointer()    const { return RemoveReference().GetTypeKind() == TYPE_POINTER; }
 	bool IsArray()      const { return RemoveReference().GetTypeKind() == TYPE_ARRAY; }
 	bool IsFixedArray() const { return RemoveReference().GetTypeKind() == TYPE_FIXED_ARRAY; }
@@ -90,7 +91,7 @@ struct TypeID {
 	// These directly subscript or dereference TypeInfo; defined inline after TypeInfo.
 	TypeInfo& Get() const;
 	TypeInfo* operator ->() const;
-	TypeInfo* GetTypeInfo() const;
+	TypeInfo* GetInfo() const;
 	TypeID    GetSubType() const;
 	u64       GetSize() const;
 	TypeID    GetFunctionInputType() const;
@@ -118,17 +119,12 @@ struct ExtensionEntry {
 	union { TypeID output; u64 length; };
 };
 
-struct ExtensionTable {
-	u32 count;
-	ExtensionEntry* entries;
-};
-
 struct TypeInfo {
 	TypeID pointer;
 	TypeID optional;
 	TypeID array;
 	TypeID reference;
-	ExtensionTable extensions;
+	List<ExtensionEntry> extensions;
 	u64 size;
 
 	struct Primitive  { };

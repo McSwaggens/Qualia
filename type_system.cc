@@ -9,7 +9,7 @@ static TypeID CreateTypeID(TypeKind kind, u32 index) {
 }
 
 inline TypeID TypeID::GetSubType() const {
-	TypeInfo* info = GetTypeInfo();
+	TypeInfo* info = GetInfo();
 	switch (GetTypeKind()) {
 		case TYPE_POINTER:     return info->pointer_info.subtype;
 		case TYPE_OPTIONAL:    return info->optional_info.subtype;
@@ -22,38 +22,38 @@ inline TypeID TypeID::GetSubType() const {
 
 inline u64 TypeID::GetSize() const {
 	static constexpr u8 PRIMITIVE_SIZE_LUT[PRIMITIVE_COUNT+1] = {
-		0,  // 0: unused
-		1,  // TYPE_BYTE (1)
-		1,  // TYPE_BOOL (2)
-		1,  // TYPE_UINT8 (3)
-		2,  // TYPE_UINT16 (4)
-		4,  // TYPE_UINT32 (5)
-		8,  // TYPE_UINT64 (6)
-		1,  // TYPE_INT8 (7)
-		2,  // TYPE_INT16 (8)
-		4,  // TYPE_INT32 (9)
-		8,  // TYPE_INT64 (10)
-		4,  // TYPE_FLOAT32 (11)
-		8,  // TYPE_FLOAT64 (12)
+		0, // 0: unused
+		1, // TYPE_BYTE (1)
+		1, // TYPE_BOOL (2)
+		1, // TYPE_UINT8 (3)
+		2, // TYPE_UINT16 (4)
+		4, // TYPE_UINT32 (5)
+		8, // TYPE_UINT64 (6)
+		1, // TYPE_INT8 (7)
+		2, // TYPE_INT16 (8)
+		4, // TYPE_INT32 (9)
+		8, // TYPE_INT64 (10)
+		4, // TYPE_FLOAT32 (11)
+		8, // TYPE_FLOAT64 (12)
 	};
-
+	TypeInfo* info = GetInfo();
 	switch (GetTypeKind()) {
 		case TYPE_PRIMITIVE:   return PRIMITIVE_SIZE_LUT[id];
-		case TYPE_TUPLE:       return GetTypeInfo()->size;
+		case TYPE_TUPLE:       return info->size;
 		case TYPE_FUNCTION:    return 0;
-		case TYPE_STRUCT:      return GetTypeInfo()->size;
-		case TYPE_ENUM:        return GetTypeInfo()->size;
+		case TYPE_STRUCT:      return info->size;
+		case TYPE_ENUM:        return info->size;
 		case TYPE_POINTER:     return 8;
-		case TYPE_OPTIONAL:    return GetTypeInfo()->size;
+		case TYPE_OPTIONAL:    return info->size;
 		case TYPE_ARRAY:       return 16;
-		case TYPE_FIXED_ARRAY: return GetTypeInfo()->size;
+		case TYPE_FIXED_ARRAY: return info->size;
 		case TYPE_REFERENCE:   return 8;
 		default: AssertUnreachable();
 	}
 }
 
-inline TypeID TypeID::GetFunctionInputType()  const { return GetTypeInfo()->function_info.input; }
-inline TypeID TypeID::GetFunctionOutputType() const { return GetTypeInfo()->function_info.output; }
+inline TypeID TypeID::GetFunctionInputType()  const { return GetInfo()->function_info.input; }
+inline TypeID TypeID::GetFunctionOutputType() const { return GetInfo()->function_info.output; }
 
 inline TypeInfo& TypeID::Get() const {
 	return type_infos[GetIndex()];
@@ -63,7 +63,7 @@ inline TypeInfo* TypeID::operator ->() const {
 	return &type_infos[GetIndex()];
 }
 
-inline TypeInfo* TypeID::GetTypeInfo() const {
+inline TypeInfo* TypeID::GetInfo() const {
 	Assert(GetIndex() < (s32)type_infos.head);
 	return &type_infos[GetIndex()];
 }
@@ -75,7 +75,7 @@ TypeID TypeID::GetArithmeticBackingType() const {
 		return TYPE_INT8;
 
 	TypeKind kind = type.GetTypeKind();
-	TypeInfo* info = type.GetTypeInfo();
+	TypeInfo* info = type.GetInfo();
 
 	if (kind == TYPE_ENUM)
 		return info->enum_info.backing_type;
@@ -91,7 +91,8 @@ static TypeID GetIntegerWithSign(TypeID type, bool sign) {
 		case TYPE_UINT64: return TYPE_INT64;
 		default: return type;
 	}
-	else switch (type) {
+
+	switch (type) {
 		case TYPE_INT8:  return TYPE_UINT8;
 		case TYPE_INT16: return TYPE_UINT16;
 		case TYPE_INT32: return TYPE_UINT32;
@@ -132,8 +133,8 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 	TypeKind from_kind = from.GetTypeKind();
 	TypeKind to_kind   = to.GetTypeKind();
 
-	TypeInfo* from_info = from.GetTypeInfo();
-	TypeInfo* to_info   = to.GetTypeInfo();
+	TypeInfo* from_info = from.GetInfo();
+	TypeInfo* to_info   = to.GetInfo();
 
 	if (from == to)
 		return true;
@@ -145,8 +146,7 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 		return from.GetSize() == 1;
 
 	switch (from_kind) {
-		case TYPE_PRIMITIVE:
-		{
+		case TYPE_PRIMITIVE: {
 			if (to_kind == TYPE_PRIMITIVE)
 				return cast >= CAST_IMPLICIT;
 
@@ -156,8 +156,7 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 			return false;
 		}
 
-		case TYPE_TUPLE:
-		{
+		case TYPE_TUPLE: {
 			if (to_kind == TYPE_TUPLE && cast >= CAST_COERCIVE && from_info->tuple_info.elements.length == to_info->tuple_info.elements.length) {
 				for (u64 i = 0; i < from_info->tuple_info.elements.length; i++) {
 					if (!from_info->tuple_info.elements[i].CanCast(cast, to_info->tuple_info.elements[i]))
@@ -171,11 +170,10 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 		case TYPE_FUNCTION: return false;
 		case TYPE_STRUCT:   return false;
 
-		case TYPE_ENUM:
-		{
+		case TYPE_ENUM: {
 			TypeID backing_type = from_info->enum_info.backing_type;
 
-			switch (to) {
+			switch ((u32)to) {
 				case TYPE_BOOL:
 					return cast >= CAST_COERCIVE;
 
@@ -196,8 +194,7 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 			return false;
 		}
 
-		case TYPE_POINTER:
-		{
+		case TYPE_POINTER: {
 			if (to_kind == TYPE_POINTER) {
 				if (from == TYPE_POINTER_BYTE || to == TYPE_POINTER_BYTE)
 					return cast >= CAST_IMPLICIT;
@@ -205,7 +202,7 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 				return cast >= CAST_EXPLICIT;
 			}
 
-			switch (to) {
+			switch ((u32)to) {
 				case TYPE_BOOL:
 					return cast >= CAST_COERCIVE;
 
@@ -226,8 +223,7 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 			return false;
 		}
 
-		case TYPE_OPTIONAL:
-		{
+		case TYPE_OPTIONAL: {
 			if (to == TYPE_BOOL)
 				return cast >= CAST_COERCIVE;
 
@@ -242,8 +238,7 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 		case TYPE_ARRAY:
 			return false;
 
-		case TYPE_FIXED_ARRAY:
-		{
+		case TYPE_FIXED_ARRAY: {
 			if (from_info->fixed_info.length == 1 && to == from.GetSubType())
 				return true;
 
@@ -253,8 +248,7 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 			return false;
 		}
 
-		case TYPE_REFERENCE:
-		{
+		case TYPE_REFERENCE: {
 			// References implicitly dereference to their subtype
 			TypeID subtype = from.GetSubType();
 			return subtype.CanCast(cast, to);
@@ -264,17 +258,6 @@ bool TypeID::CanCast(CastKind cast, TypeID to) const {
 	return false;
 }
 
-static void AddExtensionEntry(ExtensionTable* table, ExtensionEntry entry) {
-	if (!table->count || IsPow2(table->count & -16)) {
-		table->entries = (ExtensionEntry*)ReAllocMemory(
-			table->entries,
-			sizeof(ExtensionEntry) * table->count,
-			sizeof(ExtensionEntry) * RaisePow2(table->count|16)
-		);
-	}
-
-	table->entries[table->count++] = entry;
-}
 
 static void InitTypeSystem(void) {
 	type_infos.head = CORE_TYPES_COUNT;
@@ -290,10 +273,10 @@ static void InitTypeSystem(void) {
 		info->array     = CreateTypeID(TYPE_ARRAY,    TYPE_ARRAY_TO_PRIMITIVE_OFFSET    + prim);
 		info->reference = CreateTypeID(TYPE_REFERENCE, TYPE_REFERENCE_TO_PRIMITIVE_OFFSET + prim);
 
-		TypeInfo* pointer  = info->pointer.GetTypeInfo();
-		TypeInfo* optional = info->optional.GetTypeInfo();
-		TypeInfo* array    = info->array.GetTypeInfo();
-		TypeInfo* reference = info->reference.GetTypeInfo();
+		TypeInfo* pointer  = info->pointer.GetInfo();
+		TypeInfo* optional = info->optional.GetInfo();
+		TypeInfo* array    = info->array.GetInfo();
+		TypeInfo* reference = info->reference.GetInfo();
 
 		Zero(pointer);
 		Zero(optional);
@@ -311,7 +294,7 @@ static void InitTypeSystem(void) {
 		reference->reference_info.subtype = TypeID(prim);
 	}
 
-	*TYPE_BARE_FUNCTION.GetTypeInfo() = {
+	*TYPE_BARE_FUNCTION.GetInfo() = {
 		.size = 0,
 		.function_info = {
 			.input  = TYPE_EMPTY_TUPLE,
@@ -319,7 +302,7 @@ static void InitTypeSystem(void) {
 		}
 	};
 
-	TypeInfo* empty = TYPE_EMPTY_TUPLE.GetTypeInfo();
+	TypeInfo* empty = TYPE_EMPTY_TUPLE.GetInfo();
 	*empty = {
 		.size = 0,
 		.tuple_info = {
@@ -327,13 +310,7 @@ static void InitTypeSystem(void) {
 		}
 	};
 
-	AddExtensionEntry(
-		&empty->extensions,
-		(ExtensionEntry){
-			.type = TYPE_BARE_FUNCTION,
-			.output = TYPE_EMPTY_TUPLE,
-		}
-	);
+	empty->extensions.Add({ .type = TYPE_BARE_FUNCTION, .output = TYPE_EMPTY_TUPLE });
 }
 
 static TypeID CreateType(TypeKind kind, TypeInfo info) {
@@ -343,7 +320,7 @@ static TypeID CreateType(TypeKind kind, TypeInfo info) {
 TypeID TypeID::GetPointer() const {
 	Assert(*this);
 
-	TypeInfo* info = GetTypeInfo();
+	TypeInfo* info = GetInfo();
 
 	if (info->pointer) HOT
 		return info->pointer;
@@ -353,7 +330,7 @@ TypeID TypeID::GetPointer() const {
 		.pointer_info.subtype = *this,
 	});
 
-	GetTypeInfo()->pointer = ptr;
+	GetInfo()->pointer = ptr;
 
 	return ptr;
 }
@@ -361,7 +338,7 @@ TypeID TypeID::GetPointer() const {
 TypeID TypeID::GetOptional() const {
 	Assert(*this);
 
-	TypeInfo* info = GetTypeInfo();
+	TypeInfo* info = GetInfo();
 
 	if (info->optional)
 		return info->optional;
@@ -371,7 +348,7 @@ TypeID TypeID::GetOptional() const {
 		.optional_info.subtype = *this,
 	});
 
-	GetTypeInfo()->optional = result;
+	GetInfo()->optional = result;
 
 	return result;
 }
@@ -379,7 +356,7 @@ TypeID TypeID::GetOptional() const {
 TypeID TypeID::GetArray() const {
 	Assert(*this);
 
-	TypeInfo* info = GetTypeInfo();
+	TypeInfo* info = GetInfo();
 
 	if (info->array)
 		return info->array;
@@ -389,7 +366,7 @@ TypeID TypeID::GetArray() const {
 		.array_info.subtype = *this,
 	});
 
-	GetTypeInfo()->array = result;
+	GetInfo()->array = result;
 
 	return result;
 }
@@ -398,7 +375,7 @@ TypeID TypeID::GetReference() const {
 	Assert(*this);
 	Assert(!IsReference());
 
-	TypeInfo* info = GetTypeInfo();
+	TypeInfo* info = GetInfo();
 
 	if (info->reference)
 		return info->reference;
@@ -408,7 +385,7 @@ TypeID TypeID::GetReference() const {
 		.reference_info.subtype = *this,
 	});
 
-	GetTypeInfo()->reference = result;
+	GetInfo()->reference = result;
 
 	return result;
 }
@@ -416,13 +393,12 @@ TypeID TypeID::GetReference() const {
 TypeID TypeID::GetFixedArray(u64 length) const {
 	Assert(*this);
 
-	TypeInfo* info = GetTypeInfo();
+	TypeInfo* info = GetInfo();
 
 	for (u32 i = 0; i < info->extensions.count; i++) {
-		ExtensionEntry* entry = &info->extensions.entries[i];
-
-		if (entry->length == length && entry->type.GetTypeKind() == TYPE_FIXED_ARRAY)
-			return entry->type;
+		ExtensionEntry& entry = info->extensions[i];
+		if (entry.length == length && entry.type.GetTypeKind() == TYPE_FIXED_ARRAY)
+			return entry.type;
 	}
 
 	TypeID result = CreateType(TYPE_FIXED_ARRAY, {
@@ -433,13 +409,7 @@ TypeID TypeID::GetFixedArray(u64 length) const {
 		}
 	});
 
-	AddExtensionEntry(
-		&info->extensions,
-		(ExtensionEntry){
-			.type = result,
-			.length = length,
-		}
-	);
+	info->extensions.Add({ .type = result, .length = length });
 
 	return result;
 }
@@ -448,13 +418,12 @@ static TypeID GetFunctionType(TypeID input, TypeID output) {
 	Assert(input);
 	Assert(output);
 
-	TypeInfo* input_info = input.GetTypeInfo();
+	TypeInfo* input_info = input.GetInfo();
 
 	for (u32 i = 0; i < input_info->extensions.count; i++) {
-		ExtensionEntry* entry = &input_info->extensions.entries[i];
-
-		if (entry->output == output && entry->type.GetTypeKind() == TYPE_FUNCTION)
-			return entry->type;
+		ExtensionEntry& entry = input_info->extensions[i];
+		if (entry.output == output && entry.type.GetTypeKind() == TYPE_FUNCTION)
+			return entry.type;
 	}
 
 	TypeID result = CreateType(TYPE_FUNCTION, {
@@ -465,13 +434,7 @@ static TypeID GetFunctionType(TypeID input, TypeID output) {
 		}
 	});
 
-	AddExtensionEntry(
-		&input_info->extensions,
-		(ExtensionEntry){
-			.type = result,
-			.output = output,
-		}
-	);
+	input_info->extensions.Add({ .type = result, .output = output });
 
 	return result;
 }
@@ -483,21 +446,20 @@ static TypeID GetTuple(Array<TypeID> elements) {
 	if (elements.length == 1)
 		return elements[0];
 
-	TypeInfo* header_info = elements[0].GetTypeInfo();
-	ExtensionTable* table = &header_info->extensions;
+	List<ExtensionEntry>& extensions = elements[0].GetInfo()->extensions;
 
-	for (s32 i = 0; i < table->count; i++) {
-		ExtensionEntry* entry = &table->entries[i];
+	for (s32 i = 0; i < extensions.count; i++) {
+		ExtensionEntry& entry = extensions[i];
 
-		if (entry->length != elements.length)
+		if (entry.length != elements.length)
 			continue;
 
-		if (entry->type.GetTypeKind() != TYPE_TUPLE)
+		if (entry.type.GetTypeKind() != TYPE_TUPLE)
 			continue;
 
-		TypeInfo* ext_info = entry->type.GetTypeInfo();
+		TypeInfo* ext_info = entry.type.GetInfo();
 		if (elements == ext_info->tuple_info.elements)
-			return entry->type;
+			return entry.type;
 	}
 
 	u64 size = 0;
@@ -511,10 +473,7 @@ static TypeID GetTuple(Array<TypeID> elements) {
 		.tuple_info.elements = { new_elements, elements.length }
 	});
 
-	AddExtensionEntry(table, {
-		.type = result,
-		.length = elements.length,
-	});
+	extensions.Add({ .type = result, .length = elements.length });
 
 	return result;
 }
@@ -556,7 +515,7 @@ static TypeID MergeTypeRight(TypeID a, TypeID b) {
 		return GetTuple(Array<TypeID>(types, 2));
 	}
 
-	TypeInfo* b_info = b.GetTypeInfo();
+	TypeInfo* b_info = b.GetInfo();
 	u64 count = b_info->tuple_info.elements.length+1;
 
 	TypeID elements[count];

@@ -92,12 +92,12 @@ static void GenerateClosure(Ast::Struct* target, Array<TypeID> tuple) {
 		TypeID type = tuple[i];
 		TypeInfo* type_info = type.GetInfo();
 
-		if (type.GetTypeKind() == TYPE_STRUCT) {
+		if (type.GetKind() == TYPE_STRUCT) {
 			if (target->closure.AddIfUnique(type.GetInfo()->struct_info.ast)) {
 				GenerateClosure(target, type.GetInfo()->struct_info.ast);
 			}
 		}
-		else if (type.GetTypeKind() == TYPE_TUPLE) {
+		else if (type.GetKind() == TYPE_TUPLE) {
 			GenerateClosure(target, type_info->tuple_info.elements);
 		}
 	}
@@ -108,12 +108,12 @@ static void GenerateClosure(Ast::Struct* target, Ast::Struct* ast_struct) {
 		TypeID type = member->type;
 		TypeInfo* type_info = type.GetInfo();
 
-		if (type.GetTypeKind() == TYPE_STRUCT) {
+		if (type.GetKind() == TYPE_STRUCT) {
 			if (target->closure.AddIfUnique(type.GetInfo()->struct_info.ast)) {
 				GenerateClosure(target, type.GetInfo()->struct_info.ast);
 			}
 		}
-		else if (type.GetTypeKind() == TYPE_TUPLE) {
+		else if (type.GetKind() == TYPE_TUPLE) {
 			GenerateClosure(target, type_info->tuple_info.elements);
 		}
 	}
@@ -139,12 +139,11 @@ static void CalculateTupleSize(TypeID tuple) {
 	Assert(info->tuple_info.elements.length);
 	for (TypeID element_type : info->tuple_info.elements) {
 
-		if (element_type.GetTypeKind() == TYPE_STRUCT) {
+		if (element_type.GetKind() == TYPE_STRUCT)
 			CalculateStructSize(element_type.GetInfo()->struct_info.ast);
-		}
-		else if (element_type.GetTypeKind() == TYPE_TUPLE) {
+
+		if (element_type.GetKind() == TYPE_TUPLE)
 			CalculateTupleSize(element_type);
-		}
 
 		size += element_type.GetSize();
 	}
@@ -161,12 +160,11 @@ static void CalculateStructSize(Ast::Struct* ast_struct) {
 	for (Ast::Struct_Member* member = ast_struct->members; member < ast_struct->members.End(); member++) {
 		TypeID type = member->type;
 
-		if (type.GetTypeKind() == TYPE_STRUCT) {
+		if (type.GetKind() == TYPE_STRUCT)
 			CalculateStructSize(type.GetInfo()->struct_info.ast);
-		}
-		else if (type.GetTypeKind() == TYPE_TUPLE) {
+
+		if (type.GetKind() == TYPE_TUPLE)
 			CalculateTupleSize(type);
-		}
 
 		member->offset = size;
 		size += type.GetSize();
@@ -338,21 +336,21 @@ void Scanner::ScanExpressionTerminalName(Ast::Expression_Terminal* term, Ast::Sc
 		if (!type) Error(term->token->location, "User type with name '%' does not exist.\n", term->token);
 
 		term->type = type;
-		if (type.GetTypeKind() == TYPE_STRUCT) {
+		if (type.GetKind() == TYPE_STRUCT) {
 			term->kind = Ast::Expression::TERMINAL_STRUCT; // @FixMe
 			Ast::Expression_Struct* struct_term = (Ast::Expression_Struct*)term;
 			struct_term->structure = type.GetInfo()->struct_info.ast;
 			return;
 		}
 
-		if (type.GetTypeKind() == TYPE_ENUM) {
+		if (type.GetKind() == TYPE_ENUM) {
 			term->kind = Ast::Expression::TERMINAL_ENUM;
 			Ast::Expression_Enum* enum_term = (Ast::Expression_Enum*)term;
 			enum_term->enumeration = type.GetInfo()->enum_info.ast;
 			return;
 		}
 
-		if (type.GetTypeKind() == TYPE_PRIMITIVE) {
+		if (type.GetKind() == TYPE_PRIMITIVE) {
 			term->kind = Ast::Expression::TERMINAL_PRIMITIVE; // @FixMe
 			return;
 		}
@@ -390,10 +388,10 @@ void Scanner::ScanExpressionArray(Ast::Expression_Array* array, Ast::Scope* scop
 	TypeID left_type  = array->left->type.RemoveReference();
 	TypeID right_type = array->right->type.RemoveReference();
 
-	if (left_type.GetTypeKind() != TYPE_POINTER)
+	if (left_type.GetKind() != TYPE_POINTER)
 		Error(array, "Begin expression must be a pointer type, not: %\n", left_type);
 
-	if (right_type.GetTypeKind() == TYPE_POINTER) {
+	if (right_type.GetKind() == TYPE_POINTER) {
 		if (!right_type.CanCast(CAST_IMPLICIT, left_type))
 			Error(array->right, "Array begin and end types are incompatible: [%..%]\n", left_type, right_type);
 
@@ -529,11 +527,11 @@ void Scanner::ScanExpressionSubscript(Ast::Expression_Subscript* subscript, Ast:
 	if (is_lvalue)
 		array_type = array_type.GetSubType();
 
-	bool fixed = array_type.GetTypeKind() == TYPE_FIXED_ARRAY;
+	bool fixed = array_type.GetKind() == TYPE_FIXED_ARRAY;
 
-	if (array_type.GetTypeKind() != TYPE_FIXED_ARRAY &&
-		array_type.GetTypeKind() != TYPE_ARRAY &&
-		array_type.GetTypeKind() != TYPE_POINTER)
+	if (array_type.GetKind() != TYPE_FIXED_ARRAY &&
+		array_type.GetKind() != TYPE_ARRAY &&
+		array_type.GetKind() != TYPE_POINTER)
 		Error(subscript->array, "Expression with type % is not a valid array.\n", subscript->array->type);
 
 	if (!subscript->index->type.CanCast(CAST_IMPLICIT, TYPE_INT64))
@@ -562,7 +560,7 @@ void Scanner::ScanExpressionUnaryReferenceOf(Ast::Expression_Unary* unary, Ast::
 
 	TypeID ptr_type = unary->subexpr->type.RemoveReference();
 
-	if (ptr_type.GetTypeKind() != TYPE_POINTER)
+	if (ptr_type.GetKind() != TYPE_POINTER)
 		Error(unary, "Cannot dereference non-pointer type: %\n", ptr_type);
 
 	TypeID subtype = ptr_type.GetSubType();
@@ -578,7 +576,7 @@ void Scanner::ScanExpressionUnaryBitwiseNot(Ast::Expression_Unary* unary, Ast::S
 		return;
 	}
 
-	if (unary->subexpr->type.GetTypeKind() == TYPE_POINTER) {
+	if (unary->subexpr->type.GetKind() == TYPE_POINTER) {
 		unary->type = unary->subexpr->type;
 		return;
 	}
@@ -589,7 +587,7 @@ void Scanner::ScanExpressionUnaryBitwiseNot(Ast::Expression_Unary* unary, Ast::S
 void Scanner::ScanExpressionUnaryMinus(Ast::Expression_Unary* unary, Ast::Scope* scope) {
 	ScanExpression(unary->subexpr, scope);
 
-	if (!unary->subexpr->type.GetArithmeticBackingType().IsInteger() && unary->subexpr->type.GetTypeKind() != TYPE_POINTER && !unary->subexpr->type.IsFloat())
+	if (!unary->subexpr->type.GetArithmeticBackingType().IsInteger() && unary->subexpr->type.GetKind() != TYPE_POINTER && !unary->subexpr->type.IsFloat())
 		Error(unary->subexpr, "Unary minus does not work on type '%'.\n", unary->subexpr->type);
 
 	unary->subexpr = ImplicitCast(unary->subexpr, unary->subexpr->type.GetArithmeticBackingType(), module);
@@ -652,10 +650,10 @@ void Scanner::ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope
 
 	// Unwrap references, then pointers
 	type = type.RemoveReference();
-	while (type.GetTypeKind() == TYPE_POINTER)
+	while (type.GetKind() == TYPE_POINTER)
 		type = type.GetSubType();
 
-	if (type.GetTypeKind() == TYPE_STRUCT) {
+	if (type.GetKind() == TYPE_STRUCT) {
 		Ast::Struct* ast_struct = type.GetInfo()->struct_info.ast;
 		Ast::Struct_Member* member = FindStructMember(ast_struct, terminal->token->identifier_string);
 
@@ -673,8 +671,8 @@ void Scanner::ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope
 		return;
 	}
 
-	if (type.GetTypeKind() == TYPE_ARRAY || type.GetTypeKind() == TYPE_FIXED_ARRAY) {
-		bool fixed = type.GetTypeKind() == TYPE_FIXED_ARRAY;
+	if (type.GetKind() == TYPE_ARRAY || type.GetKind() == TYPE_FIXED_ARRAY) {
+		bool fixed = type.GetKind() == TYPE_FIXED_ARRAY;
 
 		if (name == "begin" || name == "data") {
 			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
@@ -725,7 +723,7 @@ void Scanner::ScanExpressionBinaryCompareOrdered(Ast::Expression_Binary* binary,
 	if (!dominant)
 		Error(binary, "Incompatible types % and %\n", binary->left->type, binary->right->type);
 
-	if (!dominant.IsInteger() && !dominant.IsFloat() && dominant.GetTypeKind() != TYPE_POINTER)
+	if (!dominant.IsInteger() && !dominant.IsFloat() && dominant.GetKind() != TYPE_POINTER)
 		Error(binary, "Cannot compare types '%' and '%'.\n", binary->left->type, binary->right->type);
 
 	binary->left  = ImplicitCast(binary->left,  dominant, module);
@@ -738,7 +736,7 @@ void Scanner::ScanExpressionBinaryArithmetic(Ast::Expression_Binary* binary, Ast
 	ScanExpression(binary->left, scope);
 	ScanExpression(binary->right, scope);
 
-	if (binary->left->type.GetTypeKind() == TYPE_POINTER) {
+	if (binary->left->type.GetKind() == TYPE_POINTER) {
 		// ptr + int = ptr
 		// ptr - int = ptr
 		// ptr - ptr = int
@@ -753,7 +751,7 @@ void Scanner::ScanExpressionBinaryArithmetic(Ast::Expression_Binary* binary, Ast
 		}
 
 		if (binary->kind == Ast::Expression::BINARY_SUBTRACT) {
-			if (binary->right->type.GetTypeKind() == TYPE_POINTER) {
+			if (binary->right->type.GetKind() == TYPE_POINTER) {
 				TypeID dominant = GetDominantType(binary->left->type, binary->right->type);
 				if (!dominant) Error(binary, "Pointer expression % % % is invalid.\n", binary->left->type, binary->op, binary->right->type);
 				binary->left  = ImplicitCast(binary->left, dominant, module);
@@ -814,10 +812,10 @@ void Scanner::ScanExpressionBinaryBitwise(Ast::Expression_Binary* binary, Ast::S
 	// ptr XOR int = ptr
 	// ptr AND int = int
 
-	if (!binary->left->type.GetArithmeticBackingType().IsInteger() && binary->left->type.GetTypeKind() != TYPE_POINTER)
+	if (!binary->left->type.GetArithmeticBackingType().IsInteger() && binary->left->type.GetKind() != TYPE_POINTER)
 		Error(binary, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
 
-	if (!binary->right->type.GetArithmeticBackingType().IsInteger() && binary->right->type.GetTypeKind() != TYPE_POINTER)
+	if (!binary->right->type.GetArithmeticBackingType().IsInteger() && binary->right->type.GetKind() != TYPE_POINTER)
 		Error(binary, "Cannot use bitwise % with type: %\n", binary->op, binary->right->type);
 
 	binary->type = binary->left->type;
@@ -827,7 +825,7 @@ void Scanner::ScanExpressionBinaryShift(Ast::Expression_Binary* binary, Ast::Sco
 	ScanExpression(binary->left, scope);
 	ScanExpression(binary->right, scope);
 
-	if (!binary->left->type.GetArithmeticBackingType().IsInteger() && binary->left->type.GetTypeKind() != TYPE_POINTER)
+	if (!binary->left->type.GetArithmeticBackingType().IsInteger() && binary->left->type.GetKind() != TYPE_POINTER)
 		Error(binary, "Cannot use bitwise % with type: %\n", binary->op, binary->left->type);
 
 	if (!binary->right->type.GetArithmeticBackingType().IsInteger())
@@ -993,7 +991,7 @@ void Scanner::ScanScope(Ast::Scope* scope) {
 			if (!member->type)
 				Error(member->ast_type.basetype.token->location, "Unknown type '%'\n", member->ast_type.basetype.token);
 
-			if (member->type.GetTypeKind() == TYPE_FUNCTION)
+			if (member->type.GetKind() == TYPE_FUNCTION)
 				Error(member->ast_type.basetype.token->location, "Bare function type not allowed as struct member\n");
 		}
 	}
@@ -1177,7 +1175,7 @@ void Scanner::ScanIncDec(Ast::Statement* statement, Ast::Code* code, Ast::Functi
 
 	TypeID value_type = inc->expression->type.GetSubType();
 
-	if (!value_type.IsInteger() && !value_type.IsFloat() && value_type.GetTypeKind() != TYPE_POINTER)
+	if (!value_type.IsInteger() && !value_type.IsFloat() && value_type.GetKind() != TYPE_POINTER)
 		Error(inc->expression, "Cannot % type %, expression must be either an integer, float or pointer.\n", (direction ? "increment" : "decrement"), value_type);
 }
 
@@ -1279,7 +1277,7 @@ void Scanner::ScanBinaryAssignment(Ast::Statement* statement, Ast::Code* code, A
 
 	if (!target_type.IsInteger() &&
 		!target_type.IsFloat() &&
-		target_type.GetTypeKind() != TYPE_POINTER)
+		target_type.GetKind() != TYPE_POINTER)
 		Error(assignment->left, "Arithmetic assignment type must be to an integer, float or pointer, not: '%'\n", target_type);
 
 	// ptr += int

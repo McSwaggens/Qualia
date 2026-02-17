@@ -64,26 +64,26 @@ struct TypeID {
 	constexpr explicit operator bool() const { return id != 0; }
 	constexpr bool IsValid()  const { return id != 0; }
 
-	TypeKind GetTypeKind()  const { return (TypeKind)(id >> TYPE_INDEX_BITCOUNT); }
-	s32      GetIndex()     const { return (s32)(id & (-1u >> TYPE_KIND_BITCOUNT)); }
+	TypeKind GetKind()  const { return (TypeKind)(id >> TYPE_INDEX_BITCOUNT); }
+	s32      GetIndex() const { return (s32)(id & (-1u >> TYPE_KIND_BITCOUNT)); }
 
-	bool IsInteger()         const { TypeID t = RemoveReference(); return t.GetTypeKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_UINT_FIRST  && t.GetIndex() < PRIMITIVE_FLOAT_FIRST; }
-	bool IsSignedInteger()   const { TypeID t = RemoveReference(); return t.GetTypeKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_INT_FIRST   && t.GetIndex() < PRIMITIVE_FLOAT_FIRST; }
-	bool IsUnsignedInteger() const { TypeID t = RemoveReference(); return t.GetTypeKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_UINT_FIRST  && t.GetIndex() < PRIMITIVE_INT_FIRST;   }
-	bool IsFloat()           const { TypeID t = RemoveReference(); return t.GetTypeKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_FLOAT_FIRST && t.GetIndex() < PRIMITIVE_END;         }
+	bool IsInteger()         const { TypeID t = RemoveReference(); return t.GetKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_UINT_FIRST  && t.GetIndex() < PRIMITIVE_FLOAT_FIRST; }
+	bool IsSignedInteger()   const { TypeID t = RemoveReference(); return t.GetKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_INT_FIRST   && t.GetIndex() < PRIMITIVE_FLOAT_FIRST; }
+	bool IsUnsignedInteger() const { TypeID t = RemoveReference(); return t.GetKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_UINT_FIRST  && t.GetIndex() < PRIMITIVE_INT_FIRST;   }
+	bool IsFloat()           const { TypeID t = RemoveReference(); return t.GetKind() == TYPE_PRIMITIVE && t.GetIndex() >= PRIMITIVE_FLOAT_FIRST && t.GetIndex() < PRIMITIVE_END;         }
 
-	bool IsReference()  const { return GetTypeKind() == TYPE_REFERENCE; }
-	bool IsPointer()    const { return RemoveReference().GetTypeKind() == TYPE_POINTER; }
-	bool IsArray()      const { return RemoveReference().GetTypeKind() == TYPE_ARRAY; }
-	bool IsFixedArray() const { return RemoveReference().GetTypeKind() == TYPE_FIXED_ARRAY; }
+	bool IsReference()  const { return GetKind() == TYPE_REFERENCE; }
+	bool IsPointer()    const { return RemoveReference().GetKind() == TYPE_POINTER; }
+	bool IsArray()      const { return RemoveReference().GetKind() == TYPE_ARRAY; }
+	bool IsFixedArray() const { return RemoveReference().GetKind() == TYPE_FIXED_ARRAY; }
 
 	bool IsFunctionPointer() const {
 		TypeID t = RemoveReference();
-		return t.GetTypeKind() == TYPE_POINTER && t.GetSubType().GetTypeKind() == TYPE_FUNCTION;
+		return t.GetKind() == TYPE_POINTER && t.GetSubType().GetKind() == TYPE_FUNCTION;
 	}
 
 	TypeID RemoveReference() const {
-		if (GetTypeKind() == TYPE_REFERENCE)
+		if (GetKind() == TYPE_REFERENCE)
 			return GetSubType();
 		return *this;
 	}

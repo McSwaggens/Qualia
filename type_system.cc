@@ -10,7 +10,7 @@ static TypeID CreateTypeID(TypeKind kind, u32 index) {
 
 inline TypeID TypeID::GetSubType() const {
 	TypeInfo* info = GetInfo();
-	switch (GetTypeKind()) {
+	switch (GetKind()) {
 		case TYPE_POINTER:     return info->pointer_info.subtype;
 		case TYPE_OPTIONAL:    return info->optional_info.subtype;
 		case TYPE_ARRAY:       return info->array_info.subtype;
@@ -37,7 +37,7 @@ inline u64 TypeID::GetSize() const {
 		8, // TYPE_FLOAT64 (12)
 	};
 	TypeInfo* info = GetInfo();
-	switch (GetTypeKind()) {
+	switch (GetKind()) {
 		case TYPE_PRIMITIVE:   return PRIMITIVE_SIZE_LUT[id];
 		case TYPE_TUPLE:       return info->size;
 		case TYPE_FUNCTION:    return 0;
@@ -74,7 +74,7 @@ TypeID TypeID::GetArithmeticBackingType() const {
 	if (type == TYPE_BOOL)
 		return TYPE_INT8;
 
-	TypeKind kind = type.GetTypeKind();
+	TypeKind kind = type.GetKind();
 	TypeInfo* info = type.GetInfo();
 
 	if (kind == TYPE_ENUM)
@@ -121,7 +121,7 @@ static TypeID GetDominantType(TypeID a, TypeID b) {
 		return GetIntegerWithSign(a, sign);
 	}
 
-	if (a.GetTypeKind() == TYPE_PRIMITIVE && b.GetTypeKind() == TYPE_PRIMITIVE) {
+	if (a.GetKind() == TYPE_PRIMITIVE && b.GetKind() == TYPE_PRIMITIVE) {
 	}
 
 	Assert("Invalid dominator combo");
@@ -130,8 +130,8 @@ static TypeID GetDominantType(TypeID a, TypeID b) {
 
 bool TypeID::CanCast(CastKind cast, TypeID to) const {
 	TypeID from = *this;
-	TypeKind from_kind = from.GetTypeKind();
-	TypeKind to_kind   = to.GetTypeKind();
+	TypeKind from_kind = from.GetKind();
+	TypeKind to_kind   = to.GetKind();
 
 	TypeInfo* from_info = from.GetInfo();
 	TypeInfo* to_info   = to.GetInfo();
@@ -397,7 +397,7 @@ TypeID TypeID::GetFixedArray(u64 length) const {
 
 	for (u32 i = 0; i < info->extensions.count; i++) {
 		ExtensionEntry& entry = info->extensions[i];
-		if (entry.length == length && entry.type.GetTypeKind() == TYPE_FIXED_ARRAY)
+		if (entry.length == length && entry.type.GetKind() == TYPE_FIXED_ARRAY)
 			return entry.type;
 	}
 
@@ -422,7 +422,7 @@ static TypeID GetFunctionType(TypeID input, TypeID output) {
 
 	for (u32 i = 0; i < input_info->extensions.count; i++) {
 		ExtensionEntry& entry = input_info->extensions[i];
-		if (entry.output == output && entry.type.GetTypeKind() == TYPE_FUNCTION)
+		if (entry.output == output && entry.type.GetKind() == TYPE_FUNCTION)
 			return entry.type;
 	}
 
@@ -454,7 +454,7 @@ static TypeID GetTuple(Array<TypeID> elements) {
 		if (entry.length != elements.length)
 			continue;
 
-		if (entry.type.GetTypeKind() != TYPE_TUPLE)
+		if (entry.type.GetKind() != TYPE_TUPLE)
 			continue;
 
 		TypeInfo* ext_info = entry.type.GetInfo();
@@ -510,7 +510,7 @@ static TypeID MergeTypeRight(TypeID a, TypeID b) {
 	if (b == TYPE_EMPTY_TUPLE)
 		return a;
 
-	if (b.GetTypeKind() != TYPE_TUPLE) {
+	if (b.GetKind() != TYPE_TUPLE) {
 		TypeID types[2] = { a, b };
 		return GetTuple(Array<TypeID>(types, 2));
 	}

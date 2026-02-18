@@ -509,7 +509,7 @@ static void Write(OutputBuffer* buffer, Ast::Expression* expression) {
 			Ast::Expression_As* as = (Ast::Expression_As*)expression;
 
 			buffer->Write("(");
-			Write(buffer, as->expression);
+			Write(buffer, as->expr);
 			buffer->Write(" as ");
 			Write(buffer, as->type);
 			buffer->Write(")");
@@ -520,7 +520,7 @@ static void Write(OutputBuffer* buffer, Ast::Expression* expression) {
 			buffer->Write("(Implicit_Cast: ");
 			Write(buffer, cast->type);
 			buffer->Write(", ");
-			Write(buffer, cast->subexpression);
+			Write(buffer, cast->subexpr);
 			buffer->Write(")");
 		} break;
 

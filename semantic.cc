@@ -881,11 +881,11 @@ void Scanner::ScanExpressionLambda(Ast::Expression* expression, Ast::Scope* scop
 }
 
 void Scanner::ScanExpressionAs(Ast::Expression_As* as, Ast::Scope* scope) {
-	ScanExpression(as->expression, scope);
+	ScanExpression(as->expr, scope);
 	as->type = GetType(&as->ast_type, scope);
 
-	if (!as->expression->type.CanCast(CAST_EXPLICIT, as->type))
-		Error(as, "Type % is not convertable to %\n", as->expression->type, as->type);
+	if (!as->expr->type.CanCast(CAST_EXPLICIT, as->type))
+		Error(as, "Type % is not convertable to %\n", as->expr->type, as->type);
 }
 
 void Scanner::ScanExpression(Ast::Expression* expression, Ast::Scope* scope) {
@@ -1156,12 +1156,12 @@ void Scanner::ScanDefer(Ast::Statement* statement, Ast::Code* code, Ast::Functio
 void Scanner::ScanClaim(Ast::Statement* statement, Ast::Code* code, Ast::Function* function) {
 	Ast::Claim* claim = &statement->claim;
 
-	ScanExpression(claim->expression, &code->scope);
+	ScanExpression(claim->expr, &code->scope);
 
-	if (!claim->expression->type.CanCast(CAST_IMPLICIT, TYPE_BOOL))
-		Error(claim->expression, "Claim expression type must be implicitly castable to bool\n");
+	if (!claim->expr->type.CanCast(CAST_IMPLICIT, TYPE_BOOL))
+		Error(claim->expr, "Claim expression type must be implicitly castable to bool\n");
 
-	claim->expression = ImplicitCast(claim->expression, TYPE_BOOL, module);
+	claim->expr = ImplicitCast(claim->expr, TYPE_BOOL, module);
 }
 
 void Scanner::ScanIncDec(Ast::Statement* statement, Ast::Code* code, Ast::Function* function) {
@@ -1187,19 +1187,19 @@ void Scanner::ScanReturn(Ast::Statement* statement, Ast::Code* code, Ast::Functi
 	if (code->has_defer_that_returns)
 		Error(statement->ret.token->location, "A defer in this scope already has a return statement. This isn't allowed.\n");
 
-	if (!statement->ret.expression) {
+	if (!statement->ret.expr) {
 		if (function->ast_return_type)
 			Error(statement->ret.token->location, "Expected return value with type: %\n", function->return_type);
 		return;
 	}
 
-	ScanExpression(statement->ret.expression, &code->scope);
+	ScanExpression(statement->ret.expr, &code->scope);
 
 	if (!function->return_type)
 		Error(statement->ret.token->location, "Unexpected return value for function that doesn't return anything.\n");
 
-	if (!statement->ret.expression->type.CanCast(CAST_IMPLICIT, function->return_type))
-		Error(statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expression->type, function->return_type);
+	if (!statement->ret.expr->type.CanCast(CAST_IMPLICIT, function->return_type))
+		Error(statement->ret.token->location, "Invalid return type: %, expected type: %\n", statement->ret.expr->type, function->return_type);
 }
 
 void Scanner::ScanBreak(Ast::Statement* statement, Ast::Code* code, Ast::Function* function) {
@@ -1349,30 +1349,30 @@ TypeID Scanner::GetTypeFromParams(Array<Ast::Variable> params) {
 	return GetTuple({ types, params.length });
 }
 
-void Scanner::ScanFunction(Ast::Function* function, Ast::Scope* scope) {
-	for (Ast::Variable* param = function->params; param < function->params.End(); param++) {
+void Scanner::ScanFunction(Ast::Function* func, Ast::Scope* scope) {
+	for (Ast::Variable* param = func->params; param < func->params.End(); param++) {
 		param->type = GetType(param->ast_type, scope);
-		function->code.scope.variables.Add(param);
+		func->code.scope.variables.Add(param);
 
 		if (!param->type)
 			Error(param->ast_type->basetype.token->location, "Unknown type '%'\n", param->ast_type->basetype.token);
 
-		for (Ast::Variable* param_other = function->params; param_other < param; param_other++) {
+		for (Ast::Variable* param_other = func->params; param_other < param; param_other++) {
 			if (param_other->name == param->name)
 				Error(param->name_token->location, "Duplicate parameter called '%'\n", param->name);
 		}
 	}
 
-	function->return_type = TYPE_EMPTY_TUPLE;
-	if (function->ast_return_type) {
-		function->return_type = GetType(function->ast_return_type, scope);
+	func->return_type = TYPE_EMPTY_TUPLE;
+	if (func->ast_return_type) {
+		func->return_type = GetType(func->ast_return_type, scope);
 
-		if (!function->return_type)
-			Error(function->ast_return_type->basetype.token->location, "Unknown type: %\n", function->ast_return_type);
+		if (!func->return_type)
+			Error(func->ast_return_type->basetype.token->location, "Unknown type: %\n", func->ast_return_type);
 	}
 
-	TypeID param_type = GetTypeFromParams(function->params);
-	function->type = GetFunctionType(param_type, function->return_type);
+	TypeID param_type = GetTypeFromParams(func->params);
+	func->type = GetFunctionType(param_type, func->return_type);
 }
 
 void Scanner::SemanticParse() {

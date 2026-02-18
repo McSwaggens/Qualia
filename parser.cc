@@ -658,7 +658,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		}
 		else if (token->kind == TOKEN_AS) {
 			Ast::Expression_As* as = stack.New<Ast::Expression_As>(token);
-			as->expression = left;
+			as->expr = left;
 
 			CheckScope(token, indent, module);
 			token++;
@@ -675,7 +675,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			Token* closure = open->closure;
 
 			CheckScope(token, indent, module);
-			call->paramsAst::Expression_Tuple*)ParseExpression(indent, false, GetPostfixPrecedence(token->kind, token->IsLeftTight()));
+			call->params = (Ast::Expression_Tuple*)ParseExpression(indent, false, GetPostfixPrecedence(token->kind, token->IsLeftTight()));
 
 			token = closure + 1;
 			left = call;
@@ -1118,130 +1118,152 @@ Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 	return branch_block;
 }
 
-Ast::Statement Parser::ParseStatement(u32 indent) {
-	Ast::Statement statement = Ast::Statement();
+Ast::Statement Parser::ParseExpressionStatement(u32 indent) {
+	Ast::Expression* expression = ParseExpression(indent+1, true);
+	Ast::Statement statement = { };
 
+	if (!IsAssignment(token->kind)) {
+		statement.kind = Ast::STATEMENT_EXPRESSION;
+		statement.expression = expression;
+		return statement;
+	}
+
+	if (token->kind == TOKEN_EQUAL)        statement.kind = Ast::STATEMENT_ASSIGNMENT;
+	if (token->kind == TOKEN_PLUS_EQUAL)   statement.kind = Ast::STATEMENT_ASSIGNMENT_ADD;
+	if (token->kind == TOKEN_MINUS_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_SUBTRACT;
+	if (token->kind == TOKEN_TIMES_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_MULTIPLY;
+	if (token->kind == TOKEN_DIVIDE_EQUAL) statement.kind = Ast::STATEMENT_ASSIGNMENT_DIVIDE;
+	if (token->kind == TOKEN_CARET_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_XOR;
+
+	CheckScope(token, indent+1, module);
+	token += 1;
+
+	statement.assignment.left  = expression;
+	statement.assignment.token = token;
+
+	CheckScope(token, indent+1, module);
+	statement.assignment.right = ParseExpression(indent+1, false);
+
+	return statement;
+}
+
+Ast::Statement Parser::ParseVariableDeclaration(u32 indent) {
+	Ast::Statement statement = { };
+	CheckScope(token+1, indent, module);
+
+	statement.kind = Ast::STATEMENT_VARIABLE_DECLARATION;
+	statement.variable_declaration.name_token = token;
+	statement.variable_declaration.name = token->identifier_string;
+
+	token += 2;
+
+	if (token->kind != TOKEN_EQUAL) {
+		CheckScope(token, indent+1, module);
+		statement.variable_declaration.ast_type = stack.Allocate<Ast::Type>();
+		*statement.variable_declaration.ast_type = ParseType(indent+1);
+	}
+
+	if (token->kind == TOKEN_EQUAL) {
+		CheckScope(token, indent+1, module);
+		token += 1;
+		CheckScope(token, indent+1, module);
+		statement.variable_declaration.assignment = ParseExpression(indent+1);
+	}
+
+	return statement;
+}
+
+Ast::Statement Parser::ParseBranchBlockStatement(u32 indent) {
+	Ast::Statement statement = { };
+	statement.kind = Ast::STATEMENT_BRANCH_BLOCK;
+	statement.branch_block = ParseBranchBlock(indent);
+	return statement;
+}
+
+Ast::Statement Parser::ParseIncDecStatement(u32 indent) {
+	Ast::Statement statement = { };
+	statement.kind = token->kind == TOKEN_INC ? Ast::STATEMENT_INCREMENT : Ast::STATEMENT_DECREMENT;
+	statement.increment.token = token;
+	token += 1;
+
+	if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
+		::Error(module, statement.increment.token->location,"Expected expression after '%' keyword\n", statement.increment.token);
+
+	statement.increment.expression = ParseExpression(indent+1);
+	return statement;
+}
+
+Ast::Statement Parser::ParseDeferStatement(u32 indent) {
+	Ast::Statement statement = { };
+	statement.kind = Ast::STATEMENT_DEFER;
+	statement.defer.token = token;
+	token += 1;
+
+	if (token->kind != TOKEN_COLON)
+		Error("Invalid 'defer' statement, Expected ':', not: '%'\n", token);
+
+	CheckScope(token, indent, module);
+	token += 1;
+
+	statement.defer.code = ParseCode(indent+1);
+	return statement;
+}
+
+Ast::Statement Parser::ParseBreakStatement(u32 indent) {
+	Ast::Statement statement = { };
+	statement.kind = Ast::STATEMENT_BREAK;
+	statement.brk.token = token;
+	token += 1;
+	return statement;
+}
+
+Ast::Statement Parser::ParseReturnStatement(u32 indent) {
+	Ast::Statement statement = { };
+	statement.kind = Ast::STATEMENT_RETURN;
+	statement.ret.token = token;
+	statement.ret.expr = null;
+	token += 1;
+
+	if (IsCorrectScope(token, indent+1))
+		statement.ret.expr = ParseExpression(indent+1, false);
+
+	return statement;
+}
+
+Ast::Statement Parser::ParseClaimStatement(u32 indent) {
+	Ast::Statement statement = { };
+	statement.kind = Ast::STATEMENT_CLAIM;
+	statement.claim.token = token;
+	token += 1;
+
+	if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
+		::Error(module, statement.increment.token->location,"Expected expression after '%' keyword\n", statement.increment.token);
+
+	statement.claim.expr = ParseExpression(indent+1, false);
+	return statement;
+}
+
+Ast::Statement Parser::ParseStatement(u32 indent) {
 	if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
 		Error("Variable names must start with a lowercase letter.\n");
 
-	if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON) {
-		CheckScope(token+1, indent, module);
+	if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON)
+		return ParseVariableDeclaration(indent);
 
-		statement.kind = Ast::STATEMENT_VARIABLE_DECLARATION;
-		statement.variable_declaration.name_token = token;
-		statement.variable_declaration.name = token->identifier_string;
+	if (IsExpressionStarter(token->kind))
+		return ParseExpressionStatement(indent);
 
-		token += 2;
+	if (token->kind == TOKEN_IF)     return ParseBranchBlockStatement(indent);
+	if (token->kind == TOKEN_FOR)    return ParseBranchBlockStatement(indent);
+	if (token->kind == TOKEN_WHILE)  return ParseBranchBlockStatement(indent);
+	if (token->kind == TOKEN_INC)    return ParseIncDecStatement(indent);
+	if (token->kind == TOKEN_DEC)    return ParseIncDecStatement(indent);
+	if (token->kind == TOKEN_DEFER)  return ParseDeferStatement(indent);
+	if (token->kind == TOKEN_BREAK)  return ParseBreakStatement(indent);
+	if (token->kind == TOKEN_RETURN) return ParseReturnStatement(indent);
+	if (token->kind == TOKEN_CLAIM)  return ParseClaimStatement(indent);
 
-		if (token->kind != TOKEN_EQUAL) {
-			CheckScope(token, indent+1, module);
-			statement.variable_declaration.ast_type = stack.Allocate<Ast::Type>();
-			*statement.variable_declaration.ast_type = ParseType(indent+1);
-		}
-
-		if (token->kind == TOKEN_EQUAL) {
-			CheckScope(token, indent+1, module);
-			token += 1;
-			CheckScope(token, indent+1, module);
-			statement.variable_declaration.assignment = ParseExpression(indent+1);
-		}
-
-		return statement;
-	}
-	else if (IsExpressionStarter(token->kind)) {
-		Ast::Expression* expression = ParseExpression(indent+1, true);
-
-		if (IsAssignment(token->kind)) {
-			if (token->kind == TOKEN_EQUAL)        statement.kind = Ast::STATEMENT_ASSIGNMENT;
-			if (token->kind == TOKEN_PLUS_EQUAL)   statement.kind = Ast::STATEMENT_ASSIGNMENT_ADD;
-			if (token->kind == TOKEN_MINUS_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_SUBTRACT;
-			if (token->kind == TOKEN_TIMES_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_MULTIPLY;
-			if (token->kind == TOKEN_DIVIDE_EQUAL) statement.kind = Ast::STATEMENT_ASSIGNMENT_DIVIDE;
-			if (token->kind == TOKEN_CARET_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_XOR;
-
-			CheckScope(token, indent+1, module);
-			token += 1;
-
-			statement.assignment.left  = expression;
-			statement.assignment.token = token;
-
-			CheckScope(token, indent+1, module);
-			statement.assignment.right = ParseExpression(indent+1, false);
-		}
-		else {
-			statement.kind = Ast::STATEMENT_EXPRESSION;
-			statement.expression = expression;
-		}
-
-		return statement;
-	}
-	else if (token->kind == TOKEN_IF || token->kind == TOKEN_FOR || token->kind == TOKEN_WHILE) {
-		Ast::BranchBlock branch_block = ParseBranchBlock(indent);
-		statement.kind = Ast::STATEMENT_BRANCH_BLOCK;
-		statement.branch_block = branch_block;
-
-		return statement;
-	}
-	else if (token->kind == TOKEN_INC || token->kind == TOKEN_DEC) {
-		statement.kind = token->kind == TOKEN_INC ? Ast::STATEMENT_INCREMENT : Ast::STATEMENT_DECREMENT;
-		statement.increment.token = token;
-		token += 1;
-
-		if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
-			::Error(module, statement.increment.token->location,"Expected expression after '%' keyword\n", statement.increment.token);
-
-		statement.increment.expression = ParseExpression(indent+1);
-
-		return statement;
-	}
-	else if (token->kind == TOKEN_DEFER) {
-		statement.kind = Ast::STATEMENT_DEFER;
-		statement.defer.token = token;
-		token += 1;
-
-		if (token->kind != TOKEN_COLON)
-			Error("Invalid 'defer' statement, Expected ':', not: '%'\n", token);
-
-		CheckScope(token, indent, module);
-		token += 1;
-
-		Ast::Code code = ParseCode(indent+1);
-		statement.defer.code = code;
-
-		return statement;
-	}
-	else if (token->kind == TOKEN_BREAK) {
-		statement.kind = Ast::STATEMENT_BREAK;
-		statement.brk.token = token;
-		token += 1;
-
-		return statement;
-	}
-	else if (token->kind == TOKEN_RETURN) {
-		statement.kind = Ast::STATEMENT_RETURN;
-		statement.ret.token = token;
-		statement.ret.expression = null;
-		token += 1;
-
-		if (IsCorrectScope(token, indent+1))
-			statement.ret.expression = ParseExpression(indent+1, false);
-
-		return statement;
-	}
-	else if (token->kind == TOKEN_CLAIM) {
-		statement.kind = Ast::STATEMENT_CLAIM;
-		statement.claim.token = token;
-		token += 1;
-
-		if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
-			::Error(module, statement.increment.token->location,"Expected expression after '%' keyword\n", statement.increment.token);
-
-		statement.claim.expression = ParseExpression(indent+1, false);
-
-		return statement;
-	}
-	else
-		Error("Invalid statement starting with '%'\n", token);
+	Error("Invalid statement starting with '%'\n", token);
 }
 
 static bool IsScopeTerminator(TokenKind kind) {
@@ -1256,36 +1278,37 @@ Ast::Code Parser::ParseCode(u32 indent) {
 	ArrayBuffer<Ast::Enum>      enums      = CreateArrayBuffer<Ast::Enum>();
 	ArrayBuffer<Ast::Function>  functions  = CreateArrayBuffer<Ast::Function>();
 
-	if (token->IsNewLine() && token->indent > indent) {
-	}
-
 	while (IsCorrectScope(token, indent) && !IsScopeTerminator(token->kind)) {
 		if (token->kind == TOKEN_STRUCT) {
 			Ast::Struct structure = ParseStruct(indent);
 			structs.Add(structure);
+			continue;
 		}
-		else if (token->kind == TOKEN_ENUM) {
+
+		if (token->kind == TOKEN_ENUM) {
 			Ast::Enum enumeration = ParseEnum(indent);
 			enums.Add(enumeration);
+			continue;
 		}
-		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN && (token[1].closure[1].kind == TOKEN_COLON || token[1].closure[1].kind == TOKEN_ARROW)) {
+
+		if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN && (token[1].closure[1].kind == TOKEN_COLON || token[1].closure[1].kind == TOKEN_ARROW)) {
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 				Error("Function names must start with an uppercase letter.\n", token);
 
 			Ast::Function function = ParseFunction(indent);
 			function.is_global = false;
 			functions.Add(function);
+			continue;
 		}
-		else {
-			Ast::Statement statement = ParseStatement(indent);
-			statements.Add(statement);
 
-			if (!token->IsNewLine() && !IsScopeTerminator(token->kind))
-				Error("Expected ';' before end of statement, not: '%'.\n", token);
+		Ast::Statement statement = ParseStatement(indent);
+		statements.Add(statement);
 
-			if (token->kind == TOKEN_SEMICOLON && IsCorrectScope(token, indent))
-				token += 1;
-		}
+		if (!token->IsNewLine() && !IsScopeTerminator(token->kind))
+			Error("Expected ';' before end of statement, not: '%'.\n", token);
+
+		if (token->kind == TOKEN_SEMICOLON && IsCorrectScope(token, indent))
+			token += 1;
 	}
 
 	if (token->indent > indent)
@@ -1364,24 +1387,32 @@ void Parser::ParseGlobalScope() {
 		if (token->kind == TOKEN_IMPORT) {
 			Ast::Import import = ParseImport(0);
 			imports.Add(import);
+			continue;
 		}
-		else if (token->kind == TOKEN_STRUCT) {
+
+		if (token->kind == TOKEN_STRUCT) {
 			Ast::Struct structure = ParseStruct(0);
 			structs.Add(structure);
+			continue;
 		}
-		else if (token->kind == TOKEN_ENUM) {
+
+		if (token->kind == TOKEN_ENUM) {
 			Ast::Enum enumeration = ParseEnum(0);
 			enums.Add(enumeration);
+			continue;
 		}
-		else if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN) {
+
+		if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN) {
 			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
 				Error("Function names must start with an uppercase letter.\n", token);
 
-			Ast::Function function = ParseFunction(0);
-			function.is_global = true;
-			functions.Add(function);
+			Ast::Function func = ParseFunction(0);
+			func.is_global = true;
+			functions.Add(func);
+			continue;
 		}
-		else Error("Unexpected token in global scope: '%'\n", token);
+
+		Error("Unexpected token in global scope: '%'\n", token);
 	}
 
 	module->imports = imports.Lock();

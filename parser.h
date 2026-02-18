@@ -51,6 +51,14 @@ struct Parser {
 	Ast::Type ParseType(u32 indent);
 	void ParseParameters(Ast::Function* function, Token* open_paren, u32 indent);
 	Ast::BranchBlock ParseBranchBlock(u32 indent);
+	Ast::Statement ParseExpressionStatement(u32 indent);
+	Ast::Statement ParseVariableDeclaration(u32 indent);
+	Ast::Statement ParseBranchBlockStatement(u32 indent);
+	Ast::Statement ParseIncDecStatement(u32 indent);
+	Ast::Statement ParseDeferStatement(u32 indent);
+	Ast::Statement ParseBreakStatement(u32 indent);
+	Ast::Statement ParseReturnStatement(u32 indent);
+	Ast::Statement ParseClaimStatement(u32 indent);
 	Ast::Statement ParseStatement(u32 indent);
 	Ast::Code ParseCode(u32 indent);
 	Ast::Function ParseFunction(u32 indent);

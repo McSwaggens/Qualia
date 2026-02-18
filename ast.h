@@ -139,11 +139,11 @@ struct Expression {
 };
 
 struct Expression_Implicit_Cast : Expression {
-	Expression* subexpression;
+	Expression* subexpr;
 
 	Expression_Implicit_Cast(Expression* subexpr, TypeID target_type) :
 		Expression(IMPLICIT_CAST, IR::NewValue(), target_type, subexpr->begin, subexpr->end),
-		subexpression(subexpr) { }
+		subexpr(subexpr) { }
 };
 
 struct Expression_Unary : Expression {
@@ -231,13 +231,13 @@ struct Expression_Fixed_Array : Expression {
 };
 
 struct Expression_As : Expression {
-	Expression* expression;
+	Expression* expr;
 	Type ast_type;
 	Token* op;
 
 	Expression_As(Token* op_token) :
 		Expression(AS, IR::NewValue(), TYPE_NULL, null, null),
-		expression(null),
+		expr(null),
 		ast_type{ },
 		op(op_token) { }
 };
@@ -454,7 +454,7 @@ struct Defer {
 
 struct Return {
 	Token* token;
-	Expression* expression;
+	Expression* expr;
 	// Defer* defer;
 	// @Todo: Prevent return statement if a prior defer in defer chain contains a return statement.
 };
@@ -469,7 +469,7 @@ struct Break {
 
 struct Claim {
 	Token* token;
-	Expression* expression;
+	Expression* expr;
 };
 
 struct Increment {

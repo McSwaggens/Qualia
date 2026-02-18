@@ -190,7 +190,7 @@ static void PrintExpression(Ast::Expression* expr, u32 indent) {
 			Ast::Expression_As* as = (Ast::Expression_As*)expr;
 			PrintIndent(indent + 1);
 			Print("expression:\n");
-			PrintExpression(as->expression, indent + 2);
+			PrintExpression(as->expr, indent + 2);
 		} break;
 
 		case Ast::Expression::TERMINAL_INTRINSIC: {
@@ -296,8 +296,8 @@ static void PrintStatements(Array<Ast::Statement> statements, u32 indent) {
 			case Ast::STATEMENT_RETURN: {
 				PrintIndent(indent);
 				Print("Return:\n");
-				if (stmt->ret.expression) {
-					PrintExpression(stmt->ret.expression, indent + 1);
+				if (stmt->ret.expr) {
+					PrintExpression(stmt->ret.expr, indent + 1);
 				}
 			} break;
 
@@ -424,7 +424,7 @@ static void PrintStatements(Array<Ast::Statement> statements, u32 indent) {
 			case Ast::STATEMENT_CLAIM: {
 				PrintIndent(indent);
 				Print("Claim:\n");
-				PrintExpression(stmt->claim.expression, indent + 1);
+				PrintExpression(stmt->claim.expr, indent + 1);
 			} break;
 
 			case Ast::STATEMENT_DEFER: {

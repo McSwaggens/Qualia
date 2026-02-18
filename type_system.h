@@ -88,7 +88,6 @@ struct TypeID {
 		return *this;
 	}
 
-	// These directly subscript or dereference TypeInfo; defined inline after TypeInfo.
 	TypeInfo& Get() const;
 	TypeInfo* operator ->() const;
 	TypeInfo* GetInfo() const;

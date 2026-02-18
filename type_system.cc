@@ -56,14 +56,19 @@ inline TypeID TypeID::GetFunctionInputType()  const { return GetInfo()->function
 inline TypeID TypeID::GetFunctionOutputType() const { return GetInfo()->function_info.output; }
 
 inline TypeInfo& TypeID::Get() const {
+	Assert(IsValid());
+	Assert(GetIndex() < (s32)type_infos.head);
 	return type_infos[GetIndex()];
 }
 
 inline TypeInfo* TypeID::operator ->() const {
+	Assert(IsValid());
+	Assert(GetIndex() < (s32)type_infos.head);
 	return &type_infos[GetIndex()];
 }
 
 inline TypeInfo* TypeID::GetInfo() const {
+	Assert(IsValid());
 	Assert(GetIndex() < (s32)type_infos.head);
 	return &type_infos[GetIndex()];
 }

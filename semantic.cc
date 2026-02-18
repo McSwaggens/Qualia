@@ -1275,9 +1275,7 @@ void Scanner::ScanBinaryAssignment(Ast::Statement* statement, Ast::Code* code, A
 
 	TypeID target_type = assignment->left->type.GetSubType();
 
-	if (!target_type.IsInteger() &&
-		!target_type.IsFloat() &&
-		target_type.GetKind() != TYPE_POINTER)
+	if (!target_type.IsInteger() && !target_type.IsFloat() && target_type.GetKind() != TYPE_POINTER)
 		Error(assignment->left, "Arithmetic assignment type must be to an integer, float or pointer, not: '%'\n", target_type);
 
 	// ptr += int

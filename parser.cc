@@ -311,7 +311,7 @@ static void CheckScope(Token* token, u32 indent, Ast::Module* module) {
 Ast::Struct Parser::ParseStruct(u32 indent) {
 	token += 1;
 
-	if (token->kind != TOKEN_IDENTIFIER_FORMAL) {
+	if (*token != TOKEN_IDENTIFIER_FORMAL) {
 		if (IsIdentifier(token->kind))
 			Error("Struct name must start with an uppercase letter.\n");
 		else
@@ -325,7 +325,7 @@ Ast::Struct Parser::ParseStruct(u32 indent) {
 	};
 	token += 1;
 
-	if (token->kind != TOKEN_COLON)
+	if (*token != TOKEN_COLON)
 		Error("Invalid struct declaration syntax, unexpected token %, Expected ':'\n", token);
 
 	CheckScope(token, indent, module);
@@ -334,14 +334,14 @@ Ast::Struct Parser::ParseStruct(u32 indent) {
 	ArrayBuffer<Ast::Struct_Member> members = CreateArrayBuffer<Ast::Struct_Member>();
 
  	while (IsCorrectScope(token, indent+1)) {
-		if (token->kind == TOKEN_IDENTIFIER_CASUAL) {
+		if (*token == TOKEN_IDENTIFIER_CASUAL) {
 			Ast::Struct_Member member;
 			member.name = token->identifier_string;
 			member.name_token = token;
 			member.index = members.count;
 			token += 1;
 
-			if (token->kind != TOKEN_COLON)
+			if (*token != TOKEN_COLON)
 				Error("Expected ':', not: '%'\n", token);
 
 			CheckScope(token, indent+1, module);
@@ -350,19 +350,19 @@ Ast::Struct Parser::ParseStruct(u32 indent) {
 			member.ast_type = ParseType(indent+2);
 			members.Add(member);
 
-			if (!token->IsNewLine() && token->kind != TOKEN_SEMICOLON)
+			if (!token->IsNewLine() && *token != TOKEN_SEMICOLON)
 				Error("Unexpected token: % after struct member.\n", token);
 
-			if (token->kind == TOKEN_SEMICOLON) {
+			if (*token == TOKEN_SEMICOLON) {
 				CheckScope(token, indent+1, module);
 				token += 1;
 			}
 
-			if (token->kind == TOKEN_SEMICOLON && IsCorrectScope(token, indent+1)) {
+			if (*token == TOKEN_SEMICOLON && IsCorrectScope(token, indent+1)) {
 				token += 1;
 			}
 		}
-		else if (token->kind == TOKEN_IDENTIFIER_FORMAL)
+		else if (*token == TOKEN_IDENTIFIER_FORMAL)
 			Error("Struct member names must start with a lowercase letter.\n");
 		else
 			Error("Unexpected token in struct: '%'\n", token);
@@ -377,7 +377,7 @@ Ast::Enum Parser::ParseEnum(u32 indent) {
 	Ast::Enum enumeration;
 	token += 1;
 
-	if (token->kind != TOKEN_IDENTIFIER_FORMAL) {
+	if (*token != TOKEN_IDENTIFIER_FORMAL) {
 		if (IsIdentifier(token->kind))
 			Error("Enum names must start with an uppercase letter.\n");
 		else
@@ -389,7 +389,7 @@ Ast::Enum Parser::ParseEnum(u32 indent) {
 	enumeration.name_token = token;
 	token += 1;
 
-	if (token->kind != TOKEN_COLON)
+	if (*token != TOKEN_COLON)
 		Error("Invalid enum declaration syntax, unexpected token '%', Expected ':'\n", token);
 
 	CheckScope(token, indent, module);
@@ -398,36 +398,37 @@ Ast::Enum Parser::ParseEnum(u32 indent) {
 	ArrayBuffer<Ast::Enum_Member> members = CreateArrayBuffer<Ast::Enum_Member>();
 
 	while (IsCorrectScope(token, indent+1)) {
-		if (token->kind == TOKEN_IDENTIFIER_FORMAL) {
+		if (*token == TOKEN_IDENTIFIER_FORMAL) {
 			Ast::Enum_Member member;
 			member.name_token = token;
 			member.name = token->identifier_string;
 			member.index = members.count;
 			token += 1;
 
-			if (token->kind != TOKEN_EQUAL)
+			if (*token != TOKEN_EQUAL)
 				Error("Expected '=', not: '%'\n", token);
 
 			CheckScope(token, indent+2, module);
 			token += 1;
 
-			if (token->kind == TOKEN_SEMICOLON)
+			if (*token == TOKEN_SEMICOLON)
 				Error("Expected expression before ';'\n");
 
 			CheckScope(token, indent+2, module);
 			member.expression = ParseExpression(indent+2);
 
-			if (!token->IsNewLine() && token->kind != TOKEN_SEMICOLON)
+			if (!token->IsNewLine() && *token != TOKEN_SEMICOLON)
 				Error("Unexpected token: '%' after enum member.\n", token);
 
-			if (token->kind == TOKEN_SEMICOLON) {
+			if (*token == TOKEN_SEMICOLON) {
 				CheckScope(token, indent+1, module);
 				token += 1;
 			}
 
 			members.Add(member);
 		}
-		else if (token->kind == TOKEN_IDENTIFIER_CASUAL)
+
+		if (*token == TOKEN_IDENTIFIER_CASUAL)
 			Error("Enum member names must start with a uppercase letter.\n");
 		else
 			Error("Unexpected token in enum: '%'\n", token);
@@ -443,7 +444,7 @@ static bool CanTakeNextOp(Token* token, bool assignment_break, s32 parent_preced
 		return false;
 
 	// Don't consume assignment statement or variable declaration's equal token.
-	if (token->kind == TOKEN_EQUAL && assignment_break)
+	if (*token == TOKEN_EQUAL && assignment_break)
 		return false;
 
 	// Adjust for right to left operators.
@@ -528,7 +529,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		token += 1;
 		left = term;
 	}
-	else if (token->kind == TOKEN_OPEN_BRACKET) {
+	else if (*token == TOKEN_OPEN_BRACKET) {
 		Token* closure = token->closure;
 
 		Ast::Expression_Array* array = stack.New<Ast::Expression_Array>();
@@ -540,7 +541,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		CheckScope(token, indent, module);
 		array->left = ParseExpression(indent+1);
 
-		if (token->kind != TOKEN_DOT_DOT)
+		if (*token != TOKEN_DOT_DOT)
 			Error("Expected '..' operator, not: \n", token);
 
 		CheckScope(token, indent, module);
@@ -552,7 +553,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		CheckScope(token, indent+1, module);
 		array->right = ParseExpression(indent+1);
 
-		if (token->kind != TOKEN_CLOSE_BRACKET)
+		if (*token != TOKEN_CLOSE_BRACKET)
 			Error("End of array expression missing, expected ']', not: '%'\n", token);
 
 		CheckScope(token, indent, module);
@@ -560,7 +561,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 		left = array;
 	}
-	else if (token->kind == TOKEN_OPEN_PAREN) {
+	else if (*token == TOKEN_OPEN_PAREN) {
 		Ast::Expression_Tuple* tuple = stack.New<Ast::Expression_Tuple>();
 
 		Token* closure = token->closure;
@@ -569,19 +570,18 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 		ArrayBuffer<Ast::Expression*> elements = CreateArrayBuffer<Ast::Expression*>();
 
-		if (closure[-1].kind == TOKEN_COMMA)
+		if (closure[-1] == TOKEN_COMMA)
 			Error("Expected expression after ','\n");
 
 		while (token < closure) {
 			CheckScope(token, indent+1, module);
 			elements.Add(ParseExpression(indent+1));
 
-			if (token->kind == TOKEN_COMMA) {
+			if (*token == TOKEN_COMMA) {
 				CheckScope(token, indent, module);
 				token += 1;
 			}
-			else if (token < closure)
-				Error("Invalid expression, unexpected token: '%'\n", token);
+			else if (token < closure) Error("Invalid expression, unexpected token: '%'\n", token);
 		}
 
 		tuple->elements = elements.Lock();
@@ -590,7 +590,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		token = closure+1;
 		left = tuple;
 	}
-	else if (token->kind == TOKEN_OPEN_BRACE) {
+	else if (*token == TOKEN_OPEN_BRACE) {
 		Ast::Expression_Fixed_Array* fixed_array = stack.New<Ast::Expression_Fixed_Array>();
 
 		Token* closure = token->closure;
@@ -609,7 +609,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			elements.Add(expression);
 			CheckScope(token, indent, module);
 
-			if (token->kind == TOKEN_COMMA) {
+			if (*token == TOKEN_COMMA) {
 				token += 1;
 
 				if (token == closure)
@@ -623,23 +623,22 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		left = fixed_array;
 	}
 	else {
-		if (token->indent != indent) {
+		if (token->indent != indent)
 			CheckScope(token, indent, module);
-		}
 
 		Error("Invalid expression, expected term, got: '%'\n", token);
 	}
 
 	while (CanTakeNextOp(token, assignment_break, parent_precedence) && IsCorrectScope(token, indent)) {
 		// @Indent does unary operators need to be treated differently? (Error check)
-		if (token->kind == TOKEN_IF) {
+		if (*token == TOKEN_IF) {
 			Token* if_token = token;
 			token += 1;
 			CheckScope(token, indent, module);
 
 			Ast::Expression* middle = ParseExpression(indent, false);
 
-			if (token->kind != TOKEN_ELSE)
+			if (*token != TOKEN_ELSE)
 				Error("Invalid 'if' expression, missing 'else' clause. Unexpected: '%'\n", token);
 
 			Token* else_token = token;
@@ -649,14 +648,13 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			CheckScope(token, indent, module);
 			Ast::Expression* right = ParseExpression(indent, assignment_break, GetTernaryPrecedence(TOKEN_IF));
 
-			Ast::Expression_Ternary* if_else = stack.New<Ast::Expression_Ternary>(
-				Ast::Expression::IF_ELSE, if_token, else_token);
+			Ast::Expression_Ternary* if_else = stack.New<Ast::Expression_Ternary>(Ast::Expression::IF_ELSE, if_token, else_token);
 			if_else->left = left;
 			if_else->middle = middle;
 			if_else->right = right;
 			left = if_else;
 		}
-		else if (token->kind == TOKEN_AS) {
+		else if (*token == TOKEN_AS) {
 			Ast::Expression_As* as = stack.New<Ast::Expression_As>(token);
 			as->expr = left;
 
@@ -667,7 +665,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 			left = as;
 		}
-		else if (token->kind == TOKEN_OPEN_PAREN) {
+		else if (*token == TOKEN_OPEN_PAREN) {
 			Ast::Expression_Call* call = stack.New<Ast::Expression_Call>();
 			call->function = left;
 
@@ -680,7 +678,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 			token = closure + 1;
 			left = call;
 		}
-		else if (token->kind == TOKEN_OPEN_BRACKET) {
+		else if (*token == TOKEN_OPEN_BRACKET) {
 			Token* open = token++;
 			Token* closure = open->closure;
 
@@ -745,19 +743,18 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 static Token* GetEndOfTypeIfValid(Token* token) {
 	while (IsSpecifier(token->kind)) {
-		if (token->kind == TOKEN_OPEN_BRACKET) token = token->closure;
+		if (*token == TOKEN_OPEN_BRACKET) token = token->closure;
 		token += 1;
 	}
 
-	if (IsPrimitive(token->kind) || token->kind == TOKEN_IDENTIFIER_FORMAL) {
+	if (IsPrimitive(token->kind) || *token == TOKEN_IDENTIFIER_FORMAL)
 		return token + 1;
-	}
-	else if (token->kind == TOKEN_OPEN_PAREN) {
+
+	if (*token == TOKEN_OPEN_PAREN) {
 		token = token->closure + 1;
 
-		if (token->kind == TOKEN_ARROW) {
+		if (*token == TOKEN_ARROW)
 			token = GetEndOfTypeIfValid(token + 1);
-		}
 
 		return token;
 	}
@@ -776,7 +773,7 @@ Ast::Type Parser::ParseType(u32 indent) {
 		specifier.size_expression = null;
 		CheckScope(token, indent, module);
 
-		if (token->kind == TOKEN_OPEN_BRACKET) {
+		if (*token == TOKEN_OPEN_BRACKET) {
 			specifier.kind = Ast::SPECIFIER_ARRAY;
 
 			Token* closure = token->closure;
@@ -793,11 +790,11 @@ Ast::Type Parser::ParseType(u32 indent) {
 
 			token = closure + 1;
 		}
-		else if (token->kind == TOKEN_ASTERISK) {
+		else if (*token == TOKEN_ASTERISK) {
 			specifier.kind = Ast::SPECIFIER_POINTER;
 			token += 1;
 		}
-		else if (token->kind == TOKEN_QUESTION_MARK) {
+		else if (*token == TOKEN_QUESTION_MARK) {
 			specifier.kind = Ast::SPECIFIER_OPTIONAL;
 			token += 1;
 		}
@@ -813,12 +810,12 @@ Ast::Type Parser::ParseType(u32 indent) {
 		type.basetype.kind = Ast::BASETYPE_PRIMITIVE;
 		token += 1;
 	}
-	else if (token->kind == TOKEN_IDENTIFIER_FORMAL) {
+	else if (*token == TOKEN_IDENTIFIER_FORMAL) {
 		CheckScope(token, indent, module);
 		type.basetype.kind = Ast::BASETYPE_USERTYPE;
 		token += 1;
 	}
-	else if (token->kind == TOKEN_OPEN_PAREN && token->closure[1].kind == TOKEN_ARROW) {
+	else if (*token == TOKEN_OPEN_PAREN && token->closure[1] == TOKEN_ARROW) {
 		Token* closure = token->closure;
 		CheckScope(token, indent, module);
 		CheckScope(closure, indent, module);
@@ -834,7 +831,7 @@ Ast::Type Parser::ParseType(u32 indent) {
 			Ast::Type param = ParseType(indent+1);
 			params.Add(param);
 
-			if (token->kind == TOKEN_COMMA) {
+			if (*token == TOKEN_COMMA) {
 				CheckScope(token, indent, module);
 				token += 1;
 
@@ -856,7 +853,7 @@ Ast::Type Parser::ParseType(u32 indent) {
 		}
 
 		// () -> () -> XXX
-		if (token->kind == TOKEN_OPEN_PAREN && token[1].kind == TOKEN_CLOSE_PAREN && token->closure[1].kind != TOKEN_ARROW) {
+		if (*token == TOKEN_OPEN_PAREN && token[1] == TOKEN_CLOSE_PAREN && token->closure[1] != TOKEN_ARROW) {
 			type.basetype.function.output = null;
 			token = token->closure+1;
 		}
@@ -866,7 +863,7 @@ Ast::Type Parser::ParseType(u32 indent) {
 		}
 
 	}
-	else if (token->kind == TOKEN_OPEN_PAREN) {
+	else if (*token == TOKEN_OPEN_PAREN) {
 		Token* closure = token->closure;
 		CheckScope(token, indent, module);
 		CheckScope(closure, indent, module);
@@ -879,7 +876,7 @@ Ast::Type Parser::ParseType(u32 indent) {
 		while (token != closure) {
 			members.Add(ParseType(indent+1));
 
-			if (token->kind == TOKEN_COMMA) {
+			if (*token == TOKEN_COMMA) {
 				CheckScope(token, indent, module);
 				token += 1;
 
@@ -909,11 +906,11 @@ void Parser::ParseParameters(Ast::Function* function, Token* open_paren, u32 ind
 	while (cursor < closure) {
 		Ast::Variable param = { .flags = Ast::VARIABLE_FLAG_PARAMETER };
 
-		if (cursor->kind == TOKEN_COMMA)
+		if (*cursor == TOKEN_COMMA)
 			::Error(module, cursor->location,"Empty parameters not allowed. (Remove redundant ',')\n");
 
-		if (cursor->kind != TOKEN_IDENTIFIER_CASUAL) {
-			if (cursor->kind == TOKEN_IDENTIFIER_FORMAL)
+		if (*cursor != TOKEN_IDENTIFIER_CASUAL) {
+			if (*cursor == TOKEN_IDENTIFIER_FORMAL)
 				::Error(module, cursor->location,"Parameter names must start with a lowercase letter, not: '%'\n", cursor);
 			else
 				::Error(module, cursor->location,"Parameter name missing, unexpected: '%'\n", cursor);
@@ -924,7 +921,7 @@ void Parser::ParseParameters(Ast::Function* function, Token* open_paren, u32 ind
 		param.name = cursor->identifier_string;
 		cursor += 1;
 
-		if (cursor->kind != TOKEN_COLON)
+		if (*cursor != TOKEN_COLON)
 			::Error(module, cursor->location,"Parameter type missing.\n");
 
 		CheckScope(cursor, indent+1, module);
@@ -939,10 +936,10 @@ void Parser::ParseParameters(Ast::Function* function, Token* open_paren, u32 ind
 
 		params.Add(param);
 
-		if (cursor->kind != TOKEN_COMMA && cursor != closure)
+		if (*cursor != TOKEN_COMMA && cursor != closure)
 			::Error(module, cursor->location,"Expected ',' or ')', not: '%'\n", cursor);
 
-		if (cursor->kind == TOKEN_COMMA) {
+		if (*cursor == TOKEN_COMMA) {
 			CheckScope(cursor, indent, module);
 			cursor += 1;
 		}
@@ -952,27 +949,25 @@ void Parser::ParseParameters(Ast::Function* function, Token* open_paren, u32 ind
 }
 
 Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
-	Ast::BranchBlock branch_block = {};
+	Ast::BranchBlock branch_block = { };
 	ArrayBuffer<Ast::Branch> branches = CreateArrayBuffer<Ast::Branch>();
 
 	Token* branch_block_begin_token = token;
 
 	do {
-		Ast::Branch branch = {};
+		Ast::Branch branch = { };
 
 		Token* clause_token = token;
 
-		if (token->kind == TOKEN_ELSE) {
+		if (*token == TOKEN_ELSE) {
 			branch.clause = Ast::BRANCH_CLAUSE_ELSE;
 			token += 1;
 		}
-		else if (token->kind == TOKEN_THEN) {
+		else if (*token == TOKEN_THEN) {
 			branch.clause = Ast::BRANCH_CLAUSE_THEN;
 			token += 1;
 		}
-		else {
-			branch.clause = Ast::BRANCH_CLAUSE_INIT;
-		}
+		else branch.clause = Ast::BRANCH_CLAUSE_INIT;
 
 		switch (token->kind) {
 			case TOKEN_IF: {
@@ -993,16 +988,16 @@ Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 				CheckScope(token, indent, module);
 				token += 1;
 
-				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
+				if (token[0] == TOKEN_IDENTIFIER_FORMAL && token[1] == TOKEN_COLON)
 					Error("Variable names must start with a lowercase letter.\n");
 
-				if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_IN)
+				if (token[0] == TOKEN_IDENTIFIER_FORMAL && token[1] == TOKEN_IN)
 					Error("Iterator names must start with a lowercase letter.\n");
 
 				// Todo: Allow user to declare the type
 				// for n : uint in signed_nums:
 
-				if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_IN) {
+				if (token[0] == TOKEN_IDENTIFIER_CASUAL && token[1] == TOKEN_IN) {
 					branch.kind = Ast::BRANCH_FOR_RANGE;
 
 					Ast::Variable* iterator = stack.Allocate<Ast::Variable>();
@@ -1022,7 +1017,7 @@ Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 					CheckScope(token, indent+1, module);
 					branch.for_range.range = ParseExpression(indent+1, false);
 
-					if (token->kind == TOKEN_WHERE) {
+					if (*token == TOKEN_WHERE) {
 						CheckScope(token, indent, module);
 						token += 1;
 
@@ -1030,7 +1025,7 @@ Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 						branch.for_range.filter = ParseExpression(indent+1, false);
 					}
 				}
-				else if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON) {
+				else if (token[0] == TOKEN_IDENTIFIER_CASUAL && token[1] == TOKEN_COLON) {
 					branch.kind = Ast::BRANCH_FOR_VERBOSE;
 
 					Ast::Variable* variable = stack.Allocate<Ast::Variable>();
@@ -1045,7 +1040,7 @@ Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 					CheckScope(token, indent, module);
 					token += 1;
 
-					if (token->kind != TOKEN_EQUAL) {
+					if (*token != TOKEN_EQUAL) {
 						CheckScope(token, indent+1, module);
 						variable->ast_type = stack.Allocate<Ast::Type>();
 						*variable->ast_type = ParseType(indent);
@@ -1053,7 +1048,7 @@ Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 
 					branch.for_verbose.variable = variable;
 
-					if (token->kind == TOKEN_EQUAL) {
+					if (*token == TOKEN_EQUAL) {
 						CheckScope(token, indent, module);
 						token += 1;
 
@@ -1061,23 +1056,23 @@ Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 						variable->assignment = ParseExpression(indent+1, false);
 					}
 
-					if (token->kind != TOKEN_COMMA)
+					if (*token != TOKEN_COMMA)
 						Error("Expected ',' and loop condition, not: '%'\n", token);
 
 					CheckScope(token, indent, module);
 					token += 1;
 
-					if (token->kind == TOKEN_COLON)
+					if (*token == TOKEN_COLON)
 						Error("For loop missing condition expression.\n");
 
 					CheckScope(token, indent+1, module);
 					branch.for_verbose.condition = ParseExpression(indent+1, false);
 
-					if (token->kind == TOKEN_COMMA) {
+					if (*token == TOKEN_COMMA) {
 						CheckScope(token, indent, module);
 						token += 1;
 
-						if (token->kind == TOKEN_COLON)
+						if (*token == TOKEN_COLON)
 							Error("For loop stride missing\n");
 
 						CheckScope(token, indent+1, module);
@@ -1091,7 +1086,7 @@ Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 			default: Error("Expected 'if', 'while', 'for' or ':' after '%' clause, not: '%'\n", clause_token, token);
 		}
 
-		if (token->kind != TOKEN_COLON)
+		if (*token != TOKEN_COLON)
 			Error("Expected ':' after branch, not: '%'\n", token);
 
 		CheckScope(token, indent, module);
@@ -1100,7 +1095,7 @@ Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 		branch.code = ParseCode(indent+1);
 
 		branches.Add(branch);
-	} while ((token->kind == TOKEN_ELSE || token->kind == TOKEN_THEN) && IsCorrectScope(token, indent));
+	} while ((*token == TOKEN_ELSE || *token == TOKEN_THEN) && IsCorrectScope(token, indent));
 
 	branch_block.branches = branches.Lock();
 
@@ -1128,12 +1123,12 @@ Ast::Statement Parser::ParseExpressionStatement(u32 indent) {
 		return statement;
 	}
 
-	if (token->kind == TOKEN_EQUAL)        statement.kind = Ast::STATEMENT_ASSIGNMENT;
-	if (token->kind == TOKEN_PLUS_EQUAL)   statement.kind = Ast::STATEMENT_ASSIGNMENT_ADD;
-	if (token->kind == TOKEN_MINUS_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_SUBTRACT;
-	if (token->kind == TOKEN_TIMES_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_MULTIPLY;
-	if (token->kind == TOKEN_DIVIDE_EQUAL) statement.kind = Ast::STATEMENT_ASSIGNMENT_DIVIDE;
-	if (token->kind == TOKEN_CARET_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_XOR;
+	if (*token == TOKEN_EQUAL)        statement.kind = Ast::STATEMENT_ASSIGNMENT;
+	if (*token == TOKEN_PLUS_EQUAL)   statement.kind = Ast::STATEMENT_ASSIGNMENT_ADD;
+	if (*token == TOKEN_MINUS_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_SUBTRACT;
+	if (*token == TOKEN_TIMES_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_MULTIPLY;
+	if (*token == TOKEN_DIVIDE_EQUAL) statement.kind = Ast::STATEMENT_ASSIGNMENT_DIVIDE;
+	if (*token == TOKEN_CARET_EQUAL)  statement.kind = Ast::STATEMENT_ASSIGNMENT_XOR;
 
 	CheckScope(token, indent+1, module);
 	token += 1;
@@ -1152,22 +1147,22 @@ Ast::Statement Parser::ParseVariableDeclaration(u32 indent) {
 	CheckScope(token+1, indent, module);
 
 	statement.kind = Ast::STATEMENT_VARIABLE_DECLARATION;
-	statement.variable_declaration.name_token = token;
-	statement.variable_declaration.name = token->identifier_string;
+	statement.vardecl.name_token = token;
+	statement.vardecl.name = token->identifier_string;
 
 	token += 2;
 
-	if (token->kind != TOKEN_EQUAL) {
+	if (*token != TOKEN_EQUAL) {
 		CheckScope(token, indent+1, module);
-		statement.variable_declaration.ast_type = stack.Allocate<Ast::Type>();
-		*statement.variable_declaration.ast_type = ParseType(indent+1);
+		statement.vardecl.ast_type = stack.Allocate<Ast::Type>();
+		*statement.vardecl.ast_type = ParseType(indent+1);
 	}
 
-	if (token->kind == TOKEN_EQUAL) {
+	if (*token == TOKEN_EQUAL) {
 		CheckScope(token, indent+1, module);
 		token += 1;
 		CheckScope(token, indent+1, module);
-		statement.variable_declaration.assignment = ParseExpression(indent+1);
+		statement.vardecl.assignment = ParseExpression(indent+1);
 	}
 
 	return statement;
@@ -1182,11 +1177,11 @@ Ast::Statement Parser::ParseBranchBlockStatement(u32 indent) {
 
 Ast::Statement Parser::ParseIncDecStatement(u32 indent) {
 	Ast::Statement statement = { };
-	statement.kind = token->kind == TOKEN_INC ? Ast::STATEMENT_INCREMENT : Ast::STATEMENT_DECREMENT;
+	statement.kind = *token == TOKEN_INC ? Ast::STATEMENT_INCREMENT : Ast::STATEMENT_DECREMENT;
 	statement.increment.token = token;
 	token += 1;
 
-	if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
+	if (!IsCorrectScope(token, indent+1) || *token == TOKEN_SEMICOLON)
 		::Error(module, statement.increment.token->location,"Expected expression after '%' keyword\n", statement.increment.token);
 
 	statement.increment.expression = ParseExpression(indent+1);
@@ -1199,7 +1194,7 @@ Ast::Statement Parser::ParseDeferStatement(u32 indent) {
 	statement.defer.token = token;
 	token += 1;
 
-	if (token->kind != TOKEN_COLON)
+	if (*token != TOKEN_COLON)
 		Error("Invalid 'defer' statement, Expected ':', not: '%'\n", token);
 
 	CheckScope(token, indent, module);
@@ -1236,7 +1231,7 @@ Ast::Statement Parser::ParseClaimStatement(u32 indent) {
 	statement.claim.token = token;
 	token += 1;
 
-	if (!IsCorrectScope(token, indent+1) || token->kind == TOKEN_SEMICOLON)
+	if (!IsCorrectScope(token, indent+1) || *token == TOKEN_SEMICOLON)
 		::Error(module, statement.increment.token->location,"Expected expression after '%' keyword\n", statement.increment.token);
 
 	statement.claim.expr = ParseExpression(indent+1, false);
@@ -1244,24 +1239,24 @@ Ast::Statement Parser::ParseClaimStatement(u32 indent) {
 }
 
 Ast::Statement Parser::ParseStatement(u32 indent) {
-	if (token[0].kind == TOKEN_IDENTIFIER_FORMAL && token[1].kind == TOKEN_COLON)
+	if (token[0] == TOKEN_IDENTIFIER_FORMAL && token[1] == TOKEN_COLON)
 		Error("Variable names must start with a lowercase letter.\n");
 
-	if (token[0].kind == TOKEN_IDENTIFIER_CASUAL && token[1].kind == TOKEN_COLON)
+	if (token[0] == TOKEN_IDENTIFIER_CASUAL && token[1] == TOKEN_COLON)
 		return ParseVariableDeclaration(indent);
 
 	if (IsExpressionStarter(token->kind))
 		return ParseExpressionStatement(indent);
 
-	if (token->kind == TOKEN_IF)     return ParseBranchBlockStatement(indent);
-	if (token->kind == TOKEN_FOR)    return ParseBranchBlockStatement(indent);
-	if (token->kind == TOKEN_WHILE)  return ParseBranchBlockStatement(indent);
-	if (token->kind == TOKEN_INC)    return ParseIncDecStatement(indent);
-	if (token->kind == TOKEN_DEC)    return ParseIncDecStatement(indent);
-	if (token->kind == TOKEN_DEFER)  return ParseDeferStatement(indent);
-	if (token->kind == TOKEN_BREAK)  return ParseBreakStatement(indent);
-	if (token->kind == TOKEN_RETURN) return ParseReturnStatement(indent);
-	if (token->kind == TOKEN_CLAIM)  return ParseClaimStatement(indent);
+	if (*token == TOKEN_IF)     return ParseBranchBlockStatement(indent);
+	if (*token == TOKEN_FOR)    return ParseBranchBlockStatement(indent);
+	if (*token == TOKEN_WHILE)  return ParseBranchBlockStatement(indent);
+	if (*token == TOKEN_INC)    return ParseIncDecStatement(indent);
+	if (*token == TOKEN_DEC)    return ParseIncDecStatement(indent);
+	if (*token == TOKEN_DEFER)  return ParseDeferStatement(indent);
+	if (*token == TOKEN_BREAK)  return ParseBreakStatement(indent);
+	if (*token == TOKEN_RETURN) return ParseReturnStatement(indent);
+	if (*token == TOKEN_CLAIM)  return ParseClaimStatement(indent);
 
 	Error("Invalid statement starting with '%'\n", token);
 }
@@ -1271,7 +1266,7 @@ static bool IsScopeTerminator(TokenKind kind) {
 }
 
 Ast::Code Parser::ParseCode(u32 indent) {
-	Ast::Code code = {};
+	Ast::Code code = { };
 
 	ArrayBuffer<Ast::Statement> statements = CreateArrayBuffer<Ast::Statement>();
 	ArrayBuffer<Ast::Struct>    structs    = CreateArrayBuffer<Ast::Struct>();
@@ -1279,20 +1274,20 @@ Ast::Code Parser::ParseCode(u32 indent) {
 	ArrayBuffer<Ast::Function>  functions  = CreateArrayBuffer<Ast::Function>();
 
 	while (IsCorrectScope(token, indent) && !IsScopeTerminator(token->kind)) {
-		if (token->kind == TOKEN_STRUCT) {
+		if (*token == TOKEN_STRUCT) {
 			Ast::Struct structure = ParseStruct(indent);
 			structs.Add(structure);
 			continue;
 		}
 
-		if (token->kind == TOKEN_ENUM) {
+		if (*token == TOKEN_ENUM) {
 			Ast::Enum enumeration = ParseEnum(indent);
 			enums.Add(enumeration);
 			continue;
 		}
 
-		if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN && (token[1].closure[1].kind == TOKEN_COLON || token[1].closure[1].kind == TOKEN_ARROW)) {
-			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
+		if (IsIdentifier(token->kind) && token[1] == TOKEN_OPEN_PAREN && (token[1].closure[1] == TOKEN_COLON || token[1].closure[1] == TOKEN_ARROW)) {
+			if (*token != TOKEN_IDENTIFIER_FORMAL)
 				Error("Function names must start with an uppercase letter.\n", token);
 
 			Ast::Function function = ParseFunction(indent);
@@ -1307,7 +1302,7 @@ Ast::Code Parser::ParseCode(u32 indent) {
 		if (!token->IsNewLine() && !IsScopeTerminator(token->kind))
 			Error("Expected ';' before end of statement, not: '%'.\n", token);
 
-		if (token->kind == TOKEN_SEMICOLON && IsCorrectScope(token, indent))
+		if (*token == TOKEN_SEMICOLON && IsCorrectScope(token, indent))
 			token += 1;
 	}
 
@@ -1332,17 +1327,17 @@ Ast::Function Parser::ParseFunction(u32 indent) {
 	ParseParameters(&function, token, indent);
 	token = token->closure+1;
 
-	if (token->kind != TOKEN_ARROW && token->kind != TOKEN_COLON)
+	if (*token != TOKEN_ARROW && *token != TOKEN_COLON)
 		Error("Expected '->' or ':', not '%'\n", token);
 
-	if (token->kind == TOKEN_ARROW) {
+	if (*token == TOKEN_ARROW) {
 		CheckScope(token, indent+1, module);
 		token += 1;
 		function.ast_return_type = stack.Allocate<Ast::Type>();
 		*function.ast_return_type = ParseType(indent);
 	}
 
-	if (token->kind != TOKEN_COLON)
+	if (*token != TOKEN_COLON)
 		Error("Expected ':', not '%'\n", token);
 
 	CheckScope(token, indent, module);
@@ -1358,14 +1353,14 @@ Ast::Import Parser::ParseImport(u32 indent) {
 	import.token = token;
 	token += 1;
 
-	if (token->kind != TOKEN_IDENTIFIER_FORMAL)
+	if (*token != TOKEN_IDENTIFIER_FORMAL)
 		Error("Expected identifier after import token, instead got: '%'\n", token);
 
 	CheckScope(token, 1, module);
 	import.module = token;
 	token += 1;
 
-	if (token->kind == TOKEN_SEMICOLON) {
+	if (*token == TOKEN_SEMICOLON) {
 		CheckScope(token, 1, module);
 		token += 1;
 	}
@@ -1383,27 +1378,27 @@ void Parser::ParseGlobalScope() {
 	ArrayBuffer<Ast::Enum>     enums      = CreateArrayBuffer<Ast::Enum>();
 	ArrayBuffer<Ast::Function> functions  = CreateArrayBuffer<Ast::Function>();
 
-	while (token->kind != TOKEN_EOF) {
-		if (token->kind == TOKEN_IMPORT) {
+	while (*token != TOKEN_EOF) {
+		if (*token == TOKEN_IMPORT) {
 			Ast::Import import = ParseImport(0);
 			imports.Add(import);
 			continue;
 		}
 
-		if (token->kind == TOKEN_STRUCT) {
+		if (*token == TOKEN_STRUCT) {
 			Ast::Struct structure = ParseStruct(0);
 			structs.Add(structure);
 			continue;
 		}
 
-		if (token->kind == TOKEN_ENUM) {
+		if (*token == TOKEN_ENUM) {
 			Ast::Enum enumeration = ParseEnum(0);
 			enums.Add(enumeration);
 			continue;
 		}
 
-		if (IsIdentifier(token->kind) && token[1].kind == TOKEN_OPEN_PAREN) {
-			if (token->kind != TOKEN_IDENTIFIER_FORMAL)
+		if (IsIdentifier(token->kind) && token[1] == TOKEN_OPEN_PAREN) {
+			if (*token != TOKEN_IDENTIFIER_FORMAL)
 				Error("Function names must start with an uppercase letter.\n", token);
 
 			Ast::Function func = ParseFunction(0);

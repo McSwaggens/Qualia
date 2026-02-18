@@ -1211,7 +1211,7 @@ void Scanner::ScanBreak(Ast::Statement* statement, Ast::Code* code, Ast::Functio
 }
 
 void Scanner::ScanVarDecl(Ast::Statement* statement, Ast::Code* code, Ast::Function* function) {
-	Ast::Variable* var = &statement->variable_declaration;
+	Ast::Variable* var = &statement->vardecl;
 
 	for (Ast::Variable** other_variable = code->scope.variables.Begin(); other_variable < code->scope.variables.End(); other_variable++) {
 		if (var->name == (*other_variable)->name)

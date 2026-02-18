@@ -285,11 +285,11 @@ static void PrintStatements(Array<Ast::Statement> statements, u32 indent) {
 		switch (stmt->kind) {
 			case Ast::STATEMENT_VARIABLE_DECLARATION: {
 				PrintIndent(indent);
-				Print("VarDecl: %\n", stmt->variable_declaration.name);
-				if (stmt->variable_declaration.assignment) {
+				Print("VarDecl: %\n", stmt->vardecl.name);
+				if (stmt->vardecl.assignment) {
 					PrintIndent(indent + 1);
 					Print("initializer:\n");
-					PrintExpression(stmt->variable_declaration.assignment, indent + 2);
+					PrintExpression(stmt->vardecl.assignment, indent + 2);
 				}
 			} break;
 

@@ -221,6 +221,9 @@ struct Token {
 	TokenFlags flags;
 	Indent16   indent;
 
+	bool operator==(TokenKind k) { return kind == k; }
+	bool operator!=(TokenKind k) { return kind != k; }
+
 	bool IsNewLine()     { return flags & TOKEN_FLAG_NEWLINE;      }
 	bool IsLeftSpaced()  { return flags & TOKEN_FLAG_LEFT_SPACED;  }
 	bool IsRightSpaced() { return flags & TOKEN_FLAG_RIGHT_SPACED; }

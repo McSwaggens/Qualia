@@ -62,10 +62,7 @@ static Ast::Expression* ImplicitCast(Ast::Expression* expression, TypeID type, A
 	if (expression->type == type)
 		return expression;
 
-	Ast::Expression_Implicit_Cast* cast = Alloc<Ast::Expression_Implicit_Cast>(); // @fixme using general allocator and not the stack. Proper Ast stack is in the parser. Which we don't have access to here.
-	new (cast) Ast::Expression_Implicit_Cast(expression, type);
-
-	return cast;
+	return new Ast::Expression_Implicit_Cast(expression, type);
 }
 
 static bool IsAssignable(Ast::Expression* expression) {
@@ -92,14 +89,12 @@ static void GenerateClosure(Ast::Struct* target, Array<TypeID> tuple) {
 		TypeID type = tuple[i];
 		TypeInfo* type_info = type.GetInfo();
 
-		if (type.GetKind() == TYPE_STRUCT) {
-			if (target->closure.AddIfUnique(type.GetInfo()->struct_info.ast)) {
-				GenerateClosure(target, type.GetInfo()->struct_info.ast);
-			}
-		}
-		else if (type.GetKind() == TYPE_TUPLE) {
+		if (type.GetKind() == TYPE_STRUCT)
+			if (target->closure.AddIfUnique(type_info->struct_info.ast))
+				GenerateClosure(target, type_info->struct_info.ast);
+
+		if (type.GetKind() == TYPE_TUPLE)
 			GenerateClosure(target, type_info->tuple_info.elements);
-		}
 	}
 }
 
@@ -183,12 +178,10 @@ static void CheckForEnumMemberDuplicates(Ast::Module* module, Ast::Enum* ast) {
 }
 
 static void CheckForStructMemberDuplicates(Ast::Module* module, Ast::Struct* ast) {
-	for (Ast::Struct_Member* m0 = ast->members; m0 < ast->members.End(); m0++) {
-		for (Ast::Struct_Member* m1 = ast->members; m1 < m0; m1++) {
+	for (Ast::Struct_Member* m0 = ast->members; m0 < ast->members.End(); m0++)
+		for (Ast::Struct_Member* m1 = ast->members; m1 < m0; m1++)
 			if (m0->name == m1->name)
 				Error(module, m0->name_token->location, "Duplicate member called '%' in struct %\n", m0->name, ast->name);
-		}
-	}
 }
 
 static Intrinsic intrinsics[INTRINSIC_COUNT];
@@ -288,9 +281,9 @@ TypeID Scanner::GetType(Ast::Type* ast_type, Ast::Scope* scope) {
 		Ast::Specifier* specifier = &ast_type->specifiers[i];
 
 		switch (specifier->kind) {
-			case Ast::SPECIFIER_POINTER:     result = result.GetPointer();  break;
-			case Ast::SPECIFIER_OPTIONAL:    result = result.GetOptional(); break;
-			case Ast::SPECIFIER_ARRAY:       result = result.GetArray();    break;
+			case Ast::SPECIFIER_POINTER:  result = result.GetPointer();  break;
+			case Ast::SPECIFIER_OPTIONAL: result = result.GetOptional(); break;
+			case Ast::SPECIFIER_ARRAY:    result = result.GetArray();    break;
 
 			case Ast::SPECIFIER_FIXED_ARRAY: {
 				ScanExpression(specifier->size_expression, scope);
@@ -378,7 +371,6 @@ void Scanner::ScanExpressionFixedArray(Ast::Expression_Fixed_Array* fixed_array,
 
 		fixed_array->elements[i] = ImplicitCast(element, subtype, module);
 	}
-
 }
 
 void Scanner::ScanExpressionArray(Ast::Expression_Array* array, Ast::Scope* scope) {
@@ -888,35 +880,35 @@ void Scanner::ScanExpressionAs(Ast::Expression_As* as, Ast::Scope* scope) {
 		Error(as, "Type % is not convertable to %\n", as->expr->type, as->type);
 }
 
-void Scanner::ScanExpression(Ast::Expression* expression, Ast::Scope* scope) {
-	switch (expression->kind) {
-		case Ast::Expression::TERMINAL_NAME:    ScanExpressionTerminalName((Ast::Expression_Terminal*)expression, scope);   break;
-		case Ast::Expression::FIXED_ARRAY:      ScanExpressionFixedArray((Ast::Expression_Fixed_Array*)expression, scope);  break;
-		case Ast::Expression::ARRAY:            ScanExpressionArray((Ast::Expression_Array*)expression, scope);             break;
-		case Ast::Expression::TERMINAL_LITERAL: ScanExpressionLiteral((Ast::Expression_Literal*)expression, scope);         break;
-		case Ast::Expression::TUPLE:            ScanExpressionTuple((Ast::Expression_Tuple*)expression, scope);             break;
-		case Ast::Expression::CALL:             ScanExpressionCall((Ast::Expression_Call*)expression, scope);               break;
-		case Ast::Expression::SUBSCRIPT:        ScanExpressionSubscript((Ast::Expression_Subscript*)expression, scope);     break;
+void Scanner::ScanExpression(Ast::Expression* expr, Ast::Scope* scope) {
+	switch (expr->kind) {
+		case Ast::Expression::TERMINAL_NAME:    ScanExpressionTerminalName((Ast::Expression_Terminal*)expr, scope);   break;
+		case Ast::Expression::FIXED_ARRAY:      ScanExpressionFixedArray((Ast::Expression_Fixed_Array*)expr, scope);  break;
+		case Ast::Expression::ARRAY:            ScanExpressionArray((Ast::Expression_Array*)expr, scope);             break;
+		case Ast::Expression::TERMINAL_LITERAL: ScanExpressionLiteral((Ast::Expression_Literal*)expr, scope);         break;
+		case Ast::Expression::TUPLE:            ScanExpressionTuple((Ast::Expression_Tuple*)expr, scope);             break;
+		case Ast::Expression::CALL:             ScanExpressionCall((Ast::Expression_Call*)expr, scope);               break;
+		case Ast::Expression::SUBSCRIPT:        ScanExpressionSubscript((Ast::Expression_Subscript*)expr, scope);     break;
 
-		case Ast::Expression::UNARY_ADDRESS_OF:   ScanExpressionUnaryAddressOf((Ast::Expression_Unary*)expression, scope);   break;
-		case Ast::Expression::UNARY_REFERENCE_OF: ScanExpressionUnaryReferenceOf((Ast::Expression_Unary*)expression, scope); break;
-		case Ast::Expression::UNARY_BITWISE_NOT:  ScanExpressionUnaryBitwiseNot((Ast::Expression_Unary*)expression, scope);  break;
-		case Ast::Expression::UNARY_MINUS:        ScanExpressionUnaryMinus((Ast::Expression_Unary*)expression, scope);       break;
-		case Ast::Expression::UNARY_PLUS:         ScanExpressionUnaryPlus((Ast::Expression_Unary*)expression, scope);        break;
-		case Ast::Expression::UNARY_NOT:          ScanExpressionUnaryNot((Ast::Expression_Unary*)expression, scope);         break;
+		case Ast::Expression::UNARY_ADDRESS_OF:   ScanExpressionUnaryAddressOf((Ast::Expression_Unary*)expr, scope);   break;
+		case Ast::Expression::UNARY_REFERENCE_OF: ScanExpressionUnaryReferenceOf((Ast::Expression_Unary*)expr, scope); break;
+		case Ast::Expression::UNARY_BITWISE_NOT:  ScanExpressionUnaryBitwiseNot((Ast::Expression_Unary*)expr, scope);  break;
+		case Ast::Expression::UNARY_MINUS:        ScanExpressionUnaryMinus((Ast::Expression_Unary*)expr, scope);       break;
+		case Ast::Expression::UNARY_PLUS:         ScanExpressionUnaryPlus((Ast::Expression_Unary*)expr, scope);        break;
+		case Ast::Expression::UNARY_NOT:          ScanExpressionUnaryNot((Ast::Expression_Unary*)expr, scope);         break;
 
-		case Ast::Expression::BINARY_DOT: ScanExpressionBinaryDot((Ast::Expression_Binary*)expression, scope); break;
+		case Ast::Expression::BINARY_DOT: ScanExpressionBinaryDot((Ast::Expression_Binary*)expr, scope); break;
 
 		case Ast::Expression::BINARY_COMPARE_EQUAL:
 		case Ast::Expression::BINARY_COMPARE_NOT_EQUAL:
-			ScanExpressionBinaryCompareEquality((Ast::Expression_Binary*)expression, scope);
+			ScanExpressionBinaryCompareEquality((Ast::Expression_Binary*)expr, scope);
 			break;
 
 		case Ast::Expression::BINARY_COMPARE_LESS:
 		case Ast::Expression::BINARY_COMPARE_LESS_OR_EQUAL:
 		case Ast::Expression::BINARY_COMPARE_GREATER:
 		case Ast::Expression::BINARY_COMPARE_GREATER_OR_EQUAL:
-			ScanExpressionBinaryCompareOrdered((Ast::Expression_Binary*)expression, scope);
+			ScanExpressionBinaryCompareOrdered((Ast::Expression_Binary*)expr, scope);
 			break;
 
 		case Ast::Expression::BINARY_ADD:
@@ -924,28 +916,28 @@ void Scanner::ScanExpression(Ast::Expression* expression, Ast::Scope* scope) {
 		case Ast::Expression::BINARY_MULTIPLY:
 		case Ast::Expression::BINARY_DIVIDE:
 		case Ast::Expression::BINARY_MODULO:
-			ScanExpressionBinaryArithmetic((Ast::Expression_Binary*)expression, scope);
+			ScanExpressionBinaryArithmetic((Ast::Expression_Binary*)expr, scope);
 			break;
 
 		case Ast::Expression::BINARY_BITWISE_OR:
 		case Ast::Expression::BINARY_BITWISE_XOR:
 		case Ast::Expression::BINARY_BITWISE_AND:
-			ScanExpressionBinaryBitwise((Ast::Expression_Binary*)expression, scope);
+			ScanExpressionBinaryBitwise((Ast::Expression_Binary*)expr, scope);
 			break;
 
 		case Ast::Expression::BINARY_LEFT_SHIFT:
 		case Ast::Expression::BINARY_RIGHT_SHIFT:
-			ScanExpressionBinaryShift((Ast::Expression_Binary*)expression, scope);
+			ScanExpressionBinaryShift((Ast::Expression_Binary*)expr, scope);
 			break;
 
 		case Ast::Expression::BINARY_AND:
 		case Ast::Expression::BINARY_OR:
-			ScanExpressionBinaryLogical((Ast::Expression_Binary*)expression, scope);
+			ScanExpressionBinaryLogical((Ast::Expression_Binary*)expr, scope);
 			break;
 
-		case Ast::Expression::IF_ELSE: ScanExpressionIfElse((Ast::Expression_Ternary*)expression, scope); break;
-		case Ast::Expression::LAMBDA:  ScanExpressionLambda(expression, scope); break;
-		case Ast::Expression::AS:      ScanExpressionAs((Ast::Expression_As*)expression, scope); break;
+		case Ast::Expression::IF_ELSE: ScanExpressionIfElse((Ast::Expression_Ternary*)expr, scope); break;
+		case Ast::Expression::LAMBDA:  ScanExpressionLambda(expr, scope); break;
+		case Ast::Expression::AS:      ScanExpressionAs((Ast::Expression_As*)expr, scope); break;
 
 		default:
 			AssertUnreachable();

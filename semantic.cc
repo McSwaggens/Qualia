@@ -665,19 +665,32 @@ void Scanner::ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope
 
 	if (type.GetKind() == TYPE_ARRAY || type.GetKind() == TYPE_FIXED_ARRAY) {
 		bool fixed = type.GetKind() == TYPE_FIXED_ARRAY;
+		bool is_ref = type.IsReference();
+		TypeID array_type = binary->left->type.RemoveReference();
 
 		if (name == "begin" || name == "data") {
 			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
-			if (fixed) binary->type = binary->left->type.GetSubType().GetReference(); // Fixed array .data/.begin gives lvalue to first element
-			else       binary->type = binary->left->type.GetSubType().GetPointer();   // Dynamic array .data/.begin is a pointer (not ref)
-			binary->right->type = binary->type;
+			binary->type = array_type.GetSubType().GetPointer();
+			binary->right->type = binary->type.GetSubType();
+
+			if (is_ref && !fixed) {
+				binary->type = binary->type.GetReference();
+				binary->right->type = binary->right->type.GetReference();
+			}
+
 			return;
 		}
 
 		if (name == "end") {
 			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_END;
-			binary->type = binary->left->type.GetSubType().GetPointer();
+			binary->type = array_type.GetSubType().GetPointer();
 			binary->right->type = binary->type;
+
+			if (is_ref && !fixed) {
+				binary->type = binary->type.GetReference();
+				binary->right->type = binary->right->type.GetReference();
+			}
+
 			return;
 		}
 
@@ -685,6 +698,12 @@ void Scanner::ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope
 			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_LENGTH;
 			binary->type = TYPE_UINT64; // Length is rvalue, not ref
 			binary->right->type = TYPE_UINT64;
+
+			if (is_ref && !fixed) {
+				binary->type = binary->type.GetReference();
+				binary->right->type = binary->right->type.GetReference();
+			}
+
 			return;
 		}
 

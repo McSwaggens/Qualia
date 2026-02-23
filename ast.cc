@@ -68,7 +68,7 @@ static const char* GetExpressionKindName(Ast::Expression::Kind kind) {
 }
 
 static void PrintIndent(u32 indent) {
-	for (u32 i = 0; i < indent; i++) Print("\t");
+	for (u32 i = 0; i < indent; i++) Print("    ");
 }
 
 static void PrintExpression(Ast::Expression* expr, u32 indent);

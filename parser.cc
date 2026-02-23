@@ -426,6 +426,7 @@ Ast::Enum Parser::ParseEnum(u32 indent) {
 			}
 
 			members.Add(member);
+			continue;
 		}
 
 		if (*token == TOKEN_IDENTIFIER_CASUAL)

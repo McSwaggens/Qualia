@@ -670,18 +670,21 @@ void Scanner::ScanExpressionBinaryDot(Ast::Expression_Binary* binary, Ast::Scope
 			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_BEGIN;
 			if (fixed) binary->type = binary->left->type.GetSubType().GetReference(); // Fixed array .data/.begin gives lvalue to first element
 			else       binary->type = binary->left->type.GetSubType().GetPointer();   // Dynamic array .data/.begin is a pointer (not ref)
+			binary->right->type = binary->type;
 			return;
 		}
 
 		if (name == "end") {
 			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_END;
 			binary->type = binary->left->type.GetSubType().GetPointer();
+			binary->right->type = binary->type;
 			return;
 		}
 
 		if (name == "length" || name == "count") {
 			binary->right->kind = Ast::Expression::TERMINAL_ARRAY_LENGTH;
 			binary->type = TYPE_UINT64; // Length is rvalue, not ref
+			binary->right->type = TYPE_UINT64;
 			return;
 		}
 

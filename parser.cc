@@ -487,35 +487,34 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		Ast::Expression_Literal* literal = stack.New<Ast::Expression_Literal>(token);
 
 		switch (token->kind) {
-			case TOKEN_LITERAL_INT:    literal->type = TYPE_INT64;  literal->value = IR::Constant(literal->token->literal_int); break;
-			case TOKEN_LITERAL_INT8:   literal->type = TYPE_INT8;   literal->value = IR::Constant(literal->token->literal_int); break;
-			case TOKEN_LITERAL_INT16:  literal->type = TYPE_INT16;  literal->value = IR::Constant(literal->token->literal_int); break;
-			case TOKEN_LITERAL_INT32:  literal->type = TYPE_INT32;  literal->value = IR::Constant(literal->token->literal_int); break;
-			case TOKEN_LITERAL_INT64:  literal->type = TYPE_INT64;  literal->value = IR::Constant(literal->token->literal_int); break;
-			case TOKEN_LITERAL_UINT:   literal->type = TYPE_UINT64; literal->value = IR::Constant(literal->token->literal_int); break;
-			case TOKEN_LITERAL_UINT8:  literal->type = TYPE_UINT8;  literal->value = IR::Constant(literal->token->literal_int); break;
-			case TOKEN_LITERAL_UINT16: literal->type = TYPE_UINT16; literal->value = IR::Constant(literal->token->literal_int); break;
-			case TOKEN_LITERAL_UINT32: literal->type = TYPE_UINT32; literal->value = IR::Constant(literal->token->literal_int); break;
-			case TOKEN_LITERAL_UINT64: literal->type = TYPE_UINT64; literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_INT:    literal->type = IR::Constant(TYPE_INT64);  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_INT8:   literal->type = IR::Constant(TYPE_INT8);   literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_INT16:  literal->type = IR::Constant(TYPE_INT16);  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_INT32:  literal->type = IR::Constant(TYPE_INT32);  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_INT64:  literal->type = IR::Constant(TYPE_INT64);  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT:   literal->type = IR::Constant(TYPE_UINT64); literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT8:  literal->type = IR::Constant(TYPE_UINT8);  literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT16: literal->type = IR::Constant(TYPE_UINT16); literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT32: literal->type = IR::Constant(TYPE_UINT32); literal->value = IR::Constant(literal->token->literal_int); break;
+			case TOKEN_LITERAL_UINT64: literal->type = IR::Constant(TYPE_UINT64); literal->value = IR::Constant(literal->token->literal_int); break;
 
 			case TOKEN_LITERAL_FLOAT:
 			case TOKEN_LITERAL_FLOAT32: {
-				literal->type = TYPE_FLOAT32;
+				literal->type = IR::Constant(TYPE_FLOAT32);
 				literal->value = IR::Constant((float32)literal->token->literal_float);
 			} break;
 
 			case TOKEN_LITERAL_FLOAT64: {
-				literal->type = TYPE_FLOAT64;
+				literal->type = IR::Constant(TYPE_FLOAT64);
 				literal->value = IR::Constant(literal->token->literal_float);
 			} break;
 
-			case TOKEN_TRUE:  literal->type = TYPE_BOOL; literal->value = IR::Constant(1); break;
-			case TOKEN_FALSE: literal->type = TYPE_BOOL; literal->value = IR::Constant(0); break;
-			case TOKEN_NULL:  literal->type = TYPE_BYTE.GetPointer(); literal->value = IR::Constant(0); break;
+			case TOKEN_TRUE:  literal->type = IR::Constant(TYPE_BOOL); literal->value = IR::Constant(1); break;
+			case TOKEN_FALSE: literal->type = IR::Constant(TYPE_BOOL); literal->value = IR::Constant(0); break;
+			case TOKEN_NULL:  literal->type = IR::Constant(TYPE_BYTE.GetPointer()); literal->value = IR::Constant(0); break;
 
 			case TOKEN_LITERAL_STRING: {
-				literal->type = TYPE_UINT8.GetFixedArray(literal->token->literal_string.length);
-				literal->type = literal->type.GetReference();  // String literals are lvalues
+				literal->type = IR::Constant(TYPE_UINT8.GetFixedArray(literal->token->literal_string.length).GetReference());
 				literal->value = IR::Constant(literal->token->literal_string.ToArray());
 			} break;
 

@@ -68,4 +68,3 @@ struct Parser {
 static void GenericWrite(OutputBuffer* buffer, Ast::Expression* expression);
 static void GenericWrite(OutputBuffer* buffer, Ast::Type* type);
 static void GenericWrite(OutputBuffer* buffer, Ast::Type type);
-static void GenericWrite(OutputBuffer* buffer, TypeID type);

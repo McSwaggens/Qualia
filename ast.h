@@ -125,18 +125,18 @@ struct Expression {
 
 	Kind kind;
 	IR::Value value;
-	TypeID type;
+	IR::Value type;
 	Token* begin;
 	Token* end;
 
-	Expression(Kind kind, IR::Value value, TypeID type, Token* begin, Token* end) :
+	Expression(Kind kind, IR::Value value, IR::Value type, Token* begin, Token* end) :
 		kind(kind), value(value), type(type), begin(begin), end(end) { }
 };
 
 struct Expression_Implicit_Cast : Expression {
 	Expression* subexpr;
 
-	Expression_Implicit_Cast(Expression* subexpr, TypeID target_type) : Expression(IMPLICIT_CAST, IR::NewValue(), target_type, subexpr->begin, subexpr->end),
+	Expression_Implicit_Cast(Expression* subexpr, IR::Value target_type) : Expression(IMPLICIT_CAST, IR::NewValue(), target_type, subexpr->begin, subexpr->end),
 		subexpr(subexpr) { }
 };
 
@@ -144,7 +144,7 @@ struct Expression_Unary : Expression {
 	Expression* subexpr;
 	Token* op;
 
-	Expression_Unary(Kind k, Token* op_token) : Expression(k, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Unary(Kind k, Token* op_token) : Expression(k, IR::NewValue(), IR::Value{}, null, null),
 		subexpr(null), op(op_token) { }
 };
 
@@ -153,7 +153,7 @@ struct Expression_Binary : Expression {
 	Expression* right;
 	Token* op;
 
-	Expression_Binary(Kind k, Token* op_token) : Expression(k, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Binary(Kind k, Token* op_token) : Expression(k, IR::NewValue(), IR::Value{}, null, null),
 		left(null), right(null), op(op_token) { }
 };
 
@@ -163,7 +163,7 @@ struct Expression_Ternary : Expression {
 	Expression* right;
 	Token* ops[2];
 
-	Expression_Ternary(Kind k, Token* op1, Token* op2) : Expression(k, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Ternary(Kind k, Token* op1, Token* op2) : Expression(k, IR::NewValue(), IR::Value{}, null, null),
 		left(null), middle(null), right(null), ops{op1, op2} { }
 };
 
@@ -171,7 +171,7 @@ struct Expression_Call : Expression {
 	Expression* function;
 	Expression_Tuple* params;
 
-	Expression_Call() : Expression(CALL, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Call() : Expression(CALL, IR::NewValue(), IR::Value{}, null, null),
 		function(null), params(null) { }
 };
 
@@ -179,7 +179,7 @@ struct Expression_Dot_Call : Expression {
 	Expression_Binary* dot;
 	Expression_Tuple* params;
 
-	Expression_Dot_Call() : Expression(DOT_CALL, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Dot_Call() : Expression(DOT_CALL, IR::NewValue(), IR::Value{}, null, null),
 		dot(null), params(null) { }
 };
 
@@ -187,7 +187,7 @@ struct Expression_Array : Expression {
 	Expression* left;
 	Expression* right;
 
-	Expression_Array() : Expression(ARRAY, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Array() : Expression(ARRAY, IR::NewValue(), IR::Value{}, null, null),
 		left(null), right(null) { }
 };
 
@@ -195,14 +195,14 @@ struct Expression_Tuple : Expression {
 	Array<Expression*> elements;
 	u32 recursive_count;
 
-	Expression_Tuple() : Expression(TUPLE, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Tuple() : Expression(TUPLE, IR::NewValue(), IR::Value{}, null, null),
 		recursive_count(0) { }
 };
 
 struct Expression_Fixed_Array : Expression {
 	Array<Expression*> elements;
 
-	Expression_Fixed_Array() : Expression(FIXED_ARRAY, IR::NewValue(), TYPE_NULL, null, null) { }
+	Expression_Fixed_Array() : Expression(FIXED_ARRAY, IR::NewValue(), IR::Value{}, null, null) { }
 };
 
 struct Expression_As : Expression {
@@ -210,14 +210,14 @@ struct Expression_As : Expression {
 	Type ast_type;
 	Token* op;
 
-	Expression_As(Token* op_token) : Expression(AS, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_As(Token* op_token) : Expression(AS, IR::NewValue(), IR::Value{}, null, null),
 		expr(null), ast_type{ }, op(op_token) { }
 };
 
 struct Expression_Literal : Expression {
 	Token* token;
 
-	Expression_Literal(Token* tok) : Expression(TERMINAL_LITERAL, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Literal(Token* tok) : Expression(TERMINAL_LITERAL, IR::NewValue(), IR::Value{}, null, null),
 		token(tok) { }
 };
 
@@ -225,7 +225,7 @@ struct Expression_Subscript : Expression {
 	Expression* array;
 	Expression* index;
 
-	Expression_Subscript() : Expression(SUBSCRIPT, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Subscript() : Expression(SUBSCRIPT, IR::NewValue(), IR::Value{}, null, null),
 		array(null), index(null) { }
 };
 
@@ -233,7 +233,7 @@ struct Expression_Terminal : Expression {
 	Token* token;
 	void* ptr;
 
-	Expression_Terminal(Token* tok) : Expression(TERMINAL_NAME, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Terminal(Token* tok) : Expression(TERMINAL_NAME, IR::NewValue(), IR::Value{}, null, null),
 		token(tok), ptr(null) { }
 };
 
@@ -241,7 +241,7 @@ struct Expression_Variable : Expression {
 	Token* token;
 	Variable* variable;
 
-	Expression_Variable(Token* tok, Variable* var) : Expression(TERMINAL_VARIABLE, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Variable(Token* tok, Variable* var) : Expression(TERMINAL_VARIABLE, IR::NewValue(), IR::Value{}, null, null),
 		token(tok), variable(var) { }
 };
 
@@ -249,7 +249,7 @@ struct Expression_Function : Expression {
 	Token* token;
 	Function* function;
 
-	Expression_Function(Token* tok, Function* func) : Expression(TERMINAL_FUNCTION, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Function(Token* tok, Function* func) : Expression(TERMINAL_FUNCTION, IR::NewValue(), IR::Value{}, null, null),
 		token(tok), function(func) { }
 };
 
@@ -257,7 +257,7 @@ struct Expression_Intrinsic : Expression {
 	Token* token;
 	IntrinsicID intrinsic;
 
-	Expression_Intrinsic(Token* tok, IntrinsicID intr) : Expression(TERMINAL_INTRINSIC, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Intrinsic(Token* tok, IntrinsicID intr) : Expression(TERMINAL_INTRINSIC, IR::NewValue(), IR::Value{}, null, null),
 		token(tok), intrinsic(intr) { }
 };
 
@@ -265,7 +265,7 @@ struct Expression_Struct : Expression {
 	Token* token;
 	Struct* structure;
 
-	Expression_Struct(Token* tok, Struct* struc) : Expression(TERMINAL_STRUCT, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Struct(Token* tok, Struct* struc) : Expression(TERMINAL_STRUCT, IR::NewValue(), IR::Value{}, null, null),
 		token(tok), structure(struc) { }
 };
 
@@ -273,7 +273,7 @@ struct Expression_Enum : Expression {
 	Token* token;
 	Enum* enumeration;
 
-	Expression_Enum(Token* tok, Enum* enu) : Expression(TERMINAL_ENUM, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Enum(Token* tok, Enum* enu) : Expression(TERMINAL_ENUM, IR::NewValue(), IR::Value{}, null, null),
 		token(tok), enumeration(enu) { }
 };
 
@@ -281,7 +281,7 @@ struct Expression_Struct_Member : Expression {
 	Token* token;
 	Struct_Member* member;
 
-	Expression_Struct_Member(Token* tok, Struct_Member* mem) : Expression(TERMINAL_STRUCT_MEMBER, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Struct_Member(Token* tok, Struct_Member* mem) : Expression(TERMINAL_STRUCT_MEMBER, IR::NewValue(), IR::Value{}, null, null),
 		token(tok), member(mem) { }
 };
 
@@ -289,7 +289,7 @@ struct Expression_Enum_Member : Expression {
 	Token* token;
 	Enum_Member* member;
 
-	Expression_Enum_Member(Token* tok, Enum_Member* mem) : Expression(TERMINAL_ENUM_MEMBER, IR::NewValue(), TYPE_NULL, null, null),
+	Expression_Enum_Member(Token* tok, Enum_Member* mem) : Expression(TERMINAL_ENUM_MEMBER, IR::NewValue(), IR::Value{}, null, null),
 		token(tok), member(mem) { }
 };
 
@@ -299,8 +299,6 @@ struct Scope {
 	Array<Struct> structs;
 	Array<Enum> enums;
 	List<Variable*> variables;
-
-	Function* FindFunction(String name, TypeID input_type);
 };
 
 struct Code {
@@ -439,7 +437,7 @@ struct Variable {
 	String name;
 	Token* name_token;
 	Variable_Flags flags;
-	TypeID type;
+	IR::Value type;
 	Type* ast_type;
 	Expression* assignment;
 	IR::Value address;
@@ -472,8 +470,8 @@ struct Function {
 	Token* name_token;
 	Array<Variable> params; // @Todo: Give parameters their own struct? Parameter?
 	Code code;
-	TypeID type;
-	TypeID return_type;
+	IR::Value type;
+	IR::Value return_type;
 	List<Return*> returns; // @Todo: Infer return type.
 	Type* ast_return_type;
 	bool is_global;
@@ -489,7 +487,7 @@ struct Import {
 struct Struct_Member {
 	String name;
 	Token* name_token;
-	TypeID type;
+	IR::Value type;
 	Type ast_type = { };
 	u64 offset;
 	u32 index;
@@ -504,7 +502,7 @@ struct Enum_Member {
 };
 
 struct Struct {
-	TypeID type;
+	IR::Value type;
 	String name;
 	Token* name_token;
 	Array<Struct_Member> members;
@@ -512,10 +510,10 @@ struct Struct {
 };
 
 struct Enum {
-	TypeID type;
+	IR::Value type;
 	String name;
 	Token* name_token;
-	TypeID underlying_type;
+	IR::Value underlying_type;
 	Array<Enum_Member> members;
 };
 

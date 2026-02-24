@@ -1,19 +1,6 @@
 #include "ast.h"
 #include "print.h"
 
-Ast::Function* Ast::Scope::FindFunction(String name, TypeID input_type) {
-	for (Ast::Scope* scope = this; scope; scope = scope->parent) {
-		for (Ast::Function* function = scope->functions; function < scope->functions.End(); function++) {
-			TypeInfo* info = function->type.GetInfo();
-
-			if (name == function->name && input_type.CanCast(CAST_IMPLICIT, info->function_info.input))
-				return function;
-		}
-	}
-
-	return null;
-}
-
 static const char* GetExpressionKindName(Ast::Expression::Kind kind) {
 	switch (kind) {
 		case Ast::Expression::TERMINAL_NAME:                   return "TERMINAL_NAME";

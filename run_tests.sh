@@ -7,6 +7,7 @@ errors=""
 # Run C++ tests
 for f in tests/*; do
     # Skip .q files, .cc files, and non-executables
+    [[ -d "$f" ]] && continue
     [[ "$f" == *.q ]] && continue
     [[ "$f" == *.cc ]] && continue
     [[ ! -x "$f" ]] && continue

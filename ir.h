@@ -46,6 +46,7 @@
 #include "assert.h"
 #include "alloc.h"
 #include "fixed_buffer.h"
+#include "large_fixed_buffer.h"
 #include "set.h"
 
 #include "binary.h"
@@ -75,7 +76,7 @@ namespace IR {
 		bool IsConstant() { return flags & VALUE_CONSTANT; }
 	};
 
-	static FixedBuffer<ValueData, 1l << 32> value_buffer;
+	static LargeFixedBuffer<ValueData, 1l << 32> value_buffer;
 
 	// A value is the set of relations it has to other values.
 	struct Value {

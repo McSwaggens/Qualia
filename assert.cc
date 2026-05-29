@@ -3,6 +3,7 @@
 #include "os.h"
 #include "print.h"
 #include "string.h"
+#include "stacktrace.h"
 
 static void Assert(bool b, const char* desc, InternalLocation loc) {
 	if (!IsDebug() || b) HOT

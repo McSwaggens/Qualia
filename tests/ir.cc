@@ -19,6 +19,7 @@ static List<Ast::Module*> modules = null;
 #include "../lexer.cc"
 #include "../array_buffer.cc"
 #include "../print.cc"
+#include "../token.cc"
 #include "../semantic.cc"
 #include "../parser.cc"
 #include "../ir.cc"

@@ -89,7 +89,7 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args) {
 		buffer->Flush();
 }
 
-#define DebugVar(x) do { Print(#x " = %\n", x); output_buffer.Flush(); } while (0);
+#define Log(x) Print(#x " = %\n", x);
 
 template<typename... Args>
 static void Print(String format, Args&&... args) {

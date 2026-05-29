@@ -16,17 +16,19 @@ ifeq ($(OS_NAME), Linux)
 	IS_LINUX=1
 	OS_FILE=linux
 	RELEASE+=-march=x86-64-v3
+	LDFLAGS=-no-pie
+	OS_FLAGS=-mcmodel=medium
 endif
 
 FLAGS := $(DEBUG)
 FLAGS += -std=c++23
-FLAGS += -mcmodel=medium -nostdinc++ -fno-rtti -fno-exceptions -Wno-vla-cxx-extension
+FLAGS += $(OS_FLAGS) -nostdinc++ -fno-rtti -fno-exceptions -Wno-vla-cxx-extension
 FLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wshift-op-parentheses
 
 all: qualia
 
 qualia: *.cc *.h $(OS_FILE).o
-	clang -lm -no-pie $(FLAGS) qualia.cc $(OS_FILE).o -o qualia
+	clang -lm $(LDFLAGS) $(FLAGS) qualia.cc $(OS_FILE).o -o qualia
 
 $(OS_FILE).o: $(OS_FILE).cc
 	clang $(FLAGS) -c $^ -o $@
@@ -41,7 +43,7 @@ time: qualia
 	fish -c "time ./qualia"
 
 tests/ir: tests/ir.cc *.h $(OS_FILE).o
-	clang -lm -no-pie $(FLAGS) tests/ir.cc $(OS_FILE).o -o tests/ir
+	clang -lm $(LDFLAGS) $(FLAGS) tests/ir.cc $(OS_FILE).o -o tests/ir
 
 test: qualia tests/ir
 	./run_tests.sh

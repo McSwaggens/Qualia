@@ -118,6 +118,11 @@ static u64 RaisePow2(u64 n) {
 	return NextPow2(n);
 }
 
+// Round n up to the nearest multiple of m, where m must be a power of 2
+static constexpr u64 RaiseMultiplePow2(u64 n, u64 m) {
+	return (n + m - 1) & ~(m - 1);
+}
+
 CFUNC s64 SystemCall(s64 rax, s64 rdi = 0, s64 rsi = 0, s64 rdx = 0, s64 r10 = 0, s64 r8 = 0, s64 r9 = 0); // @todo remove me use OS:: stuff
 
 static u64 ReadPerformanceCounter() { return __builtin_readcyclecounter(); } // rdtsc

@@ -895,9 +895,9 @@ namespace IR {
 	static void PrintState();
 };
 
-static void Write(struct OutputBuffer* buffer, IR::Value value);
-static void Write(struct OutputBuffer* buffer, IR::Value from, IR::Relation relation);
-static void Write(struct OutputBuffer* buffer, IR::Value from, Array<IR::Relation> relations);
-static void Write(struct OutputBuffer* buffer, IR::Relation::Kind kind);
-static void Write(struct OutputBuffer* buffer, IR::Context context);
-static void Write(struct OutputBuffer* buffer, IR::ValueFlag);
+static void Print(struct OutputBuffer* buffer, IR::Value value);
+static void Print(struct OutputBuffer* buffer, IR::Value from, IR::Relation relation);
+static void Print(struct OutputBuffer* buffer, IR::Value from, Array<IR::Relation> relations);
+static void Print(struct OutputBuffer* buffer, IR::Relation::Kind kind);
+static void Print(struct OutputBuffer* buffer, IR::Context context);
+static void Print(struct OutputBuffer* buffer, IR::ValueFlag);

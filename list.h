@@ -5,6 +5,8 @@
 #include "math.h"
 #include "array.h"
 
+struct OutputBuffer;
+
 template<typename T>
 struct List {
 	T*  data     = null;
@@ -166,6 +168,8 @@ struct List {
 	void Free() {
 		::Free(data, capacity);
 	}
+
+	void Print(OutputBuffer* buffer) const;
 };
 
 template<typename T>

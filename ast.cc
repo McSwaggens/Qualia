@@ -455,3 +455,237 @@ void Ast::PrintAST(Ast::Module* module) {
 		Print("\n");
 	}
 }
+
+void TypeID::Print(OutputBuffer* buffer) const {
+	if (!*this) {
+		buffer->Write("TYPE_NULL");
+		return;
+	}
+
+	TypeInfo* info = GetInfo();
+
+	switch (GetKind()) {
+		case TYPE_PRIMITIVE: {
+			switch (id) {
+				case TYPE_BYTE:    buffer->Write("byte");    break;
+				case TYPE_BOOL:    buffer->Write("bool");    break;
+				case TYPE_UINT8:   buffer->Write("uint8");   break;
+				case TYPE_UINT16:  buffer->Write("uint16");  break;
+				case TYPE_UINT32:  buffer->Write("uint32");  break;
+				case TYPE_UINT64:  buffer->Write("uint64");  break;
+				case TYPE_INT8:    buffer->Write("int8");    break;
+				case TYPE_INT16:   buffer->Write("int16");   break;
+				case TYPE_INT32:   buffer->Write("int32");   break;
+				case TYPE_INT64:   buffer->Write("int64");   break;
+				case TYPE_FLOAT32: buffer->Write("float32"); break;
+				case TYPE_FLOAT64: buffer->Write("float64"); break;
+				default: break;
+			}
+		} return;
+
+		case TYPE_TUPLE: {
+			buffer->Write('(');
+			for (s32 i = 0; i < info->tuple_info.elements.length; i++) {
+				if (i) buffer->Write(", ");
+				::Print(buffer, info->tuple_info.elements[i]);
+			}
+			buffer->Write(')');
+		} return;
+
+		case TYPE_FUNCTION: {
+			TypeInfo::Function function_info = info->function_info;
+			bool is_input_type_tuple = function_info.input.GetKind() == TYPE_TUPLE;
+
+			if (!is_input_type_tuple) buffer->Write('(');
+			::Print(buffer, function_info.input);
+			if (!is_input_type_tuple) buffer->Write(')');
+
+			buffer->Write(" -> ");
+			::Print(buffer, function_info.output);
+		} return;
+
+		case TYPE_STRUCT: buffer->Write(info->struct_info.ast->name); return;
+		case TYPE_ENUM:   buffer->Write(info->enum_info.ast->name);   return;
+
+		case TYPE_POINTER:     ::Print(buffer, "*%",     info->pointer_info.subtype);                       return;
+		case TYPE_OPTIONAL:    ::Print(buffer, "?%",     info->optional_info.subtype);                      return;
+		case TYPE_ARRAY:       ::Print(buffer, "[]%",    info->array_info.subtype);                         return;
+		case TYPE_FIXED_ARRAY: ::Print(buffer, "[%]%",   info->fixed_info.length, info->fixed_info.subtype); return;
+		case TYPE_REFERENCE:   ::Print(buffer, "(ref)%", info->reference_info.subtype);                     return;
+	}
+}
+
+void Ast::Type::Print(OutputBuffer* buffer) const {
+	for (const Ast::Specifier* specifier = specifiers.Begin(); specifier < specifiers.End(); specifier++) {
+		switch (specifier->kind) {
+			case Ast::SPECIFIER_POINTER:  buffer->Write("*");  break;
+			case Ast::SPECIFIER_OPTIONAL: buffer->Write("?");  break;
+			case Ast::SPECIFIER_ARRAY:    buffer->Write("[]"); // @Note: pre-existing fall-through to FIXED_ARRAY
+			case Ast::SPECIFIER_FIXED_ARRAY: {
+				::Print(buffer, "[%]", specifier->size_expression);
+			} break;
+		}
+	}
+
+	switch (basetype.kind) {
+		case Ast::BASETYPE_PRIMITIVE:
+		case Ast::BASETYPE_USERTYPE: {
+			::Print(buffer, basetype.token);
+		} break;
+
+		case Ast::BASETYPE_TUPLE: {
+			buffer->Write("(");
+			for (const Ast::Type* t = basetype.tuple.Begin(); t < basetype.tuple.End(); t++) {
+				if (t != basetype.tuple.Begin()) buffer->Write(", ");
+				::Print(buffer, t);
+			}
+			buffer->Write(")");
+		} break;
+
+		case Ast::BASETYPE_FUNCTION: {
+			::Print(buffer, "(%) -> (%)", basetype.function.input, basetype.function.output);
+		} break;
+	}
+}
+
+void Ast::Expression::Print(OutputBuffer* buffer) const {
+	switch (kind) {
+		case TERMINAL_VARIABLE: {
+			auto* variable = (const Ast::Expression_Variable*)this;
+			::Print(buffer, "(Variable: %)", variable->token);
+		} break;
+
+		case TERMINAL_FUNCTION: {
+			auto* function = (const Ast::Expression_Function*)this;
+			::Print(buffer, "(Function: %)", function->token);
+		} break;
+
+		case TERMINAL_INTRINSIC: {
+			auto* intrinsic = (const Ast::Expression_Intrinsic*)this;
+			::Print(buffer, "(Intrinsic: %)", intrinsic->token);
+		} break;
+
+		case TERMINAL_STRUCT: {
+			auto* structure = (const Ast::Expression_Struct*)this;
+			::Print(buffer, "(Struct: %)", structure->token);
+		} break;
+
+		case TERMINAL_ENUM: {
+			auto* enumeration = (const Ast::Expression_Enum*)this;
+			::Print(buffer, "(Enum: %)", enumeration->token);
+		} break;
+
+		case TERMINAL_STRUCT_MEMBER: {
+			auto* member = (const Ast::Expression_Struct_Member*)this;
+			::Print(buffer, "(Struct_Member: %)", member->token);
+		} break;
+
+		case TERMINAL_ENUM_MEMBER: {
+			auto* member = (const Ast::Expression_Enum_Member*)this;
+			::Print(buffer, "(Enum_Member: %)", member->token);
+		} break;
+
+		case ARRAY: {
+			auto* array = (const Ast::Expression_Array*)this;
+			::Print(buffer, "[ % .. % ]", array->left, array->right);
+		} // @Note: pre-existing fall-through to FIXED_ARRAY
+		case FIXED_ARRAY: {
+			auto* fixed_array = (const Ast::Expression_Fixed_Array*)this;
+			buffer->Write("{ ");
+			for (u32 i = 0; i < fixed_array->elements.length; i++) {
+				if (!i) buffer->Write(", ");
+				::Print(buffer, fixed_array->elements[i]);
+			}
+			buffer->Write(" }");
+		} break;
+
+		case TERMINAL_NAME:
+		case TERMINAL_LITERAL:
+		case TERMINAL_PRIMITIVE:
+		case TERMINAL_ARRAY_BEGIN:
+		case TERMINAL_ARRAY_END:
+		case TERMINAL_ARRAY_LENGTH: {
+			auto* literal = (const Ast::Expression_Literal*)this;
+			::Print(buffer, literal->token);
+		} break;
+
+		case BINARY_COMPARE_EQUAL:
+		case BINARY_COMPARE_NOT_EQUAL:
+		case BINARY_COMPARE_LESS:
+		case BINARY_COMPARE_LESS_OR_EQUAL:
+		case BINARY_COMPARE_GREATER:
+		case BINARY_COMPARE_GREATER_OR_EQUAL:
+		case BINARY_DOT:
+		case BINARY_ADD:
+		case BINARY_SUBTRACT:
+		case BINARY_MULTIPLY:
+		case BINARY_DIVIDE:
+		case BINARY_MODULO:
+		case BINARY_BITWISE_OR:
+		case BINARY_BITWISE_XOR:
+		case BINARY_BITWISE_AND:
+		case BINARY_LEFT_SHIFT:
+		case BINARY_RIGHT_SHIFT:
+		case BINARY_AND:
+		case BINARY_OR: {
+			auto* binary = (const Ast::Expression_Binary*)this;
+			::Print(buffer, "(% % %)", binary->left, binary->op, binary->right);
+		} break;
+
+		case UNARY_REFERENCE_OF:
+		case UNARY_ADDRESS_OF:
+		case UNARY_MINUS:
+		case UNARY_PLUS:
+		case UNARY_BITWISE_NOT:
+		case UNARY_NOT: {
+			auto* unary = (const Ast::Expression_Unary*)this;
+			::Print(buffer, "(% %)", unary->op, unary->subexpr);
+		} break;
+
+		case SUBSCRIPT: {
+			auto* subscript = (const Ast::Expression_Subscript*)this;
+			::Print(buffer, "%[%]", subscript->array, subscript->index);
+		} break;
+
+		case DOT_CALL:
+		case CALL: {
+			auto* call = (const Ast::Expression_Call*)this;
+			::Print(buffer, call->function);
+			if (call->params->kind != TUPLE) {
+				::Print(buffer, "(%)", call->params);
+			}
+			else {
+				::Print(buffer, call->params);
+			}
+		} break;
+
+		case TUPLE: {
+			auto* tuple = (const Ast::Expression_Tuple*)this;
+			buffer->Write("(");
+			for (u32 i = 0; i < tuple->elements.length; i++) {
+				if (i) buffer->Write(", ");
+				::Print(buffer, tuple->elements[i]);
+			}
+			buffer->Write(")");
+		} break;
+
+		case IF_ELSE: {
+			auto* ternary = (const Ast::Expression_Ternary*)this;
+			::Print(buffer, "(% if % else %)", ternary->left, ternary->middle, ternary->right);
+		} break;
+
+		case AS: {
+			auto* as = (const Ast::Expression_As*)this;
+			::Print(buffer, "(% as %)", as->expr, as->type);
+		} break;
+
+		case IMPLICIT_CAST: {
+			auto* cast = (const Ast::Expression_Implicit_Cast*)this;
+			::Print(buffer, "(Implicit_Cast: %, %)", cast->type, cast->subexpr);
+		} break;
+
+		case LAMBDA: {
+			buffer->Write("(LAMBDA)");
+		} break;
+	}
+}

@@ -13,17 +13,17 @@ static void IR::Init() {
 	}
 }
 
-static void Write(OutputBuffer* buffer, IR::Value value) {
+static void Print(OutputBuffer* buffer, IR::Value value) {
 	if (!value) {
 		buffer->Write("vNull");
 		return;
 	}
 
 	buffer->Write("v");
-	Write(buffer, value.handle);
+	Print(buffer, value.handle);
 }
 
-static void Write(OutputBuffer* buffer, IR::Relation::Kind kind) {
+static void Print(OutputBuffer* buffer, IR::Relation::Kind kind) {
 	switch (kind) {
 		case IR::Relation::NotEqual:         buffer->Write("NotEqual"); break;
 		case IR::Relation::Less:             buffer->Write("Less"); break;
@@ -35,60 +35,60 @@ static void Write(OutputBuffer* buffer, IR::Relation::Kind kind) {
 	}
 }
 
-static void Write(OutputBuffer* buffer, IR::ValueFlag flag) {
+static void Print(OutputBuffer* buffer, IR::ValueFlag flag) {
 	if (flag & IR::VALUE_CONSTANT)      buffer->Write("CONSTANT");
 	if (flag & IR::VALUE_LONG_CONSTANT) buffer->Write("LONG_CONSTANT");
 }
 
-static void WriteContextKey(OutputBuffer* buffer, IR::Context::Key key) {
-	Write(buffer, key.kind);
+static void PrintContextKey(OutputBuffer* buffer, IR::Context::Key key) {
+	Print(buffer, key.kind);
 	buffer->Write("(");
-	Write(buffer, key.from);
+	Print(buffer, key.from);
 	buffer->Write(", ");
-	Write(buffer, key.to);
+	Print(buffer, key.to);
 	if (key.value) {
 		buffer->Write(", ");
-		Write(buffer, key.value);
+		Print(buffer, key.value);
 	}
 	buffer->Write(")");
 }
 
-static void Write(OutputBuffer* buffer, IR::Value from, IR::Relation relation) {
-	Write(buffer, relation.kind);
+static void Print(OutputBuffer* buffer, IR::Value from, IR::Relation relation) {
+	Print(buffer, relation.kind);
 	buffer->Write("(");
-	Write(buffer, relation.to);
+	Print(buffer, relation.to);
 	if (relation.value.IsValid()) {
 		buffer->Write(", ");
-		Write(buffer, relation.value);
+		Print(buffer, relation.value);
 	}
 	buffer->Write(")[");
 	for (u32 i = 0; i < relation.context->keys.Count(); i++) {
 		if (i > 0) buffer->Write(", ");
-		WriteContextKey(buffer, relation.context->keys.elements[i]);
+		PrintContextKey(buffer, relation.context->keys.elements[i]);
 	}
 	buffer->Write("]");
 }
 
-static void Write(OutputBuffer* buffer, IR::Value from, Array<IR::Relation> relations) {
+static void Print(OutputBuffer* buffer, IR::Value from, Array<IR::Relation> relations) {
 	buffer->Write("[");
 	for (u32 i = 0; i < relations.length; i++) {
 		if (i > 0) buffer->Write(", ");
-		Write(buffer, from, relations[i]);
+		Print(buffer, from, relations[i]);
 	}
 	buffer->Write("]");
 }
 
-static void Write(OutputBuffer* buffer, IR::Context context) {
+static void Print(OutputBuffer* buffer, IR::Context context) {
 	buffer->Write("Context@");
-	Write(buffer, (void*)&context);
+	Print(buffer, (void*)&context);
 	if (context.parent) {
 		buffer->Write(" parent=");
-		Write(buffer, (void*)context.parent);
+		Print(buffer, (void*)context.parent);
 	}
 	buffer->Write(" keys=[");
 	for (u32 i = 0; i < context.keys.Count(); i++) {
 		if (i > 0) buffer->Write(", ");
-		WriteContextKey(buffer, context.keys.elements[i]);
+		PrintContextKey(buffer, context.keys.elements[i]);
 	}
 	buffer->Write("]");
 }
@@ -98,8 +98,8 @@ struct ValueRelations {
 	Array<IR::Relation> relations;
 };
 
-static void Write(OutputBuffer* buffer, ValueRelations vr) {
-	Write(buffer, vr.value, vr.relations);
+static void Print(OutputBuffer* buffer, ValueRelations vr) {
+	Print(buffer, vr.value, vr.relations);
 }
 
 static void IR::PrintState() {

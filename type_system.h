@@ -8,6 +8,8 @@
 #include "fixed_buffer.h"
 #include "list.h"
 
+struct OutputBuffer;
+
 namespace Ast { struct Struct; struct Enum; }
 
 enum TypeKind : u32 {
@@ -110,6 +112,8 @@ struct TypeID {
 	bool operator  >(TypeID o) const { return id  > o.id; }
 	bool operator <=(TypeID o) const { return id <= o.id; }
 	bool operator >=(TypeID o) const { return id >= o.id; }
+
+	void Print(OutputBuffer* buffer) const;
 };
 static_assert(sizeof(TypeID) == 4);
 

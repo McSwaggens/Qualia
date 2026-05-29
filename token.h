@@ -3,6 +3,8 @@
 #include "ascii.h"
 #include "string.h"
 
+struct OutputBuffer;
+
 enum TokenKind : u8 {
 	TOKEN_EOF = 0,
 	TOKEN_IDENTIFIER_FORMAL,
@@ -243,9 +245,9 @@ struct Token {
 	};
 
 	SourceLocation location;
+
+	void Print(OutputBuffer* buffer) const;
 };
 
-static void Write(struct OutputBuffer* buffer, TokenKind kind);
-static void Write(struct OutputBuffer* buffer, Token* token);
-static void Write(struct OutputBuffer* buffer, Token token);
+static void Print(OutputBuffer* buffer, TokenKind kind);
 

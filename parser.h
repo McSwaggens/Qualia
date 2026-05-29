@@ -64,8 +64,3 @@ struct Parser {
 	Ast::Function ParseFunction(u32 indent);
 	Ast::Import ParseImport(u32 indent);
 };
-
-static void GenericWrite(OutputBuffer* buffer, Ast::Expression* expression);
-static void GenericWrite(OutputBuffer* buffer, Ast::Type* type);
-static void GenericWrite(OutputBuffer* buffer, Ast::Type type);
-static void GenericWrite(OutputBuffer* buffer, TypeID type);

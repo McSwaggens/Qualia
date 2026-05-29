@@ -6,50 +6,58 @@
 #include "list.h"
 #include "ascii.h"
 
-struct IntFormat {
-	Base base;
+struct Hex {
 	u64 value;
+	constexpr Hex(u64 value) : value(value) { }
+	void Print(OutputBuffer* buffer) const;
 };
 
-static inline IntFormat Hex(u64 n) { return (IntFormat){ .base = BASE_HEX,    .value = n }; }
-static inline IntFormat Bin(u64 n) { return (IntFormat){ .base = BASE_BINARY, .value = n }; }
+struct Bin {
+	u64 value;
+	constexpr Bin(u64 value) : value(value) { }
+	void Print(OutputBuffer* buffer) const;
+};
 
-static void Write(OutputBuffer* buffer, IntFormat format);
+static void Print(OutputBuffer* buffer, char c);
+static void Print(OutputBuffer* buffer, u8  n);
+static void Print(OutputBuffer* buffer, u16 n);
+static void Print(OutputBuffer* buffer, u32 n);
+static void Print(OutputBuffer* buffer, u64 n);
 
-static void Write(OutputBuffer* buffer, char   c);
-static void Write(OutputBuffer* buffer, u8  n);
-static void Write(OutputBuffer* buffer, u16 n);
-static void Write(OutputBuffer* buffer, u32 n);
-static void Write(OutputBuffer* buffer, u64 n);
+static void Print(OutputBuffer* buffer, s8  n);
+static void Print(OutputBuffer* buffer, s16 n);
+static void Print(OutputBuffer* buffer, s32 n);
+static void Print(OutputBuffer* buffer, s64 n);
 
-static void Write(OutputBuffer* buffer, s8  n);
-static void Write(OutputBuffer* buffer, s16 n);
-static void Write(OutputBuffer* buffer, s32 n);
-static void Write(OutputBuffer* buffer, s64 n);
+static void Print(OutputBuffer* buffer, float32 n);
+static void Print(OutputBuffer* buffer, float64 n);
 
-static void Write(OutputBuffer* buffer, float32 n);
-static void Write(OutputBuffer* buffer, float64 n);
+static void Print(OutputBuffer* buffer, unsigned long int n); // Need this, otherwise sizeof won't work...
+static void Print(OutputBuffer* buffer, void* p);
+static void Print(OutputBuffer* buffer, bool b);
 
-static void Write(OutputBuffer* buffer, unsigned long int n); // Need this, otherwise sizeof won't work...
-static void Write(OutputBuffer* buffer, void* p);
+// String is the format type, so it gets a dedicated non-template overload.
+// A non-template beats both the variadic format function and the member
+// fallback below on a tie, so a lone String is never ambiguous.
+static void Print(OutputBuffer* buffer, String str);
 
-static void Write(OutputBuffer* buffer, String str);
-
+// Fallback: any type with a member T::Print(OutputBuffer*).
 template<typename T>
-static void Write(OutputBuffer* buffer, Array<T> array) {
-	buffer->Write("{ ");
-
-	for (u64 i = 0; i < array.length; i++) {
-		if (i != 0) buffer->Write(", ");
-		Write(buffer, array[i]);
-	}
-
-	buffer->Write(" }");
+requires requires (T& value, OutputBuffer* buffer) { value.Print(buffer); }
+static void Print(OutputBuffer* buffer, T&& value) {
+	value.Print(buffer);
 }
 
+// Fallback: any pointer whose pointee has T::Print(OutputBuffer*).
 template<typename T>
-static void Write(OutputBuffer* buffer, List<T> list) {
-	Write(buffer, list.ToArray());
+requires requires (T* ptr, OutputBuffer* buffer) { ptr->Print(buffer); }
+static void Print(OutputBuffer* buffer, T* ptr) {
+	if (!ptr) {
+		buffer->Write("null");
+		return;
+	}
+
+	ptr->Print(buffer);
 }
 
 template<typename... Args>
@@ -67,7 +75,7 @@ static void Print(OutputBuffer* buffer, String format, Args&&... args) {
 			buffer->Write(start, p-start);
 
 		if (p < end) {
-			Write(buffer, t);
+			Print(buffer, t);
 			p++;
 		}
 	};
@@ -87,9 +95,3 @@ template<typename... Args>
 static void Print(String format, Args&&... args) {
 	Print(&output_buffer, format, args...);
 }
-
-static void Write(OutputBuffer* buffer, bool b) {
-	if (b) buffer->Write("true");
-	else   buffer->Write("false");
-}
-

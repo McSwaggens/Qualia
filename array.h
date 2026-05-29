@@ -6,6 +6,8 @@
 #include "assert.h"
 #include "initlist.h"
 
+struct OutputBuffer;
+
 template<typename T>
 struct Array {
 	T*  data   = null;
@@ -48,6 +50,7 @@ struct Array {
 
 	constexpr bool operator !=(Array<T> o) { return !(*this == o); }
 
+	void Print(OutputBuffer* buffer) const;
 };
 
 template<typename U, typename V>

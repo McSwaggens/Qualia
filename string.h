@@ -4,6 +4,8 @@
 #include "array.h"
 #include "assert.h"
 
+struct OutputBuffer;
+
 struct String {
 	// @todo Short String Optimization!
 	u32 length = 0;
@@ -116,6 +118,8 @@ struct String {
 	constexpr Array<byte> ToArray() const {
 		return Array<byte>((byte*)data, length);
 	}
+
+	void Print(OutputBuffer* buffer) const;
 
 	String Copy() {
 		String copy = String(Alloc<char>(length), length, capacity);

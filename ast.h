@@ -6,6 +6,8 @@
 #include "type_system.h"
 #include "ir.h"
 
+struct OutputBuffer;
+
 // Forward declarations - these are defined in parser.h
 struct Line;
 enum IntrinsicID : u32;
@@ -69,6 +71,8 @@ struct BaseType {
 struct Type {
 	Array<Specifier> specifiers = { };
 	BaseType basetype;
+
+	void Print(OutputBuffer* buffer) const;
 };
 
 struct Expression {
@@ -131,6 +135,8 @@ struct Expression {
 
 	Expression(Kind kind, IR::Value value, TypeID type, Token* begin, Token* end) :
 		kind(kind), value(value), type(type), begin(begin), end(end) { }
+
+	void Print(OutputBuffer* buffer) const;
 };
 
 struct Expression_Implicit_Cast : Expression {

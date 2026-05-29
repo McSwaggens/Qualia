@@ -38,7 +38,7 @@ static const LiteralQualifier QUALIFIER_U = (1llu<<8);
 static const LiteralQualifier QUALIFIER_S = (1llu<<9);
 static const LiteralQualifier QUALIFIER_SIGN_MASK = QUALIFIER_U | QUALIFIER_S;
 
-static const LiteralQualifier QUALIFIER_CERTAIN_MASK = QUALIFIER_H | QUALIFIER_U | QUALIFIER_S | QUALIFIER_K | QUALIFIER_M | QUALIFIER_G | QUALIFIER_T | QUALIFIER_P;
+static const LiteralQualifier QUALIFIER_CERTAIN_MASK = QUALIFIER_H | QUALIFIER_U | QUALIFIER_S | QUALIFIER_K | QUALIFIER_M | QUALIFIER_G | QUALIFIER_T | QUALIFIER_P | QUALIFIER_E;
 static const LiteralQualifier QUALIFIER_INTEGER_MASK = QUALIFIER_SIGN_MASK | QUALIFIER_SCALER_MASK;
 
 static inline Base GetBaseFromQualifier(LiteralQualifier qualifier) {

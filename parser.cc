@@ -331,7 +331,7 @@ Ast::Struct Parser::ParseStruct(u32 indent) {
 	CheckScope(token, indent, module);
 	token += 1;
 
-	ArrayBuffer<Ast::Struct_Member> members = CreateArrayBuffer<Ast::Struct_Member>();
+	ArrayBuffer<Ast::Struct_Member> members;
 
  	while (IsCorrectScope(token, indent+1)) {
 		if (*token == TOKEN_IDENTIFIER_CASUAL) {
@@ -395,7 +395,7 @@ Ast::Enum Parser::ParseEnum(u32 indent) {
 	CheckScope(token, indent, module);
 	token += 1;
 
-	ArrayBuffer<Ast::Enum_Member> members = CreateArrayBuffer<Ast::Enum_Member>();
+	ArrayBuffer<Ast::Enum_Member> members;
 
 	while (IsCorrectScope(token, indent+1)) {
 		if (*token == TOKEN_IDENTIFIER_FORMAL) {
@@ -569,7 +569,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 
 		token += 1;
 
-		ArrayBuffer<Ast::Expression*> elements = CreateArrayBuffer<Ast::Expression*>();
+		ArrayBuffer<Ast::Expression*> elements;
 
 		if (closure[-1] == TOKEN_COMMA)
 			Error("Expected expression after ','\n");
@@ -595,7 +595,7 @@ Ast::Expression* Parser::ParseExpression(u32 indent, bool assignment_break, s32 
 		Ast::Expression_Fixed_Array* fixed_array = stack.New<Ast::Expression_Fixed_Array>();
 
 		Token* closure = token->closure;
-		ArrayBuffer<Ast::Expression*> elements = CreateArrayBuffer<Ast::Expression*>();
+		ArrayBuffer<Ast::Expression*> elements;
 
 		CheckScope(closure, indent, module);
 
@@ -766,7 +766,7 @@ static Token* GetEndOfTypeIfValid(Token* token) {
 Ast::Type Parser::ParseType(u32 indent) {
 	Ast::Type type = { };
 
-	ArrayBuffer<Ast::Specifier> specifiers = CreateArrayBuffer<Ast::Specifier>();
+	ArrayBuffer<Ast::Specifier> specifiers;
 
 	while (IsSpecifier(token->kind)) {
 		Ast::Specifier specifier;
@@ -899,7 +899,7 @@ Ast::Type Parser::ParseType(u32 indent) {
 void Parser::ParseParameters(Ast::Function* function, Token* open_paren, u32 indent) {
 	Token* closure = open_paren->closure;
 	Token* cursor = open_paren+1;
-	ArrayBuffer<Ast::Variable> params = CreateArrayBuffer<Ast::Variable>(); // @Todo: Get lexer to count commas in parens?
+	ArrayBuffer<Ast::Variable> params;
 
 	CheckScope(open_paren, indent, module);
 	CheckScope(closure, indent, module);
@@ -951,7 +951,7 @@ void Parser::ParseParameters(Ast::Function* function, Token* open_paren, u32 ind
 
 Ast::BranchBlock Parser::ParseBranchBlock(u32 indent) {
 	Ast::BranchBlock branch_block = { };
-	ArrayBuffer<Ast::Branch> branches = CreateArrayBuffer<Ast::Branch>();
+	ArrayBuffer<Ast::Branch> branches;
 
 	Token* branch_block_begin_token = token;
 
@@ -1269,10 +1269,10 @@ static bool IsScopeTerminator(TokenKind kind) {
 Ast::Code Parser::ParseCode(u32 indent) {
 	Ast::Code code = { };
 
-	ArrayBuffer<Ast::Statement> statements = CreateArrayBuffer<Ast::Statement>();
-	ArrayBuffer<Ast::Struct>    structs    = CreateArrayBuffer<Ast::Struct>();
-	ArrayBuffer<Ast::Enum>      enums      = CreateArrayBuffer<Ast::Enum>();
-	ArrayBuffer<Ast::Function>  functions  = CreateArrayBuffer<Ast::Function>();
+	ArrayBuffer<Ast::Statement> statements;
+	ArrayBuffer<Ast::Struct>    structs;
+	ArrayBuffer<Ast::Enum>      enums;
+	ArrayBuffer<Ast::Function>  functions;
 
 	while (IsCorrectScope(token, indent) && !IsScopeTerminator(token->kind)) {
 		if (*token == TOKEN_STRUCT) {
@@ -1374,10 +1374,10 @@ Ast::Import Parser::ParseImport(u32 indent) {
 }
 
 void Parser::ParseGlobalScope() {
-	ArrayBuffer<Ast::Import>   imports    = CreateArrayBuffer<Ast::Import>();
-	ArrayBuffer<Ast::Struct>   structs    = CreateArrayBuffer<Ast::Struct>();
-	ArrayBuffer<Ast::Enum>     enums      = CreateArrayBuffer<Ast::Enum>();
-	ArrayBuffer<Ast::Function> functions  = CreateArrayBuffer<Ast::Function>();
+	ArrayBuffer<Ast::Import>   imports;
+	ArrayBuffer<Ast::Struct>   structs;
+	ArrayBuffer<Ast::Enum>     enums;
+	ArrayBuffer<Ast::Function> functions;
 
 	while (*token != TOKEN_EOF) {
 		if (*token == TOKEN_IMPORT) {

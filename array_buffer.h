@@ -55,13 +55,3 @@ struct ArrayBuffer {
 	}
 };
 
-template<typename T>
-static ArrayBuffer<T> CreateArrayBuffer() {
-	ArrayBuffer<T> result;
-	result.data = null;
-	result.count = 0;
-	result.capacity = 0;
-	result.size = 0;
-	return result;
-}
-

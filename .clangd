@@ -1,15 +1,31 @@
+# clangd config for Qualia — mirrors the flags in `makefile`.
+# Unity build: qualia.cc #includes every other .cc directly, so the individual
+# .cc files are not standalone translation units. clangd indexes each file on
+# its own, so cross-file "undeclared identifier" noise is expected when viewing
+# an included .cc alone — feed it the same flags the real build uses.
+
 CompileFlags:
   Add:
     - -std=c++23
     - -nostdinc++
     - -fno-rtti
     - -fno-exceptions
+    - -DDEBUG
+    # Match the build's warning suppressions so clangd doesn't flag intentional usage.
+    - -Wno-vla-cxx-extension
+    - -Wno-c99-designator
+    - -Wno-reorder-init-list
+    - -Wshift-op-parentheses
   Remove:
-    - -std=c++*
+    - -std=c++*                    # Drop any conflicting std from a compile_commands.json
+    # Linux/release-only flags that clangd can't or shouldn't apply (esp. on macOS).
+    - -mcmodel=*
+    - -march=*
+    - -no-pie
 
 # Suppress unhelpful diagnostics
 Diagnostics:
-  UnusedIncludes: None          # Don't warn about unused includes
+  UnusedIncludes: None          # Don't warn about unused includes (unity build)
   MissingIncludes: None         # Don't warn about missing std library headers
   ClangTidy:
     Remove:
